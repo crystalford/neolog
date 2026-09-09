@@ -100,6 +100,11 @@ export default function EntryPage({ params }: { params: { id: string } }) {
   const [newPrecision, setNewPrecision] = useState<DatePrecision>('exact')
   const [newYear, setNewYear] = useState('')
   const [sheet, setSheet] = useState(false)
+  // Pointing at the word the second thought starts on. The read path's one
+  // honest limitation is a MISSED seam — two thoughts in one entry — and
+  // this is where he says so.
+  const [splitting, setSplitting] = useState(false)
+  const [splitSaid, setSplitSaid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -118,6 +123,26 @@ export default function EntryPage({ params }: { params: { id: string } }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    await load()
+  }, [params.id, load])
+
+  // The cut is made by the server, which knows whether the entry is still
+  // exactly what the recording says. The line below says which check ran,
+  // the same way /clear names the one it used.
+  const splitAt = useCallback(async (atWord: number) => {
+    const res = await fetch(`/api/v2/log/${params.id}/split`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ at_word: atWord }),
+    })
+    const j = await res.json().catch(() => ({})) as { cut_by?: string; error?: string }
+    setSplitting(false)
+    setSplitSaid(
+      j.error ? j.error
+        : j.cut_by === 'timings'
+          ? 'Two entries. The second is dated to the second you said it.'
+          : 'Two entries, both dated as this one was — the log has no second for the new one.',
+    )
     await load()
   }, [params.id, load])
 
@@ -194,8 +219,34 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                     <button onClick={() => setEditing(false)}>Cancel</button>
                   </div>
                 </>
+              ) : splitting ? (
+                /* fix.html's gesture, on the line instead of the transcript:
+                   point at a word, and the entry becomes two. Every word is
+                   a target except the first — a cut before the first word
+                   is not a cut. */
+                <h1 className="cutting">
+                  {e.text.trim().split(/\s+/).filter(Boolean).map((w, i) => (
+                    i === 0
+                      ? <span key={i}>{w}</span>
+                      : <button key={i} className="cut" onClick={() => void splitAt(i)}>{' '}{w}</button>
+                  ))}
+                </h1>
               ) : (
                 <h1>{e.text}</h1>
+              )}
+              {splitting && (
+                <div className="fixrow" style={{ marginTop: 10 }}>
+                  <span className="say">
+                    Click the word the second thought starts on. Nothing is
+                    rewritten — the words are the ones already there.
+                  </span>
+                  <button onClick={() => setSplitting(false)}>Never mind</button>
+                </div>
+              )}
+              {splitSaid && !splitting && (
+                <div className="fixrow" style={{ marginTop: 10 }}>
+                  <span className="say">{splitSaid}</span>
+                </div>
               )}
 
               {/* Two dates, always. The distance between them is the signal. */}
@@ -632,6 +683,30 @@ export default function EntryPage({ params }: { params: { id: string } }) {
                         router.push(`/entry/${e.came_from!.id}`)
                       }}
                     >Join it to that one</button>
+                  </div>
+                </div>
+              )}
+
+              {/* The other direction, and the one the read path actually
+                  fails at. A missed seam leaves two thoughts in one entry:
+                  the splitter can pass over a subject change, and the pause
+                  fallback is coarser still, because he changes subject
+                  without breathing. Nothing is rewritten — the cut is made
+                  in his own words, and in the recording's own timings when
+                  the entry is still exactly what they say. */}
+              {e.text.trim().split(/\s+/).filter(Boolean).length > 1 && !editing && (
+                <div className="i">
+                  <b>Two things, not one?</b>
+                  <em>
+                    If the log ran two thoughts together, point at the word
+                    the second one starts on. Both halves keep your words and
+                    the old wording is kept, dated.
+                  </em>
+                  <div className="fixrow">
+                    <button
+                      className={splitting ? 'p' : undefined}
+                      onClick={() => { setSplitSaid(null); setSplitting(v => !v) }}
+                    >{splitting ? 'Pick the word above' : 'Cut it in two'}</button>
                   </div>
                 </div>
               )}

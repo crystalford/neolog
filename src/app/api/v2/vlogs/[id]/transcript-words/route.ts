@@ -193,6 +193,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // contains the second that word was said — found by the timings, not by
   // searching the text for the old spelling, which would also hit an
   // identical word the correction was not about.
+  //
+  // ⚠️ `grounded = 1` is part of the search, not a detail of it. That column
+  // means "this text IS the transcript's words for this span", which is true
+  // of an entry the log read and false the moment he rewrites the line or
+  // cuts it in two. Rebuilding one of those would replace HIS wording with
+  // the machine's — the exact direction this product does not go — and it
+  // would silently undo a split by putting both halves back.
   const at = await findOne<{ start_time: number }>(
     db,
     `SELECT start_time FROM transcript_words
@@ -206,6 +213,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       db,
       `SELECT id, text, span_start, span_end FROM log_entries
         WHERE operator_id = ? AND vlog_id = ? AND deleted_at IS NULL
+          AND grounded = 1
           AND span_start IS NOT NULL AND span_end IS NOT NULL
           AND span_start <= ? AND span_end >= ?`,
       operator.id, params.id, at.start_time, at.start_time,

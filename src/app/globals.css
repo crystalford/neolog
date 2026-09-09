@@ -2146,6 +2146,24 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   font: inherit; font-size: 14.5px;
 }
 
+/* Cutting one entry in two. The same gesture as fixing a misheard word —
+   point at a word — but the opposite affordance: this is a mode he entered
+   on purpose and left again, so every target is visible while it lasts
+   rather than appearing under the cursor. The mark sits BEFORE the word,
+   because the word he points at is where the second entry starts. */
+.logpage h1.cutting { cursor: default; }
+.logpage h1.cutting .cut {
+  font: inherit; color: var(--fg-3); background: none; border: 0;
+  padding: 0; cursor: pointer; border-radius: 3px;
+}
+.logpage h1.cutting .cut::before {
+  content: ''; display: inline-block; width: 1px; height: 0.82em;
+  margin-right: 3px; vertical-align: -0.08em; background: var(--line-2);
+}
+.logpage h1.cutting .cut:hover { color: var(--fg); }
+.logpage h1.cutting .cut:hover::before { background: var(--t-steel); width: 2px; }
+.logpage h1.cutting .cut:focus-visible { outline: 1px solid var(--t-steel); outline-offset: 2px; }
+
 /* A button outside the log's own panels — the four places that are not a
    surface of the log (the error page, not-found, sign-in, the uploader).
    Same treatment the design gives a button everywhere it has one: bone on

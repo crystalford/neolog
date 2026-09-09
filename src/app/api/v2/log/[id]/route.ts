@@ -267,7 +267,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Both wordings kept. The previous one goes into the revision record
     // before the column is touched.
     note('text', existing.text, t)
-    sets.push('text = ?', "author = 'operator'")
+    // `grounded` means "this text IS the transcript's words for this span".
+    // Once he has rewritten the line it is not, and a later fix to a misheard
+    // word in the same span would otherwise rebuild the entry from the
+    // transcript and put the machine's wording back over his.
+    sets.push('text = ?', "author = 'operator'", 'grounded = 0')
     binds.push(t)
     // A voice entry's text IS its transcript — Whisper wrote both. Fixing a
     // misheard word in one and leaving the other is how the entry ends up
@@ -346,7 +350,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const joined = `${target.text.trim()} ${existing.text.trim()}`.replace(/\s+/g, ' ').trim()
     await run(
       db,
-      `UPDATE log_entries SET text = ?, updated_at = CURRENT_TIMESTAMP
+      // Same reason as a rewritten line: the target's text is now two
+      // passages joined, so it is no longer what the transcript says for its
+      // span, and a later word fix must not rebuild it back apart.
+      `UPDATE log_entries SET text = ?, grounded = 0, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND operator_id = ?`,
       joined, target.id, operator.id,
     )

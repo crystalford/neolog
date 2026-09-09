@@ -121,6 +121,16 @@ jobs:
       - name: Every day in exactly one week
         run: node scripts/test/month.mjs
 
+      # Splitting an entry is the only place a NEW entry's text comes out of
+      # an existing entry's, so it is the easiest place to lose a word at the
+      # seam — and losing one is invisible: two entries appear, both read
+      # plausibly, and nothing else objects. It also guards the other end:
+      # a transcript fix rebuilds only `grounded = 1` entries, without which
+      # fixing a misheard word anywhere in the original span rewrites both
+      # halves from the transcript and the split quietly comes undone.
+      - name: A cut loses no words, and nothing rebuilds over one
+        run: node scripts/test/split-entry.mjs
+
       # The same shape as check-unreached-routes.mjs, one level down.
       # src/lib/vision.ts had NO importer: both functions written, tested
       # against the schema, reached by nothing — so vision_status stayed
