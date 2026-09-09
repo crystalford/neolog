@@ -727,6 +727,77 @@ product's:
   header still described removing R2 objects, which it had already stopped
   doing.
 
+### ⚠️ The 9 Sep pass — what the deletion left RUNNING
+
+The 8 Sep pass removed four things nothing imported. This one removed
+thirteen things that were **live**, and every one of them was invisible to
+every check the repo had.
+
+**Nine queries against tables dropped on 8 Sep.** `MIGRATIONS` is append-only,
+so the statements that BUILT the extraction engine's tables are still in the
+array and their columns are still *known* to `check-sql-columns.mjs` — a
+query against `extraction_runs.total_items` passes the column checker and
+throws `no such table` on every request.
+
+⚠️ **One of them was `POST /api/v2/admin/reprocess-vlogs`** — the endpoint
+behind *transcribe the untranscribed*, the button he presses to put four
+hundred recordings through Whisper. Its `incomplete` scope resolved the list
+by LEFT JOINing `extraction_runs`, so the dry run threw and the panel could
+not answer what needed doing.
+
+**What "incomplete" means now is one thing: no word timings.** A recording
+with none writes nothing at all rather than dating its passages by guess, so
+that is exactly the set that has to go back through Whisper. `transcript_text`
+is not the test — an older run can leave prose with no timings, and that
+recording can never be read. `/api/v2/admin/pipeline-state` counts
+`words_missing` as its own bucket for the same reason: it is how four hundred
+recordings sit at "transcribed" and produce no entries, with nothing on any
+screen saying why. Its dollar estimate went too — priced off the cost table
+in `llm.ts`, and both the table and the passes it priced are gone.
+
+⚠️ **`db/seed.sql` was still applied on every deploy** — 176 lines seeding
+four rows into `prompts`: the analytical pass, the clip pass, the creative
+pass, the entity pass. The generator's prompt library, re-applied months
+after the engine was deleted. And **`db/migrations.sql` was re-creating
+`chat_threads`, `chat_messages` and `chat_attachments`** on every push, so
+the reset route dropped them and the next deploy made them again, empty.
+CLAUDE.md had recorded that reasoning for `db/schema.sql` and this file was
+missed.
+
+⚠️ **`vlogs.title` and `vlogs.summary` were the biggest text on the page.**
+The engine's last pass wrote "an AI-written title and summary back onto the
+recording". The pass went; the columns did not, nothing has written either
+since, and everything was still reading them — `v.title` was the H1 on
+`/vlog/[id]`, `title || summary` was the line under every recording on the
+feed and on a page, and both `/vlogs` and `/footage` searched them, so a
+recording could surface because a model's summary matched a word he never
+said. **The marking rule was satisfied throughout** (`author: 'log'`), and
+that is not the point: the engine went because he did not trust what it
+wrote, and a sentence it wrote is still a sentence it wrote. The frame
+description stays — that pass is live and describes what is visibly there.
+
+`scripts/check-dropped-tables.mjs` holds all of it, in CI. It reads
+`DROPPED_TABLES` and `MODEL_WRITTEN_COLUMNS` from `src/lib/dropped-tables.ts`
+and scans `src/`, `workers/` **and `db/`** — the last because a CREATE there
+does not throw, it brings the table back. Three files are exempt and must
+stay so: the migration runner, the list itself, and the reset route.
+
+⚠️ **It resolves a query's alias rather than assuming one**, and it has to:
+`p.summary` is a page's paragraph, `d.title` a document's, `v.summary` on
+`month_summaries` the month's citation-checked one. A version that flagged
+those reported sixteen files with thirteen wrong — the kind of check that
+teaches the next reader to skim the output. ⚠️ And it silently passed at
+first: `bare` was a negative lookahead for a following lowercase letter, and
+the `i` flag made `[a-z]` match the `WHERE` after `FROM vlogs`, so every
+un-aliased query read as aliased. Both forms are proved by injecting a read
+and watching it fail.
+
+The columns are not dropped — an ALTER cannot be undone, and emptying them is
+his act, so `title` and `summary` are in `VLOG_DERIVED` under **Start
+again**. `operator.profile_digest` and `operator.spark_seeds_json` are on the
+list too: a model's description of HIM, read by nothing, which is the state
+to keep.
+
 ### The backend pass — what the old engine left behind
 
 Four things survived the 8 Sep deletion because nothing imported them from a
@@ -823,6 +894,16 @@ migration, and the Pages bindings are set by REST in the bootstrap workflow
 rather than read from `wrangler.toml` (see the lock above), so the binding
 wiring has to be re-proved on the far side. **Do it as its own pass with CI
 green at each step.** Do not bolt it onto unrelated work.
+
+⚠️ **Local preview does not work on the pinned toolchain, and finding that
+out costs an hour.** `wrangler@3.114` ships workerd `2025-07-18` against a
+`compatibility_date` of `2026-05-01`; `pages dev` starts, serves `/` and
+`/api/debug/whoami`, and then the runtime dies on the first request that
+touches D1 — *"The Workers runtime failed to start"*, with the request never
+reaching a log line. `--d1 DB` also creates a different local database from
+the one `wrangler d1 execute DB --local` seeds, so the first symptom is
+`no such table: operator` and the second is a hang. Verify against CI and the
+deployed site instead, until the adapter pass above lands.
 
 ### ⚠️ `scripts/check-sql-columns.mjs` and `check-routes.mjs` — keep both green
 

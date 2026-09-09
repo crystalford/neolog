@@ -72,6 +72,11 @@ export const DROPPED_TABLES = [
 export const MODEL_WRITTEN_COLUMNS = [
   'vlogs.title',
   'vlogs.summary',
+  // A model's description of HIM, refreshed on a schedule — "exactly the
+  // output he did not trust". Nothing reads these today, which is the state
+  // to keep: `/facts` shows his one sentence or none, and will not draft one.
+  'operator.profile_digest',
+  'operator.spark_seeds_json',
 ] as const
 
 const DROPPED = new Set<string>(DROPPED_TABLES)
