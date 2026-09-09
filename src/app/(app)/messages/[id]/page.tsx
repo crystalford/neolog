@@ -108,15 +108,21 @@ export default function Thread() {
                 attached to them, and never crosses to public on your say-so
                 alone." The page says which is which before it shows either. */}
             <div className="sides">
-              <div>
-                <b>Your side — yours.</b> Each of your messages is an entry
-                you said, dated to the minute, the same as anything you type
-                into the log. Normal rules.
+              <div className="a">
+                <h4>Your side — yours</h4>
+                <p>
+                  <b>Each of your messages is an entry you said</b>, dated to
+                  the minute, the same as anything you type into the log.
+                  Normal rules.
+                </p>
               </div>
-              <div>
-                <b>Their side — theirs.</b> Kept in full, attached to them,
-                and never public without their yes. A fact they state is
-                filed as <i>they said</i>, not as fact.
+              <div className="b">
+                <h4>Their side — theirs</h4>
+                <p>
+                  <b>Kept in full, attached to them.</b> Never public without
+                  their yes. A fact they state is filed as <em>they said</em>,
+                  not as fact.
+                </p>
               </div>
             </div>
 
@@ -154,13 +160,19 @@ export default function Thread() {
                       </time>
                     )}
                   </div>
-                  <div className="body">{m.text}</div>
-                  {m.entry_id && (
-                    <div className="note"><Link href={`/entry/${m.entry_id}`}>on the log</Link></div>
-                  )}
-                  {m.side === 'other' && (
-                    <div className="note">theirs — filed as {t.person_name} says, not as fact</div>
-                  )}
+                  {/* ⚠️ `.x`, not `.body`. `.body` is the design's SECTION
+                      wrapper on this page and was nested inside itself here,
+                      so a message took a container's styling. `.msg .x` is
+                      the text, and its `<i>` is the note under it. */}
+                  <div className="x">
+                    {m.text}
+                    {m.entry_id && (
+                      <i><Link href={`/entry/${m.entry_id}`}>on the log</Link></i>
+                    )}
+                    {m.side === 'other' && (
+                      <i>theirs — filed as {t.person_name} says, not as fact</i>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -179,9 +191,19 @@ export default function Thread() {
                   className={`cs${consent === s ? ' on' : ''}`}
                   onClick={() => void setConsent(s)}
                 >
-                  <b>{CONSENT_WORDS[s].name}</b>
-                  <span>{CONSENT_WORDS[s].what}</span>
-                  {s === 'kept_private' && <em>the default — everyone starts here</em>}
+                  <span className="k">
+                    {CONSENT_WORDS[s].name}
+                    {s === 'kept_private' && <i>the default · everyone starts here</i>}
+                  </span>
+                  <span className="x">{CONSENT_WORDS[s].what}</span>
+                  {/* The state they are actually at, marked. `.no` is a dash
+                      rather than a blank: a state nobody is at is a fact
+                      about the row, and an empty cell reads as unrendered. */}
+                  <span className={`s ${consent === s ? 'on' : 'no'}`}>
+                    {consent === s
+                      ? `${t.person_name || 'them'} · ${r.consent_at ? clock(r.consent_at) : 'now'}`
+                      : '—'}
+                  </span>
                 </button>
               ))}
               <div className="how">
@@ -218,18 +240,21 @@ export default function Thread() {
                   What a stranger sees if you publish this thread today, with{' '}
                   {t.person_name || 'them'} at <b>{CONSENT_WORDS[consent].name}</b>.
                 </div>
-                {r.public_view.map(m => (
-                  <div className={`msg ${m.side === 'operator' ? 'you' : 'them'}${m.text === null ? ' veil' : ''}`} key={m.id}>
-                    {m.text === null ? (
-                      <div className="body">{m.withheld}</div>
-                    ) : (
-                      <>
-                        <div className="w">{m.speaker || 'you'}</div>
-                        <div className="body">{m.text}</div>
-                      </>
-                    )}
-                  </div>
-                ))}
+                {/* ⚠️ One LINE, not a second copy of the thread. This
+                    block answers "what would publishing do to them", and
+                    the answer is a shape: his sentences running on, with
+                    their turns as bracketed absences. Rendered as rows it
+                    read as the thread again with some of it missing, which
+                    is the same information laid out to look like a bug.
+                    `.pubv .l s` puts the brackets on. */}
+                <div className="l">
+                  {r.public_view[0]?.sent_at && <>{clock(r.public_view[0].sent_at)} — </>}
+                  {r.public_view.map(m => (
+                    m.text === null
+                      ? <s key={m.id}>{m.withheld}</s>
+                      : <span key={m.id}>&ldquo;{m.text}&rdquo; </span>
+                  ))}
+                </div>
                 {/* `.f` — inside the preview, not after it. The line is
                     about what is in the box above; as a `.none` paragraph
                     outside it, it read as a note about the page. */}

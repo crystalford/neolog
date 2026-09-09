@@ -142,7 +142,7 @@ const PAGES = [
   // PACKAGE_FURNITURE because rendering it would be the log explaining itself
   // under the feature. The badge without the step is nothing.
   ['screenshots','src/app/(app)/screenshots/page.tsx',  1],
-  ['messages',   'src/app/(app)/messages/page.tsx',     7],
+  ['messages',   'src/app/(app)/messages/page.tsx',     2],
   // messages.html covers the whole mechanic — the list AND one thread — so
   // the thread page is measured against it too; most of its classes live
   // there.
@@ -150,8 +150,39 @@ const PAGES = [
   // being previewed, and what it is) and `.f` (why it reads strangely). The
   // preview was a second copy of the thread with lines missing and nothing
   // on screen saying why — on the one surface that is half somebody else's.
-  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 7],
-  ['walk',       'src/app/(app)/walk/[id]/page.tsx',    10],
+  // 7 → 2 on 9 Sep. The list page opens on `messages.html`'s own `.top`,
+  // which says why this kind works differently before it shows a thread. The
+  // sides pair took `.a`/`.b` — steel for his half, ochre for theirs, which
+  // is the page's whole argument in two colours. The consent rows took the
+  // design's `.k`/`.x`/`.s` shape, with `.no` as a dash on every state
+  // nobody is at: an empty cell reads as unrendered, a dash is a fact.
+  // ⚠️ And the publish preview is now ONE LINE (`.l`), not a second copy of
+  // the thread with rows missing. It answers "what would publishing do to
+  // them", and the answer is a shape — his sentences running on, their turns
+  // as bracketed absences.
+  // ⚠️ `.veil` is refused. In the design it collapses a run of their
+  // messages as "3 messages about Leif's own situation — kept, not shown",
+  // which requires the log to read another person's words and decide what
+  // they are ABOUT. That is §0 rule 3 with a real person on the other end of
+  // it. Their words are kept whole here and marked as theirs.
+  // `.n` is the `.st` badge, as on screenshots.
+  ['messages',   'src/app/(app)/messages/[id]/page.tsx', 2],
+  // 10 → 0 on 9 Sep, and two of them were class collisions of the kind this
+  // file's table already records.
+  // ⚠️ `.route` is the design's BOX — it wraps the header and every step and
+  // draws the border round the whole walk. It was on the little label line
+  // inside `.hd`, so the route had no frame and a caption had one; the label
+  // is `.k` now. ⚠️ `.own` is a steel-bordered SECTION, and it was on the
+  // right-hand column of the `.prov` comparison, so one column rendered
+  // inside a gradient box. It is the section the design puts it in: what
+  // this route made, one row per page a turn named, carrying the turn it
+  // came out of — real rows, off the walk already loaded.
+  // ⚠️ `.turn` was BUILT and unreadable. The step's className was three
+  // template literals joined with `+`, and the checker's regex wants the
+  // backtick right after `className={` — so the one class this file has
+  // warned about since 8 Sep reported as unbuilt while rendering correctly.
+  // One literal now: the same string, formatted so the check can read it.
+  ['walk',       'src/app/(app)/walk/[id]/page.tsx',     0],
   ['now',        'src/app/(app)/now/page.tsx',           1],
   ['connections','src/app/(app)/ways-in/page.tsx',      10],
   // wrong.html is three sections and only the middle one is product. §1's

@@ -97,17 +97,25 @@ export default function Messages() {
         <div className="grid">
           <main>
 
-        <div className="pghead"><h1>Messages</h1></div>
-        <div className="stamp">
-          <span>the one kind with someone else in it</span>
-          <span>forwarded by you, never pulled from an inbox</span>
-        </div>
-
-        <p className="none" style={{ paddingBottom: 12 }}>
-          Paste a thread. Your side goes on the log as entries, the way
-          anything you write does. Their side is kept, attached to them, and
-          does not become public on your word alone.
-        </p>
+        {/* `messages.html`'s own opener. It says why this kind works
+            differently before it shows a single thread — half the words
+            belong to someone who is not here. */}
+        <section className="top">
+          <h1>
+            Texts, emails, messages.{' '}
+            <b>The only thing on your log that&rsquo;s half someone else&rsquo;s.</b>
+          </h1>
+          <p>
+            Everything else here is yours to keep and yours to publish. A
+            conversation isn&rsquo;t — half the words belong to the other
+            person. So this kind works differently from every other:{' '}
+            <b>
+              your side is yours; their side is kept, attached to them, and
+              never crosses to public on your say-so alone.
+            </b>{' '}
+            Forwarded by you, never pulled from an inbox.
+          </p>
+        </section>
 
         <div className="paste">
           <textarea

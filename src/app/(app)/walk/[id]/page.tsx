@@ -95,6 +95,14 @@ export default function WalkPage() {
   const turns = w?.turns ?? []
   // The turn a `led_from` points at, so a loop can say what it looped to.
   const byId = new Map(turns.map(t => [t.id, t]))
+  /**
+   * What this route made, in the order it made it: every page a turn on it
+   * named, carrying the turn it came out of. `walk.html`'s `.own` section is
+   * the same shape written about the log's own making — here it is written
+   * about this route, off the rows already loaded. Nothing is generated:
+   * a page is on this list because a turn named it.
+   */
+  const made = turns.flatMap(t => t.made.map(p => ({ ...p, turn: t })))
 
   return (
     <Shell>
@@ -127,26 +135,41 @@ export default function WalkPage() {
 
         {start && (
           <>
+            {/* ⚠️ `.route` is the design's BOX — it wraps the header and
+                every step, and it is what draws the border round the whole
+                walk. It was on the little label line inside `.hd` instead,
+                so the route had no frame and a caption had one. */}
+            <div className="route">
             <div className="hd">
-              <div className="route">a thread · started {day(start.happened_at)} · {clock(start.happened_at)}</div>
-              <h1>{start.text}</h1>
-            </div>
-            <div className="stamp">
-              <span>started</span>
-              <time dateTime={start.happened_at}>{day(start.happened_at)} · {clock(start.happened_at)}</time>
-              <span>{turns.length - 1} {turns.length - 1 === 1 ? 'turn' : 'turns'} since</span>
-              {turns.some(t => t.loop) && <span>{turns.filter(t => t.loop).length} loop back</span>}
+              <div>
+                <div className="k">
+                  a thread · started {day(start.happened_at)} · {clock(start.happened_at)}
+                </div>
+                <h2>{start.text}</h2>
+                <div className="m">
+                  <span>started with: {start.kind}</span>
+                  <span>
+                    a start + {turns.length - 1}{' '}
+                    {turns.length - 1 === 1 ? 'turn' : 'turns'}
+                  </span>
+                  {made.length > 0 && (
+                    <span>made: {made.length} {made.length === 1 ? 'page' : 'pages'}</span>
+                  )}
+                  {turns.some(t => t.loop) && (
+                    <span>{turns.filter(t => t.loop).length} loop back</span>
+                  )}
+                </div>
+              </div>
+              {/* The count, as a count. `walk.html` puts it in the corner
+                  and says when the last turn was — both facts off the rows
+                  already loaded. */}
+              <div className="cnt">
+                <b>{turns.length - 1}</b>
+                {turns.length - 1 === 1 ? 'turn so far' : 'turns so far'}<br />
+                {turns.length > 1 && <>last one {clock(turns[turns.length - 1].happened_at)}</>}
+              </div>
             </div>
 
-            {/* `walk.html`: "A thread keeps two things an entry can't — the
-                order things came in, and what each one led from." Said at
-                the top, because a list of turns looks like a list until you
-                know what the extra column is for. */}
-            <div className="two">
-              <b>A thread keeps two things an entry can&rsquo;t:</b> the order
-              things came in, and what each one led from. A page is a pile —
-              everything about one thing, newest first. A thread is a path.
-            </div>
 
             <div className="walk">
               {turns.map((t, i) => {
@@ -162,11 +185,13 @@ export default function WalkPage() {
                        source line is one the log wrote. It tints the step
                        and nothing else; it is not the entry page's card of
                        the same name (see globals.css). */
-                    className={
-                      `step${t.loop ? ' loop' : ''}`
-                      + `${t.relation === REFLECTS ? ' refl' : ''}`
-                      + `${from && from.author !== 'operator' ? ' turn' : ''}`
-                    }
+                    /* ⚠️ One template literal, on purpose. Built with `+`
+                       across three of them, `check-design.mjs` could not
+                       read any of it — its regex wants the backtick right
+                       after `className={` — so `.turn` reported as unbuilt
+                       while rendering correctly. Formatting, not
+                       contortion: the class string is the same. */
+                    className={`step${t.loop ? ' loop' : ''}${t.relation === REFLECTS ? ' refl' : ''}${from && from.author !== 'operator' ? ' turn' : ''}`}
                     key={t.id}
                     /* `walk.html` colours each step's dot through a custom
                        property on the row. Steel for a loop — the one turn
@@ -186,7 +211,7 @@ export default function WalkPage() {
                     {/* The gutter, and the dot on the line. A reflection is
                         hollow because it is not a new event (SPEC §1). */}
                     <div className="rail">
-                      <span className={t.relation === REFLECTS ? 'dot' : 'dot f'} />
+                      <span className={`dot${t.relation === REFLECTS ? '' : ' f'}`} />
                     </div>
                     <div className="c">
                       <div className="x"><Link href={t.href}>{t.text}</Link></div>
@@ -207,7 +232,12 @@ export default function WalkPage() {
                       {t.made.length > 0 && (
                         <div className="made">
                           {t.made.map(p => (
-                            <Link key={p.id} href={`/page/${p.id}`}>{p.kind} · {p.name}</Link>
+                            /* `.s` takes the step's own colour, so the
+                               thing a turn made reads as belonging to that
+                               turn rather than to the row. */
+                            <Link className="s" key={p.id} href={`/page/${p.id}`}>
+                              {p.kind} · {p.name}
+                            </Link>
                           ))}
                         </div>
                       )}
@@ -229,27 +259,142 @@ export default function WalkPage() {
                 </div>
               </div>
             </div>
+            </div>
           </>
         )}
+
+            {/* `walk.html`'s two columns. Said after the route rather than
+                before it, because the rows are the argument and this is what
+                they add up to. */}
+            <div className="two">
+              <div>
+                <div className="k">as a log</div>
+                <h3>
+                  A thread keeps two things an entry can&rsquo;t:{' '}
+                  <b>the order things came in, and what each one led from.</b>
+                </h3>
+                <p>
+                  A page is a pile — everything about one thing, newest
+                  first. A thread is a path: this led to that. The log
+                  already has the pieces; what it adds is the{' '}
+                  <b>led-from</b>, one link per step.
+                </p>
+                <ul>
+                  <li>
+                    <b>Loops are kept.</b> A turn whose led-from is not the
+                    turn before it in time is followed as a real edge, never
+                    inferred from the order.
+                  </li>
+                  <li>
+                    <b>Turns from outside the moment are kept.</b> A turn that
+                    came from reading the log hours later is still on the
+                    route. There is no session window.
+                  </li>
+                  <li>
+                    <b>Wrong turns are kept.</b> Nothing here is pruned.
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <div className="k">as making</div>
+                <h3>
+                  There is no separate creative process.{' '}
+                  <b>Making something is a thread you keep walking.</b>
+                </h3>
+                <p>
+                  Each return is a turn: a revision, a new example, a
+                  counter-case, a fork that becomes its own page. The log
+                  keeps the growth in order.
+                </p>
+                <ul>
+                  <li>
+                    <b>Nothing is drafted for you.</b> The thread is yours;
+                    the log keeps it in order and shows you the shape.
+                  </li>
+                  <li>
+                    <b>The reading of it is yours too.</b> This page shows
+                    the route and stops — which turn you have not taken is
+                    the log having an opinion about your work.
+                  </li>
+                </ul>
+              </div>
+            </div>
             {/* walk.html's closing comparison, and the reason the route is
                 worth keeping at all. */}
             <div className="prov">
-              <b>Where a finished piece came from isn&rsquo;t a list of
-              sources.</b> It&rsquo;s the whole route.
+              <div className="k">the trace, at its deepest</div>
+              <h3>
+                Where a finished piece came from isn&rsquo;t a list of
+                sources. <b>It&rsquo;s the whole route.</b>
+              </h3>
+              {/* ⚠️ The right-hand column was `.own`, which on this page is
+                  a whole steel-bordered SECTION — so one comparison column
+                  rendered inside a gradient box. It is a plain column, and
+                  `.own` is the section below, where the design puts it. */}
               <div className="cmp">
                 <div className="old">
-                  <b>What every other publication offers</b>
-                  <span>Source · Source · Source · Source</span>
+                  <div className="l">What every other publication offers</div>
+                  <ol><li>Source</li><li>Source</li><li>Source</li><li>Source</li></ol>
                 </div>
-                <div className="own">
-                  <b>What a piece from this log carries</b>
-                  <span>
-                    Every turn, dated to the second, with the turn it came out
-                    of — including the loops and the wrong ones.
-                  </span>
+                <div>
+                  <div className="l">What a piece from this log would carry</div>
+                  <ol>
+                    {turns.slice(0, 7).map(t => {
+                      const from = t.led_from ? byId.get(t.led_from) : null
+                      return (
+                        <li key={t.id}>
+                          <b>{shorten(t.text)}</b>
+                          <em>
+                            {from
+                              ? `${t.loop ? 'a loop — led from' : 'led from'} ${shorten(from.text)}`
+                              : 'where it started'}
+                          </em>
+                        </li>
+                      )
+                    })}
+                  </ol>
                 </div>
               </div>
+              <p className="v">
+                Every turn dated, including the wrong ones and the one that
+                came from looking at the log itself.{' '}
+                <b>Nobody can produce that but you</b> — not the piece, but
+                how the piece came to exist.
+              </p>
             </div>
+
+            {/* What this route made. Same shape as `walk.html`'s `.own`, and
+                every row is a page a turn on this route named — the date it
+                was named, the name, and the turn it came out of. A page is
+                made when he names it; nothing here decides anything. */}
+            {made.length > 0 && (
+              <section className="own">
+                <div className="k">what this route made</div>
+                <h3>
+                  {made.length} {made.length === 1 ? 'page' : 'pages'} came out
+                  of this thought. <b>Each one carries the turn it came from.</b>
+                </h3>
+                <div className="rows">
+                  {made.map(m => {
+                    const from = m.turn.led_from ? byId.get(m.turn.led_from) : null
+                    return (
+                      <div className="r" key={`${m.turn.id}-${m.id}`}>
+                        <span className="d">{day(m.turn.happened_at)}</span>
+                        <span className="w">
+                          <Link href={`/page/${m.id}`}>{m.name}</Link>
+                          <i>{m.kind}</i>
+                        </span>
+                        <span className="f">
+                          {from
+                            ? `${m.turn.loop ? 'looped back to' : 'led from'} ${shorten(from.text)}`
+                            : 'where it started'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            )}
           </main>
 
           <Rail goesTo={[
