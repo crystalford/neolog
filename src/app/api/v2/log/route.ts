@@ -249,15 +249,22 @@ export async function GET(req: NextRequest) {
   for (const r of entryRows) {
     if (r.led_from && r.relation !== REFLECTS) onRoute.add(r.id)
   }
-  if (entryRows.length) {
-    const ids = entryRows.map(r => r.id)
-    const ph = ids.map(() => '?').join(',')
+  //
+  // ⚠️ Chunked at ninety. The window is up to 500 rows, and this is the ONE
+  // route that must not throw — a 500 here is the log not loading at all,
+  // the same failure `vlogs.transcript` caused on 7 Sep. D1 has a
+  // bound-parameter ceiling and a 502-parameter statement is not worth
+  // finding out about in production, on a hot path, for a tag.
+  const ids = entryRows.map(r => r.id)
+  for (let i = 0; i < ids.length; i += 90) {
+    const slice = ids.slice(i, i + 90)
+    const ph = slice.map(() => '?').join(',')
     const leads = await findMany<{ led_from: string }>(
       db,
       `SELECT DISTINCT led_from FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
           AND relation <> ? AND led_from IN (${ph})`,
-      operator.id, REFLECTS, ...ids,
+      operator.id, REFLECTS, ...slice,
     )
     for (const l of leads) if (l.led_from) onRoute.add(l.led_from)
   }
