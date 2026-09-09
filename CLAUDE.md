@@ -211,7 +211,8 @@ sometimes wrong. The splitter can miss a seam, and the pause fallback is
 coarser still — he pauses mid-thought and runs two thoughts together without
 breathing. **The log is wrong about the boundary sometimes and never wrong
 about the words** — which is the right way round, and is why merge and split
-exist on an entry. A model allowed to WRITE would be wrong about the words
+both exist on an entry (`POST /api/v2/log/[id]/split`; split landed 9 Sep,
+having been claimed here since 8 Sep and absent from the code). A model allowed to WRITE would be wrong about the words
 too, and that is the line this design does not cross.
 
 **The 4-gram grounding checker is gone too**, and its absence is the same
@@ -433,11 +434,78 @@ own surface for that. The machine's mistakes are quiet — a fixed word is
 marked but does not shout; his own changed words stay struck through in view,
 because he did say them.
 
-### Corrections leave a record
+### Corrections leave a record, and `/corrections` is where they are read
 
 `entry_revisions` keeps what every correction replaced. Nothing overwrites
 without the old value being kept first — "both versions kept, dated, marked
 revised by you." The PATCH handler reads the row before it writes.
+
+`wrong.html` §2 is the surface over them, and it went unbuilt until 9 Sep:
+*"Every correction is itself an entry. So the log keeps a dated record of its
+own mistakes. This is the part no other tool does… You do not have to trust
+it."* An entry's own page showed its own history, so a mistake could only be
+read by someone who already knew where it was. `/corrections`,
+`GET /api/v2/log/corrections`, `src/lib/corrections.ts` — newest first, paged
+rather than capped, each row with what it replaced behind one tap. Linked
+from the log's footer and from the entry page's corrections row, never the
+nav.
+
+⚠️ **`by_whom` is why the entry page no longer says "revised by you" on every
+row.** It was hard-coded, and the log makes some of these: the transcript fix
+rebuilds an entry from the words in its span, which is a change the log made
+and was signed with his name. The column has existed since the table was
+created — *"'operator' always, for now: the log does not correct itself"* —
+and was never written or read. The rebuild writes `'log'` now, both surfaces
+read it, and the wording is **one map in one file** so the two cannot drift.
+
+Not built, each for a stated reason. §1's five worked cases and §3's hard
+case are `.case` articles with invented dates, invented entries and
+live-looking buttons — the design teaching the mechanic; rendering them puts
+fabricated records on the one surface whose whole point is that its records
+are real. And `.rate`'s *"↓ 2.1× wrong attaches, compared with the first
+week"* is the log telling him whether it is getting better, which is a
+reading and not a count (§0 rule 2). The four figures kept are counts with
+the rule each was counted by — including the denominator, a definite set
+rather than the design's "about 140": an entry the log had to date by
+inference, a line it wrote, a picture it held back, or a passage it cut out
+of a recording.
+
+### ⚠️ Split, and the `grounded` column that makes it safe
+
+Merge has been on the entry page since it had a rail — "wrong split → merge,
+thread intact" (`wrong.html`). **Split had not, though this file claimed both
+since 8 Sep**, and split is the one the read path actually needs: the stated
+failure mode is a MISSED seam. `splitNote` can pass over a subject change and
+the pause fallback is coarser still, because he changes subject without
+breathing.
+
+`POST /api/v2/log/[id]/split` takes one number — the index of the word the
+second thought starts on. The gesture is `fix.html`'s, moved from the
+transcript to the line. Two ways to cut and **the response says which ran**,
+the way `/clear` names the check it used:
+
+- **timings** — the entry is still, word for word, what the transcript says
+  for its span, so the cut is made in `transcript_words`. Both halves get a
+  real span and the second is dated to the second he said it. Its
+  `source_ref` is the seam `read-recording` would have written, so re-reading
+  the recording skips it rather than writing a third copy of those words.
+- **text** — everything else. The words are cut where he pointed and the new
+  half carries **no span**, because the log does not know what second it was
+  said at and will not invent one.
+
+⚠️ **`grounded` means "this text IS the transcript's words for this span",
+and it is now enforced in both directions.** The transcript-fix rebuild finds
+its entries by span alone, so fixing a misheard word anywhere in the original
+span would rewrite both halves from the transcript and **put a split silently
+back together**. The rebuild requires `grounded = 1`; the column is cleared
+when he rewrites a line, when two entries are merged, and on the half that
+keeps the row after a text cut. In every one of those cases his wording would
+otherwise be replaced by the machine's.
+
+`scripts/test/split-entry.mjs` — 68 assertions, in CI. Every cut point on a
+thirteen-word line, so a word dropped at the seam cannot hide at one index;
+the four cuts that are not cuts; and the structural gates, each proved by
+breaking the code and watching it fail.
 
 ### The mechanics built on top of the entry
 
@@ -575,6 +643,43 @@ including a live path to `api.anthropic.com` nothing selected).
 along. A check that cries wolf is worse than no check: it teaches the next
 reader to skim the output. `browser-audio.ts` was the same false alarm,
 reached three times from `CapturePanel.tsx`.
+
+### ⚠️ `scripts/check-unreached-css.mjs` — a stylesheet no page renders
+
+The third of these, one level further out again, and it hides the same way:
+as nothing. A `.logpage.pg-<page>` block with no page that renders it parses,
+every `var()` in it resolves, and **`check-design-css.mjs` reads it and
+reports the page as MATCHING the design.** Four were found on 9 Sep, 350
+rules between them.
+
+⚠️ **`pg-now` is the one that mattered.** 77 rules transcribed faithfully out
+of `now.css`, and `/now` renders `.nowpage` as its root and carries no
+`.logpage` at all — so none of them ever applied, and the check had been
+measuring the dead block. `/now` read *"4 rules out of the design"* for weeks
+when the stylesheet that actually renders it was **9** out. Five of those
+were real and are fixed; the nine that remain are recorded beside the number
+and none is drift (four keyframe RENAMES, because one stylesheet serves 23
+pages and cannot hold four `@keyframes fade`; four keyframe STEPS, where
+`from` and `0%` are compared as bare selectors; and the masthead wordmark,
+which is 15.5px because that is what the other 73 design pages say).
+
+`check-design-css.mjs` now tries `.nowpage` before `.logpage` **for `/now`
+only**, and the "only" matters in both directions: doing it everywhere makes
+the mirror-image mistake and `log.css`'s composer resolves to `/now`'s copy
+of the same controls at a different size — `/` then reads eleven rules out.
+Both mistakes were made before the rule was written.
+
+The other three were deleted rather than kept: `pg-term` (157 rules for the
+public log showing one entry to a stranger — `/public` and `/entry/[id]`
+between them; SPEC §3, nothing is designed twice), `pg-idea` (67, an entry
+example, which is `/entry/[id]`) and `pg-export` (49, a PRINTED export
+document with `doc-page` and pt units — `/export` is `takeout.html` and the
+export is Markdown plus a JSON manifest; if a printed one is ever built the
+design is where it always was, in `design/css/export.css`).
+
+⚠️ **Its `KNOWN` list is empty on purpose.** A stylesheet for a page that
+will never exist is 50 to 160 lines nobody can tell from live code, so the
+answer is always build the page or delete the rules.
 
 ### ⚠️ `scripts/check-unreached-routes.mjs` — a route nothing calls
 
@@ -761,14 +866,16 @@ Adding a value means adding it to the list on purpose, which is the point.
 Also update `src/lib/log-entry.ts` — `RELATIONS`, `RELATION_DEFAULT`,
 `REFLECTS` — rather than typing a string.
 
-**Package inventory, 8 Sep 2026** — 74 distinct pages (excluding the 37
-`e-*` entry examples): **43 built · 6 partial · 16 not built · 4 below the
+**Package inventory, 9 Sep 2026** — 74 distinct pages (excluding the 37
+`e-*` entry examples): **44 built · 5 partial · 15 not built · 4 below the
 fence · 5 meta**.
 
-Partial: `branch` (splitting one note into several), `audio` (no two-voice
-split — `transcript_words.speaker` exists but nothing populates it; Whisper is
-not asked for diarization, so the split cannot be built honestly yet), `flow`
-(a walkthrough page). `walk`, `screenshots` and `fix` are built.
+Partial: `audio` (no two-voice split — `transcript_words.speaker` exists but
+nothing populates it; Whisper is not asked for diarization, so the split
+cannot be built honestly yet), `flow` (a walkthrough page). `walk`,
+`screenshots`, `fix` and — 9 Sep — `wrong` (as `/corrections`) are built.
+`branch`'s buildable half is **split on an entry**, which now exists; the
+rest of that page is the trace essay and the offer, both below the fence.
 
 **Not built, and each for a stated reason:**
 
@@ -950,6 +1057,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Search** | `/search` | Ask the log a question. The answer is written only from passages it can point at — **every sentence's citations are checked in code against the passages actually sent**, and uncitable sentences are dropped (and counted, out loud). The abstain line — "Not answered: …" — is the only line allowed no citation. Retrieval is keyword over entries + transcripts, and the page says so. |
 | **A month** | `/month/[ym]` | Reduction as a place. The month in one paragraph, written from that month's entries only, every sentence citing one. Then **the coverage strip** — a cell per day shaded by how much was said, marked where something is public or a question was asked, with the key beside it; **the month week by week**, newest first, each week opening to its own entries; and **the year in the same shape**, a month with nothing in it not being a link. Once he edits the paragraph it is his and the log stops rewriting it — refused at the SQL level, not just hidden. |
 | **On this day** | `/onthisday` | The one permitted resurfacing. Shows; never says. No "one year ago", no count, no nudge. Approximate dates are excluded — a guessed day has no business on the surface whose discipline is not saying. |
+| **Corrections** | `/corrections` | `wrong.html` §2 — the log's dated record of its own mistakes, newest first, each keeping what it replaced. Four counts, each with the rule it was counted by; **no trend**, because whether the log is getting better is a reading and not a count. |
 | **Safe to clear** | `/clear` | The loop the log exists to close. Four states per file; only `checked` means delete it locally. SHA-256 byte check up to 50 MB, length check above it — **and the row says which one ran**. |
 | **Going through what arrived** | `/triage` | One card, four keys, no wrong answers. Not an inbox: nothing is blocked on it, there is no badge, and skipping the pile costs nothing. |
 
@@ -1222,6 +1330,14 @@ nothing could have proved a TS constant matched.
 3. **No accent stripe on any card edge.**
 4. **One frame everywhere**: `max-width 1140px`, `padding 0 44px` → 1052
    inner, spent as 708 + 48 gap + 296 rail. Nothing reframes when you click.
+
+⚠️ **`button { font: inherit }`, not `font-family: inherit`.** The design's
+base rule inherits the body's 1.6 line-height as well as the family; ours
+inherited only the family, so a button fell back to the UA's `normal` (~1.2)
+and rendered **about five pixels short of the design everywhere it did not
+set its own line-height.** Invisible in the stylesheet and to all three
+text-level checks; found by rendering the design's own markup under both
+stylesheets.
 
 ⚠️ **There was a second, contradictory design vocabulary in this file until
 8 Sep** — 56–92px heroes, uppercase letterspaced mono eyebrows, accent
