@@ -1,94 +1,91 @@
 'use client'
 
+/**
+ * Fires only when the ROOT layout itself throws — Next.js requires this
+ * file to supply its own complete `<html><body>`, so it does not inherit
+ * `layout.tsx`'s `import './globals.css'` for free.
+ *
+ * ⚠️ It never had one of its own either. What shipped instead was a warm
+ * cream background, a serif display face, and a terracotta button — none
+ * of it neolog's actual tokens, none of it the wordmark, generic
+ * "Critical Error" copy. On the one screen a total layout failure shows,
+ * the product looked like a different app entirely. Importing `globals.css`
+ * here (the officially supported way to style this file) is what
+ * `error.tsx` gets automatically and this file needs explicitly.
+ */
+
+import './globals.css'
+import { LogoMark } from '@/components/Shell'
+
 export const runtime = 'edge'
 
 export default function GlobalError({
-  error,
-  reset,
+  error, reset,
 }: {
   error: Error & { digest?: string }
   reset: () => void
 }) {
   return (
-    <html>
-      <body style={{ 
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        backgroundColor: '#faf8f5',
-        color: '#1a1816',
+    <html lang="en">
+      <body style={{
         margin: 0,
         minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
+        background: 'var(--bg)',
+        color: 'var(--fg)',
+        fontFamily: 'var(--font-body)',
+        display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ textAlign: 'center', maxWidth: '400px' }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '16px',
-            backgroundColor: 'rgba(220, 38, 38, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px',
+        <header style={{
+          padding: '24px 56px',
+          display: 'flex', alignItems: 'center',
+          maxWidth: 1280, margin: '0 auto', width: '100%',
+        }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, color: 'var(--fg)' }}>
+            <LogoMark size={20} />
+            <span style={{ fontSize: 18, fontWeight: 500, letterSpacing: '-0.4px' }}>neolog</span>
+          </span>
+        </header>
+        <main style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          textAlign: 'center', padding: 32, maxWidth: 640, margin: '0 auto',
+        }}>
+          <h1 style={{
+            fontFamily: 'var(--font-body)', fontWeight: 300,
+            fontSize: 32, lineHeight: 1.15, letterSpacing: '-0.6px',
+            color: 'var(--fg)', margin: '0 0 14px', textWrap: 'balance',
           }}>
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-          </div>
-          
-          <h1 style={{ 
-            fontSize: '32px', 
-            fontWeight: '600', 
-            marginBottom: '12px',
-            fontFamily: '"Source Serif 4", Georgia, serif',
-          }}>
-            Critical Error
+            Something broke badly<span style={{ color: 'var(--t-terra)' }}>.</span>
           </h1>
-          <p style={{ 
-            color: '#6b6965', 
-            marginBottom: '32px',
-            lineHeight: '1.6',
+          <p style={{
+            fontSize: 14.5, lineHeight: 1.6, color: 'var(--fg-2)',
+            maxWidth: 460, marginBottom: 16,
           }}>
-            Something went seriously wrong. Please refresh the page or try again later.
+            The whole page failed to render, not just one part of it. Reset
+            usually clears it — if it keeps coming back, the message below
+            points at what&rsquo;s wrong.
           </p>
-
-          <button
-            onClick={reset}
-            style={{
-              backgroundColor: '#c45d3a',
-              color: 'white',
-              border: 'none',
-              padding: '12px 24px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M23 4v6h-6M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            Try Again
+          <div style={{
+            padding: '12px 16px',
+            background: 'rgba(230,99,74,0.06)',
+            border: '1px solid var(--t-terra)',
+            borderRadius: 8,
+            fontFamily: 'var(--font-mono)', fontSize: 11.5,
+            color: 'var(--fg-1)', letterSpacing: 0.2,
+            textAlign: 'left', maxWidth: 520,
+            marginBottom: 24, wordBreak: 'break-word',
+          }}>
+            {error.message || String(error)}
+            {error.digest && (
+              <div style={{ marginTop: 8, color: 'var(--fg-4)', fontSize: 10.5 }}>
+                digest: {error.digest}
+              </div>
+            )}
+          </div>
+          <button onClick={() => reset()} className="btn primary">
+            Try again
           </button>
-
-          {error.digest && (
-            <p style={{ 
-              marginTop: '32px', 
-              fontSize: '12px', 
-              color: '#a39e99',
-            }}>
-              Error ID: {error.digest}
-            </p>
-          )}
-        </div>
+        </main>
       </body>
     </html>
   )
