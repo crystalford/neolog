@@ -1,317 +1,137 @@
 {
-  "requested_at": "2026-09-16T19:42:21Z",
+  "requested_at": "2026-09-16T19:43:58Z",
   "method": "POST",
   "path": "/api/v2/admin/reprocess-vlogs",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3c259fa798252ab-SEA\r|",
-  "body": "{\"dispatched\":50,\"failed\":0,\"skipped\":0,\"results\":[{\"vlog_id\":\"01KWM3VTDP0QZ4MR7E768T93SH\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM3ZPMZ1EJSMT8MA19JRMMK\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM43PV7DD9JEGZ50DYGBEBB\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM47WKH334HSYZKPJ7HV7H9\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM4GCYNCBZ296CSVVN5NB0T\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM4C1HWJVBA77HHG34Z6VA2\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM4MY2PZ3RZD1YC2YVS3CK8\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM4SFV6NHVCDFG1KZVQNW2Z\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM4Y8ZQQHX492Z1D2E8D0K9\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM53503Q241P1EDDH7NR4H4\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM58SDYRG1PBZ9XT5F9TJPB\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM5Q2VGATEHT85W14M87TGW\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM5FQNW6MZ71HS9PAEJZMRA\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM668THC13TH55R5BTEMNCE\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM5YG0Y598YQMM3H00Y1QP0\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWM6EZ0TWE30PKVAWXGPHQ45\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWMH20DSPQ57F7SY3RXZZVH3\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWMHW2YC0FBB74GRK2BH76BY\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWMJWXGWGNBN53NTD1Z35JX3\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWN6EPMJVYD8K524XZCGNXSC\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWN7J7Q9XMQEX5W244GR1XMB\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMEX14CJAGCB811F9J51B5\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KWN8XT0B5JW84Q98S0PJ2KSA\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMF7DCXC0XZVQS518Z7N27\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMFB65XJWYXM82HTC363QN\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMFHGBXVZ9Q4MY733TBTGY\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMGEY72DXQ3T1AET0VQQF7\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMHC1D36RCKNE2V0B47FP0\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMKQ938NV10CBG67D45Z4F\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMP45H66HVXTKQKMETC7RR\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMPRYW7YPZRTQGQRE6SDVM\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMQGXN9VQ43NK2JJYW62AB\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMR8EV3ANV2FK1YGE4KN34\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMS75R1JRJCV5R6KWVR7ZJ\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMT8J9HSPT4ZG8KE8AKYN9\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZMVJCYBNN93NPDH6F6PN6F\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZN3702QS1C4ZWBJ00C69C8\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZN4W3ATBRNCWC9KK2AHWGX\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZN6JBGBPNPFKW0VRY02SXB\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZN890DX6C1HVWK09H516GV\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNA77J7Z61FYYAJNDTWJ4Y\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNC9FHTEP4TYPNKJ5CCZHX\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNF44CAEGRXR1V200XMV9N\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNJ5FP20EY0XMDMGYCRE6T\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNNYBKGMZ590YTQWFFJ5W8\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNYG7QKAEV5JBVSKT0MTTW\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNT00QGKDKX9ZS5BEJS1C0\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZP37NKX2MFRN011EN91SGY\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZPCTWA7R27Z7GAENV4RAAM\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"}],\"dispatched_start\":6,\"dispatched_reextract\":44}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3c25ca99ea8b0cf-ATL\r|",
+  "body": "{\"dispatched\":20,\"failed\":0,\"skipped\":0,\"results\":[{\"vlog_id\":\"01KXZPQQYVG7YG5ABGYQ81CF0C\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZPJ8FEYX50KNT019FFEA0B\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZR0GGBMEEWNG9BEA85RVNM\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZR8CN6Z9MNW46WPA23J0KZ\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZRPY3DS8394K4VBY6QF89N\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZRFKQFZSZ1ZRK95Y11Y18E\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZRZ32VX8JPT71NRYF9N5PQ\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZS7JX7C6XXEP3Y9XKBSF9D\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZTRQ4WD2FFCYA14YA5YZ74\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZXA21FYKBBH6P7C3Z1VJKG\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZY7CXK8MQXCCGYQCWY6MX1\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZZ568THTEG5HTVBCVJKNK5\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KY005PW7NBJRX4EJVPVTS8CJ\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZWDQX524KCF4KHC18B69VM\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KY016ARTEZV3N5QVD783MRBV\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KY0292XRJVBF1485FFTY8CTR\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KY04EZQEZXPFAGGYDGESKWM4\",\"entry\":\"reextract\",\"ok\":true,\"backend\":\"pipeline_do\"}],\"dispatched_start\":0,\"dispatched_reextract\":20}",
   "body_json": {
-    "dispatched": 50,
+    "dispatched": 20,
     "failed": 0,
     "skipped": 0,
     "results": [
       {
-        "vlog_id": "01KWM3VTDP0QZ4MR7E768T93SH",
+        "vlog_id": "01KXZPQQYVG7YG5ABGYQ81CF0C",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM3ZPMZ1EJSMT8MA19JRMMK",
+        "vlog_id": "01KXZPJ8FEYX50KNT019FFEA0B",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM43PV7DD9JEGZ50DYGBEBB",
+        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM47WKH334HSYZKPJ7HV7H9",
+        "vlog_id": "01KXZQTFA63BN68T7E93Q0N1P7",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM4GCYNCBZ296CSVVN5NB0T",
+        "vlog_id": "01KXZR0GGBMEEWNG9BEA85RVNM",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM4C1HWJVBA77HHG34Z6VA2",
+        "vlog_id": "01KXZR8CN6Z9MNW46WPA23J0KZ",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM4MY2PZ3RZD1YC2YVS3CK8",
+        "vlog_id": "01KXZRPY3DS8394K4VBY6QF89N",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM4SFV6NHVCDFG1KZVQNW2Z",
+        "vlog_id": "01KXZRFKQFZSZ1ZRK95Y11Y18E",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM4Y8ZQQHX492Z1D2E8D0K9",
+        "vlog_id": "01KXZRZ32VX8JPT71NRYF9N5PQ",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM53503Q241P1EDDH7NR4H4",
+        "vlog_id": "01KXZS7JX7C6XXEP3Y9XKBSF9D",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM58SDYRG1PBZ9XT5F9TJPB",
+        "vlog_id": "01KXZTRQ4WD2FFCYA14YA5YZ74",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM5Q2VGATEHT85W14M87TGW",
+        "vlog_id": "01KXZVK86V2MMSNQCTF9K1J9BJ",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM5FQNW6MZ71HS9PAEJZMRA",
+        "vlog_id": "01KXZXA21FYKBBH6P7C3Z1VJKG",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM668THC13TH55R5BTEMNCE",
+        "vlog_id": "01KXZY7CXK8MQXCCGYQCWY6MX1",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM5YG0Y598YQMM3H00Y1QP0",
+        "vlog_id": "01KXZZ568THTEG5HTVBCVJKNK5",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWM6EZ0TWE30PKVAWXGPHQ45",
+        "vlog_id": "01KY005PW7NBJRX4EJVPVTS8CJ",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWMH20DSPQ57F7SY3RXZZVH3",
+        "vlog_id": "01KXZWDQX524KCF4KHC18B69VM",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWMHW2YC0FBB74GRK2BH76BY",
+        "vlog_id": "01KY016ARTEZV3N5QVD783MRBV",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWMJWXGWGNBN53NTD1Z35JX3",
+        "vlog_id": "01KY0292XRJVBF1485FFTY8CTR",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       },
       {
-        "vlog_id": "01KWN6EPMJVYD8K524XZCGNXSC",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KWN7J7Q9XMQEX5W244GR1XMB",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMEX14CJAGCB811F9J51B5",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KWN8XT0B5JW84Q98S0PJ2KSA",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMF7DCXC0XZVQS518Z7N27",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMFB65XJWYXM82HTC363QN",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMFHGBXVZ9Q4MY733TBTGY",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMGEY72DXQ3T1AET0VQQF7",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMHC1D36RCKNE2V0B47FP0",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMKQ938NV10CBG67D45Z4F",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMP45H66HVXTKQKMETC7RR",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMPRYW7YPZRTQGQRE6SDVM",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMQGXN9VQ43NK2JJYW62AB",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMR8EV3ANV2FK1YGE4KN34",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMS75R1JRJCV5R6KWVR7ZJ",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMT8J9HSPT4ZG8KE8AKYN9",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZMVJCYBNN93NPDH6F6PN6F",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZN3702QS1C4ZWBJ00C69C8",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZN4W3ATBRNCWC9KK2AHWGX",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZN6JBGBPNPFKW0VRY02SXB",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZN890DX6C1HVWK09H516GV",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNA77J7Z61FYYAJNDTWJ4Y",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNC9FHTEP4TYPNKJ5CCZHX",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNF44CAEGRXR1V200XMV9N",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNJ5FP20EY0XMDMGYCRE6T",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNNYBKGMZ590YTQWFFJ5W8",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNYG7QKAEV5JBVSKT0MTTW",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNT00QGKDKX9ZS5BEJS1C0",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZP7Z3B7G9E3K0BX5MSCK6M",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZP37NKX2MFRN011EN91SGY",
-        "entry": "reextract",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZPCTWA7R27Z7GAENV4RAAM",
+        "vlog_id": "01KY04EZQEZXPFAGGYDGESKWM4",
         "entry": "reextract",
         "ok": true,
         "backend": "pipeline_do"
       }
     ],
-    "dispatched_start": 6,
-    "dispatched_reextract": 44
+    "dispatched_start": 0,
+    "dispatched_reextract": 20
   }
 }
