@@ -1,0 +1,115 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;
+  --fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;--steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;
+  --body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+.wrap{max-width:1180px;margin:0 auto;padding:0 44px}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}
+.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg);flex-shrink:0}.mk svg{width:100%;height:100%;display:block}
+.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap;flex-shrink:0}
+.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}.mh nav a:hover{color:var(--fg)}
+.crumb{padding:22px 0 0;font-size:12px;color:var(--fg-4)}.crumb a{color:var(--fg-3)}
+h1{font-size:27px;font-weight:300;letter-spacing:-0.9px;color:var(--fg);line-height:1.25;margin-top:10px;text-wrap:pretty}h1 b{font-weight:450}
+.meta{margin-top:14px;display:flex;flex-wrap:wrap;gap:0 20px;row-gap:6px;font-size:12.5px;color:var(--fg-4);padding-bottom:18px;border-bottom:1px solid var(--line)}
+.meta span{white-space:nowrap}.meta b{color:var(--fg-1);font-weight:450}.meta time,.meta code{font-family:var(--mono);font-size:11px;color:var(--fg-3)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:40px;align-items:start;padding-top:22px}
+/* waveform — the audio's own picture */
+.aud{border:1px solid var(--line-1);border-radius:12px;overflow:hidden;background:var(--bg-1)}
+.wave{padding:22px 18px 8px;position:relative}
+.bars{display:flex;align-items:center;gap:2px;height:96px}
+.bars i{flex:1;display:block;border-radius:1px;background:var(--fg-4);min-height:2px}
+.bars i.a{background:var(--steel)}.bars i.b{background:var(--ochre)}
+.bars i.dim{opacity:.35}
+.head{position:absolute;top:22px;bottom:8px;left:31%;width:2px;background:var(--fg)}
+.ctl{display:flex;align-items:center;gap:14px;padding:10px 18px 14px;border-top:1px solid var(--line)}
+.play{width:36px;height:36px;border-radius:50%;background:var(--fg);display:grid;place-items:center;flex-shrink:0}
+.play::after{content:'';border-left:11px solid #000;border-top:7px solid transparent;border-bottom:7px solid transparent;margin-left:3px}
+.ctl .tc{font-family:var(--mono);font-size:11.5px;color:var(--fg-2)}
+.ctl .sp{margin-left:auto;display:flex;gap:14px;font-size:11.5px;color:var(--fg-4)}
+.ctl .sp i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.ctl .spd{font-family:var(--mono);font-size:11px;color:var(--fg-3);padding:3px 8px;border:1px solid var(--line-1);border-radius:5px}
+/* transcript with speakers */
+.tbar{display:flex;align-items:baseline;gap:16px;padding:26px 0 10px;border-bottom:1px solid var(--line)}
+.tbar h2{font-size:15px;font-weight:450;color:var(--fg)}
+.tbar .r{margin-left:auto;display:flex;gap:16px;font-size:12px}
+.tbar .r button{color:var(--fg-3);border-bottom:1px solid transparent;white-space:nowrap}
+.tbar .r button.on{color:var(--fg);border-bottom-color:var(--fg)}
+.tr{max-height:520px;overflow-y:auto;padding-right:6px}
+.ln{display:grid;grid-template-columns:56px 74px 1fr;gap:14px;padding:8px 8px 8px 0;border-radius:6px;cursor:pointer}
+.ln:hover{background:var(--bg-1)}
+.ln .t{font-family:var(--mono);font-size:10.5px;color:var(--fg-4);text-align:right;padding-top:3px}
+.ln .s{font-size:11.5px;padding-top:3px;white-space:nowrap}
+.ln .s.a{color:var(--steel)}.ln .s.b{color:var(--ochre)}
+.ln .x{font-size:15px;line-height:1.6;color:var(--fg-2)}
+.ln.you .x{color:var(--fg-1)}
+.ln .x mark{background:none;color:var(--fg);border-bottom:1.5px solid var(--violet);padding-bottom:1px}
+.ln .x i{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:4px}
+.ln .x i a{color:var(--fg-3);border-bottom:1px solid var(--line-2)}
+.ln .x .gap{color:var(--fg-4);font-style:italic}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;gap:10px}
+.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px;white-space:nowrap}
+.rc .i{padding:11px 14px;font-size:13px;color:var(--fg-2);line-height:1.5}
+.rc .i+.i{border-top:1px solid var(--line)}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+.rc .i a{color:var(--fg-1);border-bottom:1px solid var(--line-2)}
+.rc .i .sw{display:flex;gap:8px;margin-top:6px;align-items:center}
+.rc .i .sw span{font-size:11.5px;padding:4px 9px;border:1px solid var(--line-1);border-radius:100px;color:var(--fg-3)}
+.rc .i .sw span.on{color:var(--fg);border-color:var(--line-3)}
+.rc.warm{border-color:rgba(200,150,64,.3)}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.acts a,.acts button{font-size:12px;font-weight:500;padding:7px 12px;border-radius:7px;border:1px solid var(--line-2);color:var(--fg-1);white-space:nowrap}
+.acts .p{background:var(--fg);color:#000;border-color:var(--fg)}
+.rule{font-size:12.5px;color:var(--fg-3);line-height:1.6;padding:0 2px}
+.rule b{color:var(--fg-1);font-weight:450}
+.short{margin-top:36px;padding:16px 20px;border:1px dashed var(--line-2);border-radius:12px;display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.short h3{font-size:14px;font-weight:450;color:var(--fg)}
+.short p{font-size:13.5px;color:var(--fg-2);margin-top:5px;line-height:1.55;text-wrap:pretty}
+.short p b{color:var(--fg-1);font-weight:450}
+.ft{margin-top:60px;padding:24px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-size:12px;color:var(--fg-4)}
+.ft span,.ft a{white-space:nowrap}.ft .r{display:flex;gap:18px}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}
+
+/* a player must be given a width. .aud sits in a flex row, so as flex:0 1 auto it
+   shrink-wraps to content — and .wv (flex-basis 0) contributes nothing to that
+   intrinsic width, so it resolved to 57px and overflow:hidden ate 19 of 38 bars.
+   An audio-only media block is not a row of tiles; it is one full-width object. */
+.media:has(.aud){display:block}
+.aud{width:100%;flex:1 1 100%}
+.aud .wv{min-width:0}
+.en .pics:has(.aud){display:block}
+.en .pics .aud{max-width:420px}

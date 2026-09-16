@@ -1,0 +1,203 @@
+'use client'
+
+/**
+ * Messages — correspondence, and the way one gets onto the log.
+ *
+ * `messages.html`: "Forwarded by you, always. The log never reads your
+ * inbox... Correspondence is chosen, one thread at a time, because every
+ * thread has someone else in it."
+ *
+ * So the top of this page is a paste box and nothing else. There is no
+ * connect-your-email button here, and its absence is the feature — the
+ * email door in this product is for him writing TO the log, never for the
+ * log reading what others wrote to him.
+ */
+
+export const runtime = 'edge'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
+import { CONSENT_WORDS, asConsent } from '@/lib/correspondence'
+
+interface Thread {
+  id: string; person_name: string; person_page_id: string | null
+  medium: string; started_at: string | null; ended_at: string | null
+  message_count: number; created_at: string; consent: string | null
+}
+
+const day = (s: string | null) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+export default function Messages() {
+  const [threads, setThreads] = useState<Thread[]>([])
+  const [loading, setLoading] = useState(true)
+  const [text, setText] = useState('')
+  const [mine, setMine] = useState('')
+  const [speakers, setSpeakers] = useState<string[] | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v2/log/correspondence', { cache: 'no-store' })
+      if (res.ok) setThreads(((await res.json()) as { threads: Thread[] }).threads || [])
+    } catch { /* the list just doesn't show */ }
+    finally { setLoading(false) }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  const bringIn = useCallback(async () => {
+    if (!text.trim() || busy) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const res = await fetch('/api/v2/log/correspondence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, mine: mine || undefined }),
+      })
+      const j = await res.json() as {
+        error?: string; speakers?: string[]; needs?: string
+        messages?: number; entries_written?: number; person_name?: string
+      }
+      if (res.status === 409 && j.needs === 'mine') {
+        // Nothing was written. Which side is his is not something the log
+        // will guess — getting it wrong files their sentences as his.
+        setSpeakers(j.speakers || [])
+        setMsg('Which one of these is you?')
+      } else if (!res.ok) {
+        setMsg(j.error || 'that did not read as a conversation')
+      } else {
+        // One line saying what happened. Nothing is asked at this moment.
+        setMsg(
+          `Kept ${j.messages} messages with ${j.person_name}. ` +
+          `${j.entries_written} of your own are on the log. ` +
+          `Theirs are kept and are not public.`,
+        )
+        setText('')
+        setMine('')
+        setSpeakers(null)
+        await load()
+      }
+    } catch {
+      setMsg('that did not go in')
+    } finally { setBusy(false) }
+  }, [text, mine, busy, load])
+
+  return (
+    <Shell>
+      <div className="logpage pg-messages">
+        <div className="back"><Link href="/">the log</Link></div>
+
+        <div className="grid">
+          <main>
+
+        {/* `messages.html`'s own opener. It says why this kind works
+            differently before it shows a single thread — half the words
+            belong to someone who is not here. */}
+        <section className="top">
+          <h1>
+            Texts, emails, messages.{' '}
+            <b>The only thing on your log that&rsquo;s half someone else&rsquo;s.</b>
+          </h1>
+          <p>
+            Everything else here is yours to keep and yours to publish. A
+            conversation isn&rsquo;t — half the words belong to the other
+            person. So this kind works differently from every other:{' '}
+            <b>
+              your side is yours; their side is kept, attached to them, and
+              never crosses to public on your say-so alone.
+            </b>{' '}
+            Forwarded by you, never pulled from an inbox.
+          </p>
+        </section>
+
+        <div className="paste">
+          <textarea
+            value={text}
+            onChange={e => setText(e.target.value)}
+            placeholder={'You  27 Aug 22:14\nGot the job. Ancaster. Start Monday.\n\nLeif  22:19\nHa. Eighteen years.'}
+            rows={8}
+          />
+          {speakers && speakers.length > 0 && (
+            <div className="who">
+              {speakers.map(s => (
+                <button
+                  key={s}
+                  className={mine === s ? 'on' : ''}
+                  onClick={() => setMine(s)}
+                >{s}</button>
+              ))}
+              <em>Nothing was written. Say which name is yours and press again.</em>
+            </div>
+          )}
+          <div className="bar">
+            <button className="p" onClick={() => void bringIn()} disabled={busy || !text.trim()}>
+              {busy ? 'Keeping it' : 'Bring it in'}
+            </button>
+            {msg && <span className="say">{msg}</span>}
+          </div>
+        </div>
+
+        {loading && <div className="none">Reading the log.</div>}
+
+        {!loading && !threads.length && (
+          <div className="none">
+            No conversations here yet.
+          </div>
+        )}
+
+        {threads.map(t => {
+          const c = asConsent(t.consent)
+          return (
+            <div className="th" key={t.id}>
+              <b>
+                <Link href={`/messages/${t.id}`}>
+                  {t.medium === 'email' ? 'Emails' : t.medium === 'chat' ? 'Messages' : 'Texts'} with {t.person_name}
+                </Link>
+              </b>
+              <span>
+                {t.started_at && <time dateTime={t.started_at}>{day(t.started_at)}</time>}
+                <span>{t.message_count} {t.message_count === 1 ? 'message' : 'messages'}</span>
+                <span>{CONSENT_WORDS[c].name.toLowerCase()}</span>
+                {t.person_page_id
+                  ? <Link href={`/page/${t.person_page_id}`}>their page</Link>
+                  : <span>not attached to a page</span>}
+              </span>
+            </div>
+          )
+        })}
+
+        {/* `messages.html` closes on these three, and they are the design
+            rather than a footnote to it. */}
+        <div className="rules">
+          <div>
+            <b>Two owners, one entry.</b> Your side is yours — entries,
+            quotes, public, normal rules. Their side is theirs: kept,
+            attached to them, filed as &ldquo;they said&rdquo;, never public
+            on your word alone.
+          </div>
+          <div>
+            <b>Their yes is a fact on the log.</b> Not a checkbox. When they
+            said it, how, for which words. Revocable, and revoking pulls the
+            quotes. The default, for everyone, is the most private state.
+          </div>
+          <div>
+            <b>Forwarded, never pulled.</b> The log doesn&rsquo;t read your
+            inbox. Every conversation on it is one you chose to bring in,
+            because every one has another person in it.
+          </div>
+        </div>
+                </main>
+
+          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/ways-in', label: 'the ways in' }]} />
+        </div>
+      </div>
+    </Shell>
+  )
+}

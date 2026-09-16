@@ -23,7 +23,7 @@ export const runtime = 'edge'
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
-import { deleteObject, presignGetUrl, putObject, type R2Env } from '@/lib/r2'
+import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { deriveRecordedAt } from '@/lib/recorded-at'
 import { ulid } from '@/lib/ulid'
@@ -262,10 +262,17 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(searchParams.get('offset') || '0', 10)
 
   let sql = `
-    SELECT id, title, original_filename, file_size_bytes, mime_type, duration_seconds,
+    SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
            recorded_at, recorded_at_source, uploaded_at, thumbnail_url, thumbnail_r2_key,
            r2_key, transcoded_r2_key,
            pipeline_status, pipeline_error, visibility, transcript_text IS NOT NULL AS has_transcript,
+           read_at,
+           -- How many entries the log has read out of this recording. The
+           -- only number about it the log knows rather than guessed, and one
+           -- correlated subquery rather than a second round trip per row.
+           (SELECT COUNT(*) FROM log_entries le
+             WHERE le.vlog_id = vlogs.id AND le.operator_id = vlogs.operator_id
+               AND le.deleted_at IS NULL AND le.buried_at IS NULL) AS entry_count,
            created_at, updated_at
     FROM vlogs
     WHERE operator_id = ? AND deleted_at IS NULL
@@ -286,7 +293,6 @@ export async function GET(req: NextRequest) {
   const db = getDb(env)
   const rows = await findMany<{
     id: string
-    title: string | null
     original_filename: string
     file_size_bytes: number
     mime_type: string
@@ -302,6 +308,8 @@ export async function GET(req: NextRequest) {
     pipeline_error: string | null
     visibility: string
     has_transcript: number
+    read_at: string | null
+    entry_count: number
     created_at: string
     updated_at: string
   }>(db, sql, ...binds)
@@ -366,14 +374,35 @@ export async function DELETE(req: NextRequest) {
   )
   if (!vlog) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Cascade-delete dependent rows via FK ON DELETE CASCADE
-  await run(db, 'DELETE FROM vlogs WHERE id = ? AND operator_id = ?', id, operator.id)
+  // Buried, not deleted, and the FILE IS NOT TOUCHED.
+  //
+  // This used to `DELETE FROM vlogs` (cascading the derived rows away) and
+  // then delete the R2 objects. Since 8 Sep the recordings in R2 are the only
+  // data this product preserves, which makes that handler the one
+  // unrecoverable action in it — a hand slipping on a button.
+  //
+  // SPEC §1: "There is no delete action. Bury removes an entry from the feed,
+  // search and counts and keeps the file." The entries the log read out of
+  // the recording are buried with it: they are its words, and leaving them on
+  // the feed pointing at a recording that is off it is worse than either.
+  await run(
+    db,
+    `UPDATE vlogs SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND operator_id = ?`,
+    id, operator.id,
+  )
+  const buried: any = await run(
+    db,
+    `UPDATE log_entries SET buried_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+      WHERE vlog_id = ? AND operator_id = ? AND buried_at IS NULL`,
+    id, operator.id,
+  )
 
-  // Best-effort R2 cleanup (don't fail the delete if R2 cleanup fails)
-  const keysToDelete = [vlog.r2_key, vlog.transcoded_r2_key].filter(Boolean) as string[]
-  await Promise.all(keysToDelete.map(k => deleteObject(env, k).catch(() => null)))
-
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({
+    ok: true,
+    entries_buried: buried?.meta?.changes ?? 0,
+    file_kept: true,
+  })
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

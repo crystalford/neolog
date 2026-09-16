@@ -2,42 +2,23 @@
  * Anthropic Claude client — Workers-runtime friendly.
  *
  * Uses fetch directly against the Messages API (no SDK to keep the Worker
- * bundle small). Loads the prompt from D1 by name + is_active=1 so prompt
- * iteration doesn't require redeployment.
+ * bundle small). The Anthropic API key is a Worker secret:
+ * env.ANTHROPIC_API_KEY.
  *
- * The Anthropic API key is a Worker secret: env.ANTHROPIC_API_KEY.
+ * ⚠️ Nothing calls this, on purpose. Anthropic is a paid opt-in the operator
+ * has not taken, and wiring it is a deliberate act — "no branch reaches it"
+ * is what "nothing currently calls it" should mean.
+ *
+ * `loadPrompt` used to live here and read the active row out of `prompts`,
+ * a table dropped on 8 Sep with the rest of the extraction engine. Its four
+ * seeded prompts — the analytical pass, the clip pass, the creative pass and
+ * the entity pass — were the generator, and `db/seed.sql` was still being
+ * applied by the bootstrap workflow on every deploy. Both are gone. A prompt
+ * library coming back means a generator came back with it.
  */
-
-import type { D1Database } from '@cloudflare/workers-types'
-import { findOne } from './d1'
 
 export interface ClaudeEnv {
   ANTHROPIC_API_KEY: string
-  DB: D1Database
-}
-
-export interface PromptRecord {
-  id: string
-  name: string
-  version: string
-  body: string
-  model: string
-  is_active: number
-}
-
-/**
- * Load the active version of a named prompt.
- */
-export async function loadPrompt(db: D1Database, name: string): Promise<PromptRecord> {
-  const row = await findOne<PromptRecord>(
-    db,
-    'SELECT id, name, version, body, model, is_active FROM prompts WHERE name = ? AND is_active = 1 LIMIT 1',
-    name,
-  )
-  if (!row) {
-    throw new Error(`No active prompt found for name='${name}'. Apply db/seed.sql.`)
-  }
-  return row
 }
 
 export interface ClaudeMessage {

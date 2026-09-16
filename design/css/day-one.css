@@ -1,0 +1,107 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;
+  --fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;
+  --steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--sage:#84b16f;--terra:#e6634a;
+  --body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+.wrap{max-width:1140px;margin:0 auto;padding:0 44px}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}
+.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg);flex-shrink:0}.mk svg{width:100%;height:100%;display:block}
+.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap;flex-shrink:0}
+.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}.mh nav a:hover,.mh nav a.on{color:var(--fg)}
+
+.top{max-width:800px}
+h1{font-size:30px;font-weight:300;letter-spacing:-1px;color:var(--fg);line-height:1.2;text-wrap:pretty}
+h1 b{font-weight:450}
+.top p{font-size:15.5px;color:var(--fg-2);margin-top:14px;line-height:1.6;text-wrap:pretty}
+.top p b{color:var(--fg);font-weight:450}
+
+.st{display:grid;grid-template-columns:120px 1fr;gap:28px;padding:48px 0 0;align-items:baseline}
+.st .n{font-size:12px;color:var(--fg-4);white-space:nowrap}
+.st .n b{display:block;font-size:22px;font-weight:300;color:var(--fg);letter-spacing:-0.6px}
+.st h2{font-size:20px;font-weight:300;letter-spacing:-0.5px;color:var(--fg);line-height:1.35;text-wrap:pretty}
+.st h2 b{font-weight:450}
+.st p{font-size:14px;color:var(--fg-3);margin-top:8px;line-height:1.55;max-width:680px;text-wrap:pretty}
+.body{margin-left:148px;margin-top:20px}
+
+/* a frame of the home page */
+.fr{border:1px solid var(--line-1);border-radius:14px;background:var(--bg-1);overflow:hidden}
+.fr .fmh{display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);font-size:12px;color:var(--fg-3)}
+.fr .fmh .mk{width:16px;height:16px}.fr .fmh .wm{font-size:13px}
+.fr .fmh nav{margin-left:auto;display:flex;gap:14px;font-size:11.5px;color:var(--fg-4)}.fr .fmh nav a.on{color:var(--fg)}
+.fr .g{display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:32px;padding:16px 18px 20px}
+.comp{border-radius:12px;padding:1px;background:linear-gradient(180deg,rgba(255,255,255,.12),rgba(255,255,255,.04) 40%,rgba(78,161,213,.08))}
+.comp .in{background:#0a0a0b;border-radius:11px;overflow:hidden}
+.comp .ta{padding:14px 16px 4px;font-size:16px;font-weight:300;color:var(--fg-4);min-height:54px;letter-spacing:-0.3px}
+.comp .ta.typed{color:var(--fg)}
+.comp .bar2{display:flex;align-items:center;gap:3px;padding:7px 8px 8px 10px;border-top:1px solid rgba(255,255,255,.05)}
+.way{width:28px;height:28px;border-radius:7px;display:grid;place-items:center;color:var(--fg-3)}
+.way svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round}
+.mic{width:32px;height:32px;border-radius:50%;background:var(--fg);color:#000;margin-right:5px;box-shadow:0 0 0 4px rgba(255,255,255,.035),0 0 0 8px rgba(255,255,255,.016)}
+.mic svg{stroke:#000;width:13px;height:13px}
+.sep{width:1px;height:16px;background:rgba(255,255,255,.08);margin:0 6px 0 3px}
+.send{margin-left:auto;width:28px;height:28px;border-radius:8px;background:var(--fg);display:grid;place-items:center}
+.send svg{width:12px;height:12px;stroke:#000;fill:none;stroke-width:1.8;stroke-linecap:round}
+.rcpt{margin-top:10px;font-size:12.5px;color:var(--fg-2);padding:0 4px}
+.rcpt b{color:var(--fg);font-weight:450}.rcpt a{color:var(--fg-4);margin-left:10px}
+.empty{padding:26px 4px 6px;font-size:13.5px;color:var(--fg-4);line-height:1.55}
+.day{font-size:11px;color:var(--fg-4);padding:22px 0 6px;display:flex;gap:10px;align-items:baseline}
+.day b{font-weight:450;color:var(--fg-2);font-size:12px}.day::after{content:'';flex:1;height:1px;background:var(--line)}
+.en{display:grid;grid-template-columns:48px 1fr;gap:14px;padding:9px 8px 9px 0}
+.en .t{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--fg-3);padding-top:3px}
+.en .x{font-size:14px;font-weight:300;color:var(--fg);line-height:1.45;letter-spacing:-0.2px}
+.en .x i{font-style:normal;font-size:10.5px;color:var(--fg-4);margin-left:8px;white-space:nowrap}
+.en .x b{font-weight:450}
+.rail{display:flex;flex-direction:column;gap:14px;padding-top:2px}
+.rc{border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.rc .h{padding:8px 12px;border-bottom:1px solid var(--line);background:var(--bg-2);font-size:11.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+.rc .h span{font-weight:400;color:var(--fg-4)}
+.rc .i{padding:9px 12px;font-size:12px;color:var(--fg-3);line-height:1.5}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{display:block;font-style:normal;font-size:11px;color:var(--fg-4);margin-top:3px}
+.rc .i .a{display:flex;gap:8px;margin-top:7px;font-size:11px}
+.rc .i .a .p{padding:4px 9px;border-radius:5px;background:var(--fg);color:#000;font-weight:500}
+.rc .i .a a:not(.p){color:var(--fg-4)}
+.dots{display:flex;gap:2px;align-items:flex-end;height:22px;padding:0 12px 6px}
+.dots i{flex:1;min-height:2px;background:var(--line-1);display:block;border-radius:1px 1px 0 0}
+.dots i.on{background:var(--steel);height:100%}
+
+.rules{margin-top:44px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rules>div{background:var(--bg);padding:18px 20px}
+.rules b{font-size:14px;font-weight:450;color:var(--fg);display:block;line-height:1.4}
+.rules p{font-size:13px;color:var(--fg-2);margin-top:7px;line-height:1.55;text-wrap:pretty}
+.ft{margin-top:70px;padding:26px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-size:12px;color:var(--fg-4)}
+.ft span,.ft a{white-space:nowrap}.ft .r2{display:flex;gap:18px}.ft a:hover{color:var(--fg-2)}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

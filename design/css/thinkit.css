@@ -1,0 +1,72 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;--fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;--steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+.wrap{max-width:1140px;margin:0 auto;padding:0 44px}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg)}.mk svg{width:100%;height:100%;display:block}.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap}.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}
+.top{padding:26px 0 0;max-width:840px}h1{font-size:28px;font-weight:300;letter-spacing:-0.9px;color:var(--fg);line-height:1.25;text-wrap:pretty}h1 b{font-weight:450}.top p{font-size:15px;color:var(--fg-2);margin-top:12px;line-height:1.6;text-wrap:pretty}.top p b{color:var(--fg);font-weight:450}
+.st{display:grid;grid-template-columns:120px 1fr;gap:28px;padding:40px 0 0;align-items:baseline}.st .n{font-size:12px;color:var(--fg-4);white-space:nowrap}.st .n b{display:block;font-size:22px;font-weight:300;color:var(--fg)}.st h2{font-size:20px;font-weight:300;letter-spacing:-0.5px;color:var(--fg);line-height:1.35;text-wrap:pretty}.st h2 b{font-weight:450}.st p{font-size:14px;color:var(--fg-3);margin-top:8px;line-height:1.55;max-width:700px}
+.body{margin-left:148px;margin-top:16px}
+.claim{padding:16px 20px;border:1px solid var(--line-1);border-radius:12px;background:var(--bg-1)}.claim .k{font-size:11.5px;color:var(--fg-4);margin-bottom:6px}.claim .c{font-size:17px;font-weight:300;color:var(--fg);line-height:1.45}.claim .c b{font-weight:450}.claim .f{font-size:12.5px;color:var(--fg-3);margin-top:8px;line-height:1.5}
+.qs{display:flex;flex-direction:column;gap:8px}
+.q{border:1px solid rgba(200,150,64,.35);border-radius:10px;padding:13px 16px;background:linear-gradient(90deg,rgba(200,150,64,.06),var(--bg-1) 60%);display:grid;grid-template-columns:26px 1fr;gap:12px}.q i{font-style:normal;font-family:var(--mono);font-size:11px;color:var(--ochre);padding-top:4px}.q .t{font-size:15.5px;color:var(--fg);line-height:1.45}.q .w{font-size:12.5px;color:var(--fg-3);margin-top:4px;line-height:1.5}.q .w b{color:var(--fg-1);font-weight:450}
+.q.ans{border-color:var(--line-1);background:var(--bg-1)}.q.ans i{color:var(--teal)}.q .a{margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--bg-2);font-size:14px;color:var(--fg-1);line-height:1.55}.q .a small{display:block;font-size:11px;color:var(--fg-4);font-family:var(--mono);margin-top:4px}
+.q .go{display:flex;gap:10px;margin-top:8px;font-size:11.5px;align-items:center}.q .go .p{padding:5px 10px;border-radius:6px;background:var(--fg);color:#000;font-weight:500}.q .go a{color:var(--fg-4)}
+.gate{margin-top:10px;font-size:12.5px;color:var(--fg-4);line-height:1.5;padding:8px 12px;border:1px dashed var(--line-2);border-radius:8px}.gate b{color:var(--fg-2);font-weight:450}
+/* the slider */
+.sl{display:flex;align-items:center;gap:0;border:1px solid var(--line-1);border-radius:100px;overflow:hidden;background:var(--bg-1);width:max-content}.sl button{font-size:12.5px;padding:8px 16px;color:var(--fg-3);border-right:1px solid var(--line)}.sl button:last-child{border-right:0}.sl button.on{background:var(--bg-3);color:var(--fg)}
+.slk{font-size:12px;color:var(--fg-4);margin-top:8px;line-height:1.5}.slk b{color:var(--fg-2);font-weight:450}
+.struct{margin-top:14px;border:1px solid var(--line-1);border-radius:12px;overflow:hidden;background:var(--bg-1)}
+.part{display:grid;grid-template-columns:110px 1fr 200px;gap:16px;padding:13px 18px;border-bottom:1px solid var(--line);align-items:start}.part:last-child{border-bottom:0}
+.part .r{font-size:11.5px;color:var(--fg-4);padding-top:3px}.part .r b{display:block;color:var(--fg-2);font-weight:450;font-size:12.5px}
+.part .x{font-size:15px;color:var(--fg);line-height:1.5}.part .x s{display:block;color:var(--fg-4);font-size:13px;text-decoration:none;margin-top:5px;padding-left:10px;border-left:1px solid var(--line-2)}.part .x s::before{content:'you said: ';color:var(--fg-4)}
+.part .who{font-size:11.5px;text-align:right;padding-top:3px;line-height:1.5}.part .who b{display:block;font-weight:450}.part .who .y{color:var(--teal)}.part .who .d{color:var(--violet)}.part .who a{color:var(--fg-4)}
+.part.gapp .x{color:var(--ochre);font-style:italic}
+.out{margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.out a{font-size:12.5px;font-weight:500;padding:8px 14px;border-radius:7px;border:1px solid var(--line-2);color:var(--fg-1);white-space:nowrap}.out .p{background:var(--fg);color:#000;border-color:var(--fg)}.out span{font-size:12px;color:var(--fg-4)}
+.rules{margin-top:40px;display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}.rules>div{background:var(--bg);padding:18px 20px}.rules b{font-size:14px;font-weight:450;color:var(--fg);display:block;line-height:1.4}.rules p{font-size:13px;color:var(--fg-2);margin-top:7px;line-height:1.55}
+.rn{margin-top:36px;padding:18px 22px;border:1px solid var(--line-1);border-radius:12px;background:var(--bg-1)}.rn .k{font-size:11.5px;color:var(--ochre);margin-bottom:6px}.rn p{font-size:13.5px;color:var(--fg-2);line-height:1.6}.rn p+p{margin-top:8px}.rn p b{color:var(--fg-1);font-weight:450}
+.ft{margin-top:60px;padding:24px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--fg-4)}.ft .r2{display:flex;gap:18px}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* the rail, same as the log's */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:48px;align-items:start;padding-top:20px}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;gap:10px}
+.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px;white-space:nowrap}
+.rc .i{padding:11px 14px;font-size:13px;color:var(--fg-2);line-height:1.5}
+.rc .i+.i{border-top:1px solid var(--line)}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+.rc .i a{color:var(--fg-1);border-bottom:1px solid var(--line-2)}
+.rc .acts{display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px}
+.rc .acts a{font-size:11.5px;padding:6px 10px;border-radius:6px;border:1px solid var(--line-1);color:var(--fg-2);white-space:nowrap}
+.rc .acts a:hover{color:var(--fg);border-color:var(--line-3)}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

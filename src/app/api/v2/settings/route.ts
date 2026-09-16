@@ -1,8 +1,11 @@
 /**
- * /api/v2/settings — operator key/value preferences.
+ * /api/v2/settings
  *
- *   GET  → returns { settings: { key: value, ... } } for the current operator
- *   POST → body { key, value }     upsert one setting
+ *   GET   → { settings: {...}, bio } — the key/value preferences plus the
+ *           one sentence he has written about himself.
+ *   POST  → { key, value } upsert one setting.
+ *   PATCH → { bio } — his sentence, which `/facts` shows as his and will
+ *           never write itself.
  *
  * Whitelist of known keys lives in src/lib/operator-settings.ts. Unknown keys
  * are rejected so a typo in the client doesn't silently write garbage.
@@ -11,7 +14,8 @@ export const runtime = 'edge'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
-import { getDb } from '@/lib/d1'
+import { getDb, findOne, run } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { getAllSettings, setSetting, SETTING_KEYS, type SettingKey } from '@/lib/operator-settings'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -32,8 +36,18 @@ export async function GET(req: NextRequest) {
     throw e
   }
   try {
-    const settings = await getAllSettings(getDb(env), operator.id)
-    return NextResponse.json({ settings })
+    const db = await readyDb(getDb(env), 'settings')
+    const [settings, who] = await Promise.all([
+      getAllSettings(db, operator.id),
+      findOne<{ bio: string | null; same_as_json: string | null }>(
+        db, `SELECT bio, same_as_json FROM operator WHERE id = ?`, operator.id,
+      ),
+    ])
+    return NextResponse.json({
+      settings,
+      bio: who?.bio ?? null,
+      same_as: who?.same_as_json ?? null,
+    })
   } catch (err: any) {
     // operator_settings table might not exist yet on live D1 if migrations
     // haven't fully run. Return empty settings + a hint instead of 500 so
@@ -71,5 +85,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'value must be a string' }, { status: 400 })
   }
   await setSetting(getDb(env), operator.id, body.key as SettingKey, body.value)
+  return NextResponse.json({ ok: true })
+}
+
+/** His one sentence. Typed by him or absent — the log does not draft it. */
+export async function PATCH(req: NextRequest) {
+  const env = getRequestContext().env as unknown as Env
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
+  const body = await req.json().catch(() => ({})) as {
+    bio?: string
+    same_as?: { kind?: string; url?: string }[]
+  }
+  const db = await readyDb(getDb(env), 'settings')
+
+  // Where else to find him. `/facts` emits these as `sameAs` in a Person
+  // block, so a url that is not a url is worse than none: it says a stranger's
+  // account is his, in a format built to be trusted. Only http(s) survives,
+  // and the kind is a word he types beside it.
+  if (Array.isArray(body.same_as)) {
+    const clean = body.same_as
+      .filter(x => x && typeof x.url === 'string' && /^https?:\/\//.test(x.url.trim()))
+      .map(x => ({
+        kind: String(x.kind || '').trim().slice(0, 40) || 'elsewhere',
+        url: x.url!.trim().slice(0, 500),
+      }))
+      .slice(0, 20)
+    await run(
+      db,
+      `UPDATE operator SET same_as_json = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      clean.length ? JSON.stringify(clean) : null, operator.id,
+    )
+    if (typeof body.bio !== 'string') return NextResponse.json({ ok: true, same_as: clean })
+  }
+
+  if (typeof body.bio !== 'string') {
+    return NextResponse.json({ error: 'bio must be a string' }, { status: 400 })
+  }
+  await run(
+    db,
+    `UPDATE operator SET bio = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    body.bio.trim().slice(0, 2000) || null, operator.id,
+  )
   return NextResponse.json({ ok: true })
 }

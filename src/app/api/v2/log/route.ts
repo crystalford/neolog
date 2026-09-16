@@ -1,0 +1,492 @@
+/**
+ * GET /api/v2/log — the log. One feed, everything in it.
+ *
+ * Params:
+ *   order  = happened | logged   (default happened — SPEC §1)
+ *   filter = all | said | did | auto | mem | pub | priv | held | buried
+ *   q      = free text; matches the sentence, the detail AND the transcript
+ *            of a recording, because searching text the reader cannot see is
+ *            worse than no search (log.html)
+ *   limit  = 1..500 (default 200)
+ *   from   = ISO date, inclusive — open one folded period
+ *   to     = ISO date, inclusive
+ *
+ * Reads `log_entries`, `vlogs` and `photos` and returns one normalised list.
+ * The reasoning for reading rather than importing is in `src/lib/log-entry.ts`
+ * — that's the handoff's open question #1, settled there.
+ *
+ * Buried rows are excluded from the feed, from search and from the count
+ * (SPEC §1 — burial, not deletion). The day still shows how many it skipped,
+ * which is what `buried` in the response is for.
+ */
+
+export const runtime = 'edge'
+
+import { NextRequest, NextResponse } from 'next/server'
+import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getDb, findMany } from '@/lib/d1'
+import { readyDb } from '@/lib/ready-db'
+import { buildFold, OPEN_DAYS } from '@/lib/fold'
+import { presignGetUrl, type R2Env } from '@/lib/r2'
+import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { lookAtHeldBacklog } from '@/lib/log-intake'
+import {
+  REFLECTS,
+  type LogEntry, type FeedFilter, type DatePrecision, type Visibility,
+  type Author, type EntryKind, type MediaRef,
+  vlogSentence, photoSentence, matchesFilter,
+} from '@/lib/log-entry'
+import type { D1Database } from '@cloudflare/workers-types'
+
+interface Env extends R2Env {
+  DB: D1Database
+  // The hold-back backlog is drained from here, and it looks at pictures.
+  AI: { run: (m: unknown, a: unknown) => Promise<unknown> }
+  NEOLOG_DEV_OPERATOR_EMAIL?: string
+}
+
+const SIGNED_TTL = 24 * 3600
+
+/**
+ * What the log can honestly say about a recording it has not finished
+ * reading. Never a spinner: `processing.html` is explicit that when a step
+ * breaks the log says which one and why, in words.
+ */
+function pipelineLine(status: string | null, error: string | null): string | null {
+  if (error) return `The log could not finish reading this: ${error}`
+  switch ((status || '').toLowerCase()) {
+    case 'uploaded':
+    case 'queued':       return 'Just arrived. Nothing read yet.'
+    case 'transcoding':  return 'Being converted so it will play here.'
+    case 'transcribing': return 'Being transcribed. The words are not searchable yet.'
+    // `reading` is the step; `extracting` is what it was called before the
+    // extraction engine was removed, kept so rows written by the old
+    // pipeline still say something true rather than falling through.
+    case 'reading':
+    case 'extracting':   return 'Transcribed. Being read for what was said in it.'
+    case 'failed':       return 'The log could not finish reading this.'
+    case 'archived':     return 'Kept, not read — you asked for it that way.'
+    default:             return null
+  }
+}
+
+/** Presign a batch of keys at once. Serialised awaits made /media slow. */
+async function presignAll(env: Env, keys: (string | null)[]): Promise<(string | null)[]> {
+  return Promise.all(keys.map(async k => {
+    if (!k) return null
+    try { return await presignGetUrl(env, k, SIGNED_TTL) } catch { return null }
+  }))
+}
+
+/**
+ * Which R2 key an item still needs a URL for, and where it goes.
+ *
+ * Presigning is HMAC work, and each of the three sources returns up to
+ * `limit` rows — so signing them all before the merge meant up to three
+ * times `limit` signatures to show `limit` rows, two thirds of them for rows
+ * that never survive the trim. The keys ride along instead and only the
+ * survivors are signed.
+ */
+const NEEDS_URL = new WeakMap<LogEntry, { key: string; slot: 'url' | 'poster_url' }>()
+
+export async function GET(req: NextRequest) {
+  const env = getRequestContext().env as unknown as Env
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
+  const db = await readyDb(getDb(env), 'log')
+  const url = new URL(req.url)
+  const order = url.searchParams.get('order') === 'logged' ? 'logged' : 'happened'
+  const filter = (url.searchParams.get('filter') || 'all') as FeedFilter
+  const q = (url.searchParams.get('q') || '').trim().toLowerCase()
+  const limit = Math.min(500, Math.max(1, parseInt(url.searchParams.get('limit') || '200', 10)))
+  // Opening one folded period. "Nothing is a flat list past about twenty —
+  // fold by time, fold by heading, search first" (SPEC §1 design constants).
+  const from = url.searchParams.get('from')
+  const to = url.searchParams.get('to')
+  const dateCol = order === 'logged'
+    ? 'COALESCE(logged_at, created_at)'
+    : 'COALESCE(happened_at, occurred_at)'
+  const rangeSql = from || to
+    ? ` AND ${dateCol} >= ? AND ${dateCol} <= ?`
+    : ''
+  const rangeBinds: string[] = from || to
+    ? [
+        from ? new Date(from).toISOString() : '0000',
+        to ? new Date(`${to}T23:59:59.999Z`).toISOString() : '9999',
+      ]
+    : []
+  // Burial removes an entry from the feed, search and the counts. Asking for
+  // it by name is the only way to see it — and the only way back to digging
+  // one up, since the dig-up control lives on the entry's own page.
+  const wantBuried = filter === 'buried'
+
+  // Pull a generous slice from each table, merge, then cap. Each table is
+  // capped at `limit` because after the merge only `limit` rows survive
+  // anyway — no table can starve another out of the window.
+  const [entryRows, vlogRows, photoRows, buriedRow, buriedDayRows, coverageRows] = await Promise.all([
+    findMany<{
+      id: string; text: string; detail: string | null
+      occurred_at: string; created_at: string
+      happened_at: string | null; logged_at: string | null
+      date_precision: string; kind: string; visibility: string
+      held_reason: string | null; author: string; source_kind: string
+      batch_id: string | null; r2_key: string | null; mime: string | null
+      duration_seconds: number | null; transcript: string | null
+      link_url: string | null; original_filename: string | null
+      vlog_id: string | null; source_ref: string | null
+      led_from: string | null; relation: string
+    }>(
+      db,
+      `SELECT id, text, detail, occurred_at, created_at, happened_at, logged_at,
+              date_precision, kind, visibility, held_reason, author, source_kind,
+              batch_id, r2_key, mime, duration_seconds, transcript, link_url,
+              original_filename, vlog_id, source_ref, led_from, relation
+         FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL
+          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}${rangeSql}
+        ORDER BY COALESCE(${order === 'logged' ? 'logged_at, created_at' : 'happened_at, occurred_at'}) DESC
+        LIMIT ?`,
+      operator.id, ...rangeBinds, limit,
+    ),
+    wantBuried ? Promise.resolve([]) : findMany<{
+      id: string; original_filename: string | null
+      thumbnail_r2_key: string | null; thumbnail_url: string | null
+      duration_seconds: number | null; recorded_at: string | null
+      recorded_at_source: string | null; created_at: string
+      vision_description: string | null
+      transcript_text: string | null; visibility: string | null
+      pipeline_status: string | null; pipeline_error: string | null
+    }>(
+      db,
+      `SELECT id, original_filename, thumbnail_r2_key, thumbnail_url,
+              duration_seconds, recorded_at, recorded_at_source, created_at,
+              vision_description, transcript_text, visibility,
+              pipeline_status, pipeline_error
+         FROM vlogs
+        WHERE operator_id = ? AND deleted_at IS NULL${
+          rangeSql.replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(recorded_at, created_at)')
+                  .replace(/COALESCE\(logged_at, created_at\)/g, 'created_at')}
+        ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
+        LIMIT ?`,
+      operator.id, ...rangeBinds, limit,
+    ),
+    wantBuried ? Promise.resolve([]) : findMany<{
+      id: string; thumbnail_r2_key: string | null; r2_key: string
+      caption: string | null; vision_description: string | null
+      taken_at: string | null; created_at: string; visibility: string | null
+    }>(
+      db,
+      `SELECT id, thumbnail_r2_key, r2_key, caption, vision_description,
+              taken_at, created_at, visibility
+         FROM photos
+        WHERE operator_id = ? AND deleted_at IS NULL${
+          rangeSql.replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(taken_at, created_at)')
+                  .replace(/COALESCE\(logged_at, created_at\)/g, 'created_at')}
+        ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'taken_at, created_at'}) DESC
+        LIMIT ?`,
+      operator.id, ...rangeBinds, limit,
+    ),
+    findMany<{ n: number }>(
+      db,
+      `SELECT COUNT(*) AS n FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NOT NULL`,
+      operator.id,
+    ),
+    // Per day, so a day whose only entry is buried still shows up with one
+    // dim line rather than disappearing. "The day keeps one dim row" —
+    // buried.html. A day that silently vanishes is a delete with extra steps.
+    findMany<{ d: string; n: number }>(
+      db,
+      `SELECT substr(COALESCE(happened_at, occurred_at, created_at), 1, 10) AS d,
+              COUNT(*) AS n
+         FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NOT NULL
+        GROUP BY d`,
+      operator.id,
+    ),
+    // Coverage by year, over the WHOLE log rather than the page being shown.
+    // Computing it from the returned rows made the bar describe a 200-row
+    // window, and clicking a year re-filtered the feed and collapsed the bar
+    // to the single year just clicked.
+    findMany<{ y: string; n: number }>(
+      db,
+      `SELECT strftime('%Y', COALESCE(happened_at, occurred_at, created_at)) AS y,
+              COUNT(*) AS n
+         FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+        GROUP BY y
+       UNION ALL
+       SELECT strftime('%Y', COALESCE(recorded_at, created_at)) AS y, COUNT(*) AS n
+         FROM vlogs
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY y
+       UNION ALL
+       SELECT strftime('%Y', COALESCE(taken_at, created_at)) AS y, COUNT(*) AS n
+         FROM photos
+        WHERE operator_id = ? AND deleted_at IS NULL
+        GROUP BY y`,
+      operator.id, operator.id, operator.id,
+    ),
+  ])
+
+  const items: LogEntry[] = []
+
+  // ── Which of these are on a route ────────────────────────────────────────
+  // `log.html` marks a row "in a chain" in steel. An entry is on one if it
+  // led from something, or if something led from it. The first half is on
+  // the row already; the second is one query over the ids in this window,
+  // not one per row — the lesson the fold learned when it ran a query per
+  // bucket.
+  //
+  // ⚠️ A REFLECTION's led_from is not a chain. SPEC §1: a later thought
+  // about an earlier event "never becomes a second event", so it is a layer
+  // under its target, not a turn on a route. The walk follows turns.
+  const onRoute = new Set<string>()
+  for (const r of entryRows) {
+    if (r.led_from && r.relation !== REFLECTS) onRoute.add(r.id)
+  }
+  //
+  // ⚠️ Chunked at ninety. The window is up to 500 rows, and this is the ONE
+  // route that must not throw — a 500 here is the log not loading at all,
+  // the same failure `vlogs.transcript` caused on 7 Sep. D1 has a
+  // bound-parameter ceiling and a 502-parameter statement is not worth
+  // finding out about in production, on a hot path, for a tag.
+  const ids = entryRows.map(r => r.id)
+  for (let i = 0; i < ids.length; i += 90) {
+    const slice = ids.slice(i, i + 90)
+    const ph = slice.map(() => '?').join(',')
+    const leads = await findMany<{ led_from: string }>(
+      db,
+      `SELECT DISTINCT led_from FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND relation <> ? AND led_from IN (${ph})`,
+      operator.id, REFLECTS, ...slice,
+    )
+    for (const l of leads) if (l.led_from) onRoute.add(l.led_from)
+  }
+
+  // A reflection never becomes a second event, so it is lifted out of the
+  // list and attached to what it is about. One whose target is not in this
+  // window falls back to being its own row — better a row out of place than
+  // a thought that vanishes.
+  const layersFor = new Map<string, { id: string; text: string; at: string }[]>()
+  const present = new Set(entryRows.map(r => r.id))
+  const reflections = new Set<string>()
+  for (const r of entryRows) {
+    if (r.relation !== REFLECTS || !r.led_from || !present.has(r.led_from)) continue
+    reflections.add(r.id)
+    const list = layersFor.get(r.led_from) || []
+    list.push({ id: r.id, text: r.text, at: r.happened_at || r.occurred_at || r.created_at })
+    layersFor.set(r.led_from, list)
+  }
+
+  // ── Typed, spoken, dropped-in entries ────────────────────────────────────
+  entryRows.forEach(r => {
+    if (reflections.has(r.id)) return
+    const media: MediaRef[] = []
+    if (r.r2_key) {
+      const m = r.mime || ''
+      media.push({
+        kind: m.startsWith('image/') ? 'image'
+            : m.startsWith('video/') ? 'video'
+            : m.startsWith('audio/') ? 'audio' : 'file',
+        url: null,
+        duration_seconds: r.duration_seconds,
+        label: r.original_filename,
+      })
+    }
+    items.push({
+      id: r.id,
+      source: 'entry',
+      kind: (r.kind || 'said') as EntryKind,
+      sentence: r.text,
+      detail: r.detail,
+      happened_at: r.happened_at || r.occurred_at || r.created_at,
+      logged_at: r.logged_at || r.created_at || r.occurred_at,
+      date_precision: (r.date_precision || 'exact') as DatePrecision,
+      visibility: (r.visibility || 'public') as Visibility,
+      held_reason: r.held_reason,
+      author: (r.author || 'operator') as Author,
+      href: `/entry/${r.id}`,
+      media,
+      duration_seconds: r.duration_seconds,
+      batch_id: r.batch_id,
+      vlog_id: r.vlog_id,
+      source_ref: r.source_ref,
+      layers: layersFor.get(r.id),
+      on_route: onRoute.has(r.id),
+      searchable: [r.text, r.detail, r.transcript, r.link_url, r.original_filename]
+        .filter(Boolean).join(' ').toLowerCase(),
+    })
+    if (r.r2_key) NEEDS_URL.set(items[items.length - 1], { key: r.r2_key, slot: 'url' })
+  })
+
+  // ── Recordings ──────────────────────────────────────────────────────────
+  // The sentence is the log's, composed from the file's own facts, and what
+  // sits underneath is the log's description of the FRAME — nothing the
+  // extraction engine wrote about it.
+  vlogRows.forEach(v => {
+    // A legacy data-URI thumbnail needs no signing; a key does.
+    const thumb = v.thumbnail_url || null
+    // A date the pipeline had to guess is a fuzzy date, and says so.
+    const src = v.recorded_at_source || ''
+    const precision: DatePrecision =
+      !v.recorded_at ? 'approx'
+      : src === 'upload_time' ? 'approx'
+      : src === 'filename' || src === 'filename_date_only' ? 'day'
+      : 'exact'
+    items.push({
+      id: v.id,
+      source: 'vlog',
+      kind: 'made',
+      sentence: vlogSentence(v.duration_seconds),
+      // The entry appears immediately, before anything has been read — and
+      // then says where it has got to, in words rather than a spinner. A
+      // recording mid-transcription and one whose pipeline died looked
+      // identical to a finished one, which is the worst of the three.
+      // ⚠️ `vlogs.title` and `vlogs.summary` used to sit here, ahead of the
+      // frame description. Both were written by the extraction engine's last
+      // pass — "an AI-written title and summary written back onto the
+      // recording" — and nothing has written either since 8 Sep, so every
+      // non-filename value in them is the deleted generator's prose about
+      // his life, rendering as the recording's line on the home page. The
+      // marking rule was satisfied (`author: 'log'`), and that is not the
+      // point: the engine went because he did not trust its output.
+      detail: pipelineLine(v.pipeline_status, v.pipeline_error)
+        // A recording with no words in it is not a broken recording. If the
+        // log has only a description of the frames, it says so — "nobody
+        // spoke" is a fact about the recording, and leaving it unsaid makes
+        // the log's own sentence look like a transcript (silent.html).
+        || (v.vision_description
+              ? `Nobody spoke. ${v.vision_description}`
+              : null),
+      happened_at: v.recorded_at || v.created_at,
+      logged_at: v.created_at,
+      date_precision: precision,
+      // Read, never asserted. `vlogs.visibility` defaults to 'private', so
+      // claiming every recording is public marked three hundred of them for
+      // a public log that had not been asked about a single one.
+      visibility: (v.visibility === 'public' ? 'public' : 'private') as Visibility,
+      held_reason: null,
+      author: 'log',
+      href: `/vlog/${v.id}`,
+      media: [{
+        kind: 'video',
+        url: null,
+        poster_url: thumb,
+        duration_seconds: v.duration_seconds,
+        label: v.original_filename,
+      }],
+      duration_seconds: v.duration_seconds,
+      batch_id: null,
+      vlog_id: v.id,
+      source_ref: null,
+      // The transcript is searchable even though the row never shows it.
+      // Same reason they are not in `detail`: a row surfacing because a
+      // deleted model's summary matched is the log deciding relevance out of
+      // words he never said, with nothing on screen saying why it matched.
+      searchable: [v.vision_description, v.original_filename, v.transcript_text]
+        .filter(Boolean).join(' ').toLowerCase(),
+    })
+    if (v.thumbnail_r2_key) {
+      NEEDS_URL.set(items[items.length - 1], { key: v.thumbnail_r2_key, slot: 'poster_url' })
+    }
+  })
+
+  // ── Photos ──────────────────────────────────────────────────────────────
+  photoRows.forEach(p => {
+    items.push({
+      id: p.id,
+      source: 'photo',
+      kind: 'seen',
+      sentence: photoSentence(1),
+      // A caption the operator wrote is his. A vision description is the
+      // log's, and the author field is what says so.
+      detail: p.caption || p.vision_description || null,
+      happened_at: p.taken_at || p.created_at,
+      logged_at: p.created_at,
+      date_precision: p.taken_at ? 'exact' : 'approx',
+      visibility: (p.visibility === 'public' ? 'public' : 'private') as Visibility,
+      held_reason: null,
+      author: p.caption ? 'operator' : 'log',
+      // A row links to its content, never to the container it belongs to
+      // (SPEC §11). A photo has no page of its own in this build, so its row
+      // is not clickable — and it does not need to be: the picture IS the
+      // content, and clicking the picture opens it. Never invent a
+      // destination to satisfy an affordance.
+      href: '',
+      media: [{ kind: 'image', url: null, label: p.caption }],
+      duration_seconds: null,
+      batch_id: null,
+      vlog_id: null,
+      source_ref: null,
+      searchable: [p.caption, p.vision_description].filter(Boolean).join(' ').toLowerCase(),
+    })
+    NEEDS_URL.set(items[items.length - 1], {
+      key: p.thumbnail_r2_key || p.r2_key, slot: 'url',
+    })
+  })
+
+  // ── One list ────────────────────────────────────────────────────────────
+  const dateOf = (e: LogEntry) => (order === 'logged' ? e.logged_at : e.happened_at) || ''
+  let list = items.filter(e => matchesFilter(e, filter))
+  if (q) list = list.filter(e => e.searchable.includes(q) || e.sentence.toLowerCase().includes(q))
+  list.sort((a, b) => dateOf(b).localeCompare(dateOf(a)))
+
+  const total = list.length
+  const trimmed = list.slice(0, limit)
+
+  // Only the rows that are actually being returned get a signature.
+  const pending = trimmed.map(e => NEEDS_URL.get(e) || null)
+  const signed = await presignAll(env, pending.map(p => p?.key || null))
+  trimmed.forEach((e, i) => {
+    const want = pending[i]
+    if (!want || !signed[i] || !e.media.length) return
+    if (want.slot === 'url') e.media[0].url = signed[i]
+    else e.media[0].poster_url = signed[i]
+  })
+
+  // The three sources are counted separately, so fold them into one year map.
+  const coverage: Record<string, number> = {}
+  for (const r of coverageRows) {
+    if (!r.y) continue
+    coverage[r.y] = (coverage[r.y] || 0) + (r.n || 0)
+  }
+
+  // The folded periods, for the unfiltered default view only. A filtered or
+  // searched feed is already a narrowed list, and folding it again would
+  // hide the thing being looked for.
+  const fold = (!q && filter === 'all' && !from && !to)
+    ? await buildFold(db, operator.id, { order })
+    : []
+
+  // ── Look at the pictures that are still waiting ────────────────────────
+  //
+  // A camera-roll import lands more images than one request can look at, so
+  // intake checks a few and leaves the rest exactly as they arrived. This is
+  // where the remainder gets seen: a small batch per feed load, after the
+  // response has gone. The feed is the right place because a held row is
+  // visible ON it — "not looked at yet" is a state he can watch clear.
+  //
+  // A picture the check already refused is not re-asked; its `held_reason`
+  // says what the log saw, and asking again would eventually release
+  // something it held on purpose.
+  getRequestContext().ctx.waitUntil(
+    lookAtHeldBacklog(env as never, db, operator.id, 6)
+      .catch(err => console.warn('[log] hold-back backlog:', err?.message || err)),
+  )
+
+  return NextResponse.json(
+    {
+      items: trimmed, total, order, filter,
+      buried: buriedRow[0]?.n || 0,
+      buried_by_day: Object.fromEntries(buriedDayRows.filter(r => r.d).map(r => [r.d, r.n])),
+      coverage, fold, open_days: OPEN_DAYS,
+    },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
+}

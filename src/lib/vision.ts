@@ -15,7 +15,7 @@
  */
 
 import type { Ai, D1Database } from '@cloudflare/workers-types'
-import { callChat } from './llm'
+import { callChat, VISION_MODEL } from './llm'
 import { getObject, type R2Env } from './r2'
 import { findMany, run } from './d1'
 
@@ -31,7 +31,6 @@ export interface VisionResult {
   model: string
 }
 
-const VISION_MODEL_KEY = 'scout' as const  // Llama 4 Scout — multimodal, in-house
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024     // skip enormous originals; display JPEGs are small
 
 const SYSTEM = `You describe a personal photo for the operator's own archive.
@@ -62,7 +61,6 @@ export async function describeImageFromR2(
 
   try {
     const res = await callChat(env as any, {
-      model: VISION_MODEL_KEY,
       system: SYSTEM,
       messages: [{
         role: 'user',
@@ -76,7 +74,7 @@ export async function describeImageFromR2(
     })
     const parsed = parseVision(res.text)
     if (!parsed) return null
-    return { ...parsed, model: res.model || VISION_MODEL_KEY }
+    return { ...parsed, model: res.model || VISION_MODEL }
   } catch (err: any) {
     console.warn(`[vision] model call failed for ${r2Key}: ${err?.message || err}`)
     return null

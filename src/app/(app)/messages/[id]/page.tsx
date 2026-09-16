@@ -1,0 +1,284 @@
+'use client'
+
+/**
+ * One thread — both sides, and what a stranger would see today.
+ *
+ * The second half is the point of the page. `messages.html` shows the
+ * default state's public rendering and says: "Your words, his absences. The
+ * shape of a conversation with none of his content. It reads a little
+ * strange — **that's correct.** The strangeness is his privacy, made visible
+ * instead of quietly overridden."
+ *
+ * So the preview is not a nicety. It is the only way he can see what his
+ * publishing would actually do to someone else before he does it, and it is
+ * rendered from the same function the public surfaces use — never from a
+ * second copy of the rule that could drift from it.
+ */
+
+export const runtime = 'edge'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
+import {
+  CONSENT_STATES, CONSENT_WORDS, asConsent, type Consent,
+} from '@/lib/correspondence'
+
+interface Msg {
+  id: string; side: 'operator' | 'other'; speaker: string | null
+  text: string; sent_at: string | null; sent_at_source: string
+  position: number; entry_id: string | null
+}
+interface PubMsg {
+  id: string; side: 'operator' | 'other'; speaker: string | null
+  text: string | null; sent_at: string | null; withheld: string | null
+}
+interface Result {
+  thread: {
+    id: string; person_name: string; person_page_id: string | null
+    medium: string; started_at: string | null; ended_at: string | null
+    message_count: number
+  }
+  messages: Msg[]
+  consent: string
+  consent_at: string | null
+  consent_note: string | null
+  public_view: PubMsg[]
+}
+
+const clock = (s: string | null) => {
+  if (!s) return ''
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? '' : d.toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+export default function Thread() {
+  const params = useParams<{ id: string }>()
+  const [r, setR] = useState<Result | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [note, setNote] = useState('')
+  const [err, setErr] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/v2/log/correspondence/${params.id}`, { cache: 'no-store' })
+      if (res.ok) setR(await res.json() as Result)
+    } catch { setR(null) }
+    finally { setLoading(false) }
+  }, [params.id])
+  useEffect(() => { void load() }, [load])
+
+  const setConsent = useCallback(async (state: Consent) => {
+    setErr(null)
+    try {
+      const res = await fetch(`/api/v2/log/correspondence/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent: state, consent_note: note }),
+      })
+      if (!res.ok) {
+        const j = await res.json() as { error?: string }
+        setErr(j.error || 'that did not save')
+        return
+      }
+      setNote('')
+      await load()
+    } catch { setErr('that did not save') }
+  }, [params.id, note, load])
+
+  const consent = asConsent(r?.consent)
+  const t = r?.thread
+
+  return (
+    <Shell>
+      <div className="logpage">
+        <div className="back">
+          <Link href="/">the log</Link>
+          <Link href="/messages">messages</Link>
+        </div>
+
+        <div className="grid">
+          <main>
+
+            {/* `messages.html`: "Your side is yours; their side is kept,
+                attached to them, and never crosses to public on your say-so
+                alone." The page says which is which before it shows either. */}
+            <div className="sides">
+              <div className="a">
+                <h4>Your side — yours</h4>
+                <p>
+                  <b>Each of your messages is an entry you said</b>, dated to
+                  the minute, the same as anything you type into the log.
+                  Normal rules.
+                </p>
+              </div>
+              <div className="b">
+                <h4>Their side — theirs</h4>
+                <p>
+                  <b>Kept in full, attached to them.</b> Never public without
+                  their yes. A fact they state is filed as <em>they said</em>,
+                  not as fact.
+                </p>
+              </div>
+            </div>
+
+        {loading && <div className="none">Reading it.</div>}
+        {!loading && !t && <div className="none">No such conversation.</div>}
+
+        {t && r && (
+          <>
+            <div className="pghead">
+              <h1>
+                {t.medium === 'email' ? 'Emails' : t.medium === 'chat' ? 'Messages' : 'Texts'} with {t.person_name}
+              </h1>
+            </div>
+            <div className="stamp">
+              {t.started_at && <time dateTime={t.started_at}>{clock(t.started_at)}</time>}
+              <span>{t.message_count} messages</span>
+              {t.person_page_id
+                ? <Link href={`/page/${t.person_page_id}`}>their page</Link>
+                : <span>not attached to a page</span>}
+            </div>
+
+            {/* Both sides, whole, as he forwarded them. This half is his to
+                read and is not affected by the consent state — the state
+                governs what a STRANGER sees, not what he keeps. */}
+            <div className="sh"><span>the thread</span><b>only you see this</b></div>
+            <div className="body">
+              {r.messages.map(m => (
+                <div className={`msg ${m.side === 'operator' ? 'you' : 'them'}`} key={m.id}>
+                  <div className="w">
+                    {m.speaker || (m.side === 'operator' ? 'you' : t.person_name)}
+                    {m.sent_at && (
+                      <time dateTime={m.sent_at}>
+                        {clock(m.sent_at)}
+                        {m.sent_at_source !== 'paste' && ' · no time given'}
+                      </time>
+                    )}
+                  </div>
+                  {/* ⚠️ `.x`, not `.body`. `.body` is the design's SECTION
+                      wrapper on this page and was nested inside itself here,
+                      so a message took a container's styling. `.msg .x` is
+                      the text, and its `<i>` is the note under it. */}
+                  <div className="x">
+                    {m.text}
+                    {m.entry_id && (
+                      <i><Link href={`/entry/${m.entry_id}`}>on the log</Link></i>
+                    )}
+                    {m.side === 'other' && (
+                      <i>theirs — filed as {t.person_name} says, not as fact</i>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Their answer. Four states, and the default is the most
+                private one — set without asking, because the person whose
+                words these are is not here to ask. */}
+            <div className="sh">
+              <span>their answer</span>
+              <b>{r.consent_at ? `set ${clock(r.consent_at)}` : 'never asked'}</b>
+            </div>
+            <div className="cons">
+              {CONSENT_STATES.map(s => (
+                <button
+                  key={s}
+                  className={`cs${consent === s ? ' on' : ''}`}
+                  onClick={() => void setConsent(s)}
+                >
+                  <span className="k">
+                    {CONSENT_WORDS[s].name}
+                    {s === 'kept_private' && <i>the default · everyone starts here</i>}
+                  </span>
+                  <span className="x">{CONSENT_WORDS[s].what}</span>
+                  {/* The state they are actually at, marked. `.no` is a dash
+                      rather than a blank: a state nobody is at is a fact
+                      about the row, and an empty cell reads as unrendered. */}
+                  <span className={`s ${consent === s ? 'on' : 'no'}`}>
+                    {consent === s
+                      ? `${t.person_name || 'them'} · ${r.consent_at ? clock(r.consent_at) : 'now'}`
+                      : '—'}
+                  </span>
+                </button>
+              ))}
+              <div className="how">
+                <input
+                  value={note}
+                  onChange={e => setNote(e.target.value)}
+                  placeholder="How did they say it? Said so on the phone, 4 Sep."
+                />
+                <em>
+                  Their yes is a fact on the log, not a checkbox: when they
+                  said it and how, kept with the state.
+                  {r.consent_note && ` Currently: ${r.consent_note}`}
+                </em>
+              </div>
+              {err && <div className="err">{err}</div>}
+            </div>
+
+            {/* The whole reason this page exists. */}
+            <div className="sh">
+              <span>what a stranger sees if you publish this today</span>
+            </div>
+            {r.public_view.length === 0 ? (
+              <div className="none">
+                Nothing. They asked to be removed, and your side alone would
+                read as though you said all of it.
+              </div>
+            ) : (
+              <div className="pubv">
+                {/* `messages.html`'s `.k` — the preview says whose consent
+                    state it is previewing, and what that state is. Without
+                    it the block is a second copy of the thread with some
+                    lines missing, and nothing on screen says why. */}
+                <div className="k">
+                  What a stranger sees if you publish this thread today, with{' '}
+                  {t.person_name || 'them'} at <b>{CONSENT_WORDS[consent].name}</b>.
+                </div>
+                {/* ⚠️ One LINE, not a second copy of the thread. This
+                    block answers "what would publishing do to them", and
+                    the answer is a shape: his sentences running on, with
+                    their turns as bracketed absences. Rendered as rows it
+                    read as the thread again with some of it missing, which
+                    is the same information laid out to look like a bug.
+                    `.pubv .l s` puts the brackets on. */}
+                <div className="l">
+                  {r.public_view[0]?.sent_at && <>{clock(r.public_view[0].sent_at)} — </>}
+                  {r.public_view.map(m => (
+                    m.text === null
+                      ? <s key={m.id}>{m.withheld}</s>
+                      : <span key={m.id}>&ldquo;{m.text}&rdquo; </span>
+                  ))}
+                </div>
+                {/* `.f` — inside the preview, not after it. The line is
+                    about what is in the box above; as a `.none` paragraph
+                    outside it, it read as a note about the page. */}
+                {consent !== 'quotable' && r.public_view.length > 0 && (
+                  <div className="f">
+                    Your words, their absences. The shape of a conversation
+                    with none of their content. It reads a little strange —{' '}
+                    <b>that is correct.</b> The strangeness is their privacy,
+                    made visible instead of quietly overridden.
+                  </div>
+                )}
+              </div>
+            )}
+
+          </>
+        )}
+                </main>
+
+          <Rail goesTo={[
+            { href: '/messages', label: 'every conversation' },
+            { href: '/pages', label: 'the index' },
+          ]} />
+        </div>
+      </div>
+    </Shell>
+  )
+}

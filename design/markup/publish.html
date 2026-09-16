@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — making one entry public</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+</head>
+<body><div class="wrap">
+<header class="mh">
+  <a class="lock" href="log.html"><span class="mk"></span><span class="wm">neolog</span></a>
+  <span class="pv">private · making one entry public</span>
+  <nav><a href="log.html">home</a><a href="search.html">search</a><a href="headings.html">index</a></nav>
+</header><div class="specnote">A page from the spec — one mechanic, shown. <a href="expanded.html">The product itself is the log and the expanded entry.</a></div>
+<div class="grid">
+<main>
+<section class="top">
+  <h1>Everything is private until you pick one entry and say otherwise. <b>This is what that looks like.</b></h1>
+  <p>There is no publish queue, no drafts folder, no schedule. On the private log, every entry has a small <b>make public</b> link. You click it on one entry. A sheet shows you exactly what would be visible, what stays private, and what gets attached so the thing can be traced back to you. You say yes or no. That's the whole thing.</p>
+</section>
+<!-- ===== 1 ===== -->
+<div class="st"><div class="n"><b>1</b>on the log</div><div><h2>Hover an entry. <b>One of the links is "make public."</b></h2><p>Same as every other action on an entry — small, grey, at the bottom. It's not promoted. Most entries never get clicked.</p></div></div>
+<div class="body">
+  <div class="en">
+    <span class="t">24 Aug</span>
+    <div>
+      <div class="x">Got the job. <b>Ancaster.</b><i>said · a job</i></div>
+      <div class="acts"><a href="#">open</a><a href="#">edit</a><a href="#">change date</a><a href="#" class="on">make public</a><a href="#">bury</a></div>
+    </div>
+  </div>
+</div>
+<!-- ===== 2 ===== -->
+<div class="st"><div class="n"><b>2</b>the sheet</div><div><h2>Left: what you have. Right: what a stranger would see. <b>Nothing on the right that isn't on the left.</b></h2><p>The public version is your words, sometimes shorter. If the log trimmed anything, the trimmed part is struck through on the left so you can see it. The private context — the voice note behind it, the July mention, the photo — stays private unless you add it.</p></div></div>
+<div class="body">
+  <div class="sheet">
+    <div class="h"><b>Make this entry public?</b><span>24 Aug 2026 · one entry · nothing else changes</span></div>
+    <div class="two">
+      <div>
+        <h4>What you have — stays private</h4>
+        <div class="priv">Got the job. <b>Ancaster.</b> <s>First agency job in eighteen years. Not recorded anywhere else — no LinkedIn, no announcement.</s><br><br>Behind it: a 1:12 voice note from that morning, the 27 July note where you first mentioned "the job," a photo of the building from 1 Sep. <b>None of this goes.</b></div>
+        <div class="kept"><b>Trimmed for public:</b> the second and third sentences. Untick to include them. The log never adds a sentence you didn't write.</div>
+      </div>
+      <div>
+        <h4>What a stranger sees — on the public log</h4>
+        <div class="pub">Got the job. <b>Ancaster.</b><i>24 August 2026 · said · Chris Telford</i></div>
+        <div class="kept"><b>Reads alone?</b> Yes — a person, a date, a thing that happened. If it needed the private context to make sense, the log would say so here and suggest a fuller version.</div>
+      </div>
+    </div>
+    <div class="trace">
+      <h4>What gets attached so it can be traced back to you</h4>
+      <div class="tr"><span class="k">an address</span><span class="v"><code>neolog.ai/chris/log/2026-08-24-ancaster</code><em>permanent · never reused</em></span></div>
+      <div class="tr"><span class="k">a date</span><span class="v">24 August 2026 — when it happened. <em>Also when it was made public: today.</em></span></div>
+      <div class="tr"><span class="k">your name</span><span class="v">Chris Telford, linked to <a href="dossier.html" style="border-bottom:1px solid var(--line-2)">the about page</a><em>so a machine knows which Chris</em></span></div>
+      <div class="tr"><span class="k">the words</span><span class="v">Exactly the sentence on the right. <em>Not a summary of it.</em></span></div>
+      <div class="tr"><span class="k">a page</span><span class="v">Makes <b>Ancaster</b> visible on the public side too — the page, with this one entry under it. <em>Untick to publish the entry alone.</em></span></div>
+    </div>
+    <div class="btm"><a class="b" href="#">Make it public</a><a class="b gh" href="#">Include the trimmed lines</a><a class="b gh" href="#">Not this one</a><span class="q">reversible — see below</span></div>
+  </div>
+</div>
+<!-- ===== 3 ===== -->
+<div class="st"><div class="n"><b>3</b>after</div><div><h2>The entry stays where it was. <b>It just has a second address now.</b></h2><p>On your log, a small <em>public</em> mark. On the public log, the sentence. Same entry, two views. Take it back and the public address returns "this was here, and was taken down on [date]" — never a 404, never a silent deletion. The log doesn't pretend things didn't happen, including publishing.</p></div></div>
+<div class="body">
+  <div class="after">
+    <div class="af">
+      <div class="h"><b>Your log</b><span>private</span></div>
+      <div class="en2"><span class="t">24 Aug</span><div class="x">Got the job. Ancaster.<i class="pub">public</i><i>said · a job</i></div></div>
+    </div>
+    <div class="af">
+      <div class="h"><b>The public log</b><span>neolog.ai/chris</span></div>
+      <div class="en2"><span class="t">24 Aug</span><div class="x">Got the job. Ancaster.<i>said</i></div></div>
+    </div>
+  </div>
+</div>
+<div class="rules">
+  <div><b>One entry at a time, by hand.</b><p>No bulk publish, no "make everything under this page public," no schedule. The friction is the feature: every public sentence was chosen once, by you, looking at it.</p></div>
+  <div><b>Nothing on the right that isn't on the left.</b><p>The public version can be shorter than the private one. It can never be longer, and it can never contain a sentence you didn't write. Trimmed parts are struck through, not hidden.</p></div>
+  <div><b>Taking it back leaves a mark.</b><p>An unpublished entry's address says it was here and when it was taken down. Not a 404. The log keeps the fact that something was public, because that also happened.</p></div>
+</div>
+</main>
+<aside class="rail"><div class="rc"><div class="h">On this page</div><div class="i">Hover an entry. One of the links is "make public."</div><div class="i">The entry stays where it was. It just has a second address now.</div></div><div class="rc"><div class="h">Goes to</div><div class="i"><a href="dossier.html">the about page</a></div></div><div class="rc"><div class="h">Elsewhere</div><div class="acts"><a href="log.html">the log</a><a href="portal.html">every page</a></div></div></aside>
+</div>
+<footer class="ft"><span>neolog · the publish moment</span><span class="r2"><a href="public-log.html">the public log</a><a href="index.html">everything</a></span></footer>
+</div></body></html>

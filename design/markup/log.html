@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — the log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+<link rel="stylesheet" href="detail.css">
+</head>
+<body><div class="page"><div class="wrap">
+<header class="mh">
+  <a class="lock" href="log.html"><span class="mk"></span><span class="wm">neolog</span></a>
+  <span class="pv">home · private · only you see this</span>
+  <nav><a href="log.html" class="on">home</a><a href="search.html">search</a><a href="headings.html">index</a></nav>
+</header>
+<div class="grid">
+<main>
+  <div class="comp" id="slab">
+    <div class="in">
+      <div class="att" id="att"></div>
+      <span class="cnt" id="cnt"></span>
+      <textarea id="in" rows="2" placeholder="What happened?"></textarea>
+      <div class="bar2">
+        <button class="way" id="mic" title="Talk"></button><span class="sep"></span>
+        <label class="way" title="Files"><input type="file" multiple></label>
+        <label class="way" title="Photos and video"><input type="file" accept="image/*,video/*" multiple></label>
+        <button class="way" id="lnk" title="A link"></button>
+        <button class="way" id="cht" title="A conversation"></button>
+        <a class="focus" href="now.html">full screen</a>
+        <button class="send" title="Put it in · Enter"></button>
+      </div>
+    </div>
+  </div>
+  <div class="rcpt" id="rcpt"></div>
+  <div class="find">
+    <input id="q" placeholder="Search the log — a word, a name, a day" aria-label="Search the log">
+    <span class="clr" id="qclr" hidden>clear</span>
+  </div>
+  <div class="bar">
+    <div class="f" id="f"><button class="on" data-k="all">everything</button><button data-k="said">what I said</button><button data-k="did">what I did</button><button data-k="auto">arrived on its own</button><button data-k="mem">from memory</button><button data-k="pub">public</button><button data-k="priv">kept private</button><button data-k="held">held back</button></div>
+    <div class="r"><span id="shown"></span><span>order:</span><button class="on" id="o-life">when it happened</button><button id="o-log">when I logged it</button></div>
+  </div>
+  <div id="feed">
+  <div class="day"><b>Today</b>5 September 2026</div>
+  <div class="en" data-open="held.html" data-k="auto held priv" data-life="2026-09-05" data-log="2026-09-05" data-about="building neolog"><div class="t" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">Took a photo of my driver's licence.</span><span class="tags"><i>arrived</i><i class="held">held back</i></span></div>
+    <div class="pics"><span class="still" style="border:1px solid var(--line-1);border-radius:6px;background:repeating-linear-gradient(135deg,#141414 0 8px,#191919 8px 16px);position:relative"><span style="position:absolute;inset:0;display:grid;place-items:center;font-size:10.5px;color:var(--fg-4)">not shown</span></span><span class="cap">blurred here too, until you say otherwise</span></div>
+    <div class="more"><b>The log kept this private on its own.</b> It looks like an identity document — a name, a date of birth and a number on a card. Nothing about it has left your device, and it is not on the public log. You can publish it anyway, but you have to say so.</div>
+  </div></div>
+  <div class="en" data-open="e-applied-geo.html" data-k="did pub" data-life="2026-09-05" data-log="2026-09-05" data-about="building neolog"><div class="t" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">Put both dates, the author and who-wrote-it into all 37 entry pages.</span><span class="tags"><i>did</i><i class="ch">in a chain</i></span></div>
+    <div class="more">The end of a chain that started with a question three days earlier.</div>
+  </div></div>
+  <div class="en" data-open="e-position-geo.html" data-k="said pub" data-life="2026-09-05" data-log="2026-09-05" data-about="being cited"><div class="t" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">A record that can be cited has to be dated, disclosed, and mentioned elsewhere.</span><span class="tags"><i>said</i><i class="ch">in a chain</i></span></div>
+    <div class="more">Three things, in that order. The first two are mine to fix; the third is not entirely.</div>
+  </div></div>
+  <div class="en" data-open="e-voice.html" data-k="said pub" data-life="2026-09-05" data-log="2026-09-05" data-about="the deck|building neolog"><div class="t" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">Talked for two minutes about the deck while walking back.</span><span class="tags"><i>said</i></span></div>
+    <div class="pics"><div class="aud" data-dur="2:14">
+      <button class="pb" aria-label="Play"><span class="tri"></span></button>
+      <span class="wv"><i style="height:34%"></i><i style="height:52%"></i><i style="height:70%"></i><i style="height:44%"></i><i style="height:86%"></i><i style="height:62%"></i><i style="height:96%"></i><i style="height:58%"></i><i style="height:40%"></i><i style="height:74%"></i><i style="height:90%"></i><i style="height:50%"></i><i style="height:66%"></i><i style="height:82%"></i><i style="height:46%"></i><i style="height:94%"></i><i style="height:56%"></i><i style="height:38%"></i><i style="height:72%"></i><i style="height:88%"></i><i style="height:48%"></i><i style="height:64%"></i><i style="height:80%"></i><i style="height:42%"></i><i style="height:92%"></i><i style="height:54%"></i><i style="height:36%"></i><i style="height:68%"></i><i style="height:84%"></i><i style="height:44%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:76%"></i><i style="height:50%"></i><i style="height:86%"></i><i style="height:42%"></i><i style="height:58%"></i><i style="height:32%"></i><span class="prog"></span></span>
+      <span class="tm">2:14</span><span class="cap">transcribed</span>
+    </div></div>
+    <div class="more">Transcribed on arrival. The audio is kept; the words are what the log reads.</div>
+  </div></div>
+  <div class="en" data-open="document.html" data-k="did pub" data-life="2026-09-05" data-log="2026-09-05" data-about="being cited"><div class="t" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">Kept a research report on how AI engines decide who to cite.</span><span class="tags"><i>did</i><i class="ch">in a chain</i></span></div>
+    <div class="more">Drafted by Claude from my questions, and it says so on the document. Three investigations landed on one requirement: dated, disclosed, human-origin material.</div>
+  </div></div>
+  <div class="day"><b>Yesterday</b>4 September</div>
+  <div class="en" data-open="question.html" data-k="said pub" data-life="2026-09-04" data-log="2026-09-04" data-about="building neolog|performers vs writers"><div class="t" data-stamp="4 Sep">4 Sep</div><div>
+    <div class="x"><span class="s">Did Michelle Branch write "Everywhere"? Asked out loud, in the shower.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Yes — she co-wrote it with John Shanks in 2001. The log looked that up. What is mine is why I was asking.</div>
+  </div></div>
+  <div class="en" data-open="e-talked-geo.html" data-k="said pub" data-life="2026-09-04" data-log="2026-09-04" data-about="being cited"><div class="t" data-stamp="4 Sep">4 Sep</div><div>
+    <div class="x"><span class="s">"So being structured isn’t enough — you have to be mentioned."</span><span class="tags"><i>said</i><i class="ch">in a chain</i></span></div>
+    <div class="more">Talked it through on the way back from the site.</div>
+  </div></div>
+  <div class="en" data-open="e-read.html" data-k="auto pub" data-life="2026-09-04" data-log="2026-09-04"><div class="t" data-stamp="4 Sep">4 Sep</div><div>
+    <div class="x"><span class="s">Read a paper on how AI engines choose their sources.</span><span class="tags"><i>arrived</i><i class="ch">in a chain</i></span></div>
+    <div class="more">Saved, not written. What I thought about it is a separate entry.</div>
+  </div></div>
+  <div class="en" data-open="recording.html" data-k="did pub" data-life="2026-09-04" data-log="2026-09-04" data-about="what I record"><div class="t" data-stamp="4 Sep">4 Sep</div><div>
+    <div class="x"><span class="s">Published four minutes of video — the first thing out in a year.</span><span class="tags"><i>did</i></span></div>
+    <div class="pics"><span class="vid" aria-label="The four minutes"><span class="play"></span><span class="dur">4:12</span></span><span class="cap">from the 22-minute original</span></div>
+    <div class="more">Cut from the 19 August drive. The recording is kept whole; this is the part I chose.</div>
+  </div></div>
+  <div class="en" data-open="e-away.html" data-k="did pub" data-life="2026-09-04" data-log="2026-09-04" data-about="building neolog|what I record"><div class="t" data-stamp="4 Sep">4 Sep</div><div>
+    <div class="x"><span class="s">Sent the four minutes to YouTube and TikTok.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">Approved by me, then sent. The log kept a record of where each copy went.</div>
+  </div></div>
+  <div class="day"><b>5 September</b></div>
+  <div class="en" data-open="session.html" data-k="auto pub" data-life="2026-09-05" data-log="2026-09-07"><div class="t fz" data-stamp="5 Sep">5 Sep</div><div>
+    <div class="x"><span class="s">Pasted a conversation with Claude and two research reports.</span><span class="tags"><i>arrived</i><i>3 documents</i></span></div>
+    <div class="more">Nine entries out of it, my words and Claude's kept apart. No timestamps in the file, so it sits on the 5th with no time. One thing in it contradicts a decision from the 4th, and the log said so.</div>
+  </div></div>
+  <div class="day"><b>3 September</b>Wednesday</div>
+  <div class="en" data-open="idea.html" data-k="said pub" data-life="2026-09-03" data-log="2026-09-03" data-about="agents and design"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">Don't hand a coding agent a design. Hand it a spec it can't misread.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">First said on 19 August, angrier. Two things happened in between that changed it.</div>
+  </div></div>
+  <div class="en" data-open="e-revision.html" data-k="said pub" data-life="2026-09-03" data-log="2026-09-03" data-about="performers vs writers"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">Changed "relevance" to "respect" in the Michelle Branch note.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">I said relevance and meant respect. Both wordings are kept, dated.</div>
+  </div></div>
+  <div class="en" data-open="photo.html" data-k="did pub" data-life="2026-09-03" data-log="2026-09-03"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">Put the original Shakespeare's Steakhouse photo here, under my full name.</span><span class="tags"><i>did</i></span></div>
+    <div class="pics"><span class="still" style="border:1px solid var(--line-1);border-radius:6px;background:linear-gradient(150deg,#1d1a14,#0a0a0a)"></span><span class="cap">the original, unaltered</span></div>
+    <div class="more">Google has shown it a million times and credited a first name. Wherever a copy ends up now, it traces back here.</div>
+  </div></div>
+  <div class="en" data-open="said.html" data-k="said priv" data-life="2026-09-03" data-log="2026-09-03"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">"It seems pretty sparse. What stays and what goes?"</span><span class="tags"><i>said</i><i class="priv">private</i></span></div>
+    <div class="more">The question that led to building the page page. Until this afternoon there was a list of facts at the top and entries at the bottom, with nothing in between.</div>
+  </div></div>
+  <div class="en" data-open="e-asked-geo.html" data-k="said pub" data-life="2026-09-03" data-log="2026-09-03" data-about="being cited"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">"How do AI engines actually decide who to cite?"</span><span class="tags"><i>said</i><i class="ch">in a chain</i></span></div>
+    <div class="more">Asked out loud, with no idea of the answer.</div>
+  </div></div>
+  <div class="en" data-open="e-audio.html" data-k="said pub" data-life="2026-09-03" data-log="2026-09-03" data-about="the job"><div class="t" data-stamp="3 Sep">3 Sep</div><div>
+    <div class="x"><span class="s">An hour on the phone about the agency.</span><span class="tags"><i>said</i></span></div>
+    <div class="pics"><div class="aud" data-dur="58:20">
+      <button class="pb" aria-label="Play"><span class="tri"></span></button>
+      <span class="wv"><i style="height:34%"></i><i style="height:52%"></i><i style="height:70%"></i><i style="height:44%"></i><i style="height:86%"></i><i style="height:62%"></i><i style="height:96%"></i><i style="height:58%"></i><i style="height:40%"></i><i style="height:74%"></i><i style="height:90%"></i><i style="height:50%"></i><i style="height:66%"></i><i style="height:82%"></i><i style="height:46%"></i><i style="height:94%"></i><i style="height:56%"></i><i style="height:38%"></i><i style="height:72%"></i><i style="height:88%"></i><i style="height:48%"></i><i style="height:64%"></i><i style="height:80%"></i><i style="height:42%"></i><i style="height:92%"></i><i style="height:54%"></i><i style="height:36%"></i><i style="height:68%"></i><i style="height:84%"></i><i style="height:44%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:76%"></i><i style="height:50%"></i><i style="height:86%"></i><i style="height:42%"></i><i style="height:58%"></i><i style="height:32%"></i><span class="prog"></span></span>
+      <span class="tm">58:20</span><span class="cap">my half transcribed</span>
+    </div></div>
+    <div class="more">Two voices. Only my half becomes entries — the other person did not agree to be logged.</div>
+  </div></div>
+  <div class="day"><b>2 September</b>Tuesday</div>
+  <div class="en" data-open="e-naming.html" data-k="said pub" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog|what I record"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Named this "neolog" after <b>neologism</b>. Later noticed it also reads as "the new log."</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Logging, then blogging, then vlogging. When I picked the name I did not know what came after those three.</div>
+  </div></div>
+  <div class="en" data-open="image.html" data-k="auto priv" data-life="2026-09-02" data-log="2026-09-02"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Pasted a screenshot of the recall page — the grey buttons stretched tall.</span><span class="tags"><i>arrived</i><i class="priv">private</i></span></div>
+    <div class="pics"><img src="uploads/pasted-1788428069104-0.png" alt="Screenshot of the recall page, 2 Sep 2026, 22:14"><span class="cap">1532 × 832 · pasted into the design session to show the fault</span></div>
+    <div class="more">The file's own timestamp gives the date. What the picture shows is known from the session it was pasted into. Both are kept: when it arrived is one thing, what it shows is another.</div>
+  </div></div>
+  <div class="en" data-open="image-filter.html" data-k="auto priv" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Pasted a screenshot of the old public-log filter — boxed, mono, four segments.</span><span class="tags"><i>arrived</i><i class="priv">private</i></span></div>
+    <div class="pics"><img src="uploads/pasted-1788425923074-0.png" alt="Screenshot of the old segmented filter, 2 Sep 2026, 21:38"><span class="cap">680 × 130 · replaced by text tabs the same night</span></div>
+    <div class="more">Pasted rather than uploaded. The log treats the two the same way.</div>
+  </div></div>
+  <div class="en" data-open="metricool.html" data-k="did pub" data-life="2026-09-02" data-log="2026-09-02" data-about="what I record"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Set up a Metricool account.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">For sending approved videos to YouTube and TikTok. Nothing has been sent yet.</div>
+  </div></div>
+  <div class="en" data-open="e-neo.html" data-k="said pub" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog|being cited"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Coined <b>Neural Engine Optimization</b>.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Noticed that "neolog" already starts with NEO, the way the search acronyms end in EO — and decided that was worth making into a fifth one rather than leaving as a coincidence.</div>
+  </div></div>
+  <div class="en" data-open="e-writing.html" data-k="did pub" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">Wrote the page that argues what neolog is for.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">Mine, typed, in one sitting. The log holds the file and every later version of it.</div>
+  </div></div>
+  <div class="en" data-open="e-autobiography.html" data-k="said priv" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog|the job"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">"I got a new job last week. That isn't recorded anywhere. That is what neolog is. An autobiography."</span><span class="tags"><i>said</i><i class="priv">private</i></span></div>
+    <div class="more">The same realisation as the night before, said again the next day in different words. Both are kept and linked; the log doesn't choose between them.<div class="lay-row"><span>pairs with</span>№ 1,861 · 14 — "it's me telling stories and inputting markers"</div></div>
+  </div></div>
+  <div class="en" data-open="e-reduction.html" data-k="said priv" data-life="2026-09-02" data-log="2026-09-02" data-about="building neolog"><div class="t" data-stamp="2 Sep">2 Sep</div><div>
+    <div class="x"><span class="s">"Reduction — compressing, sort of like lossless."</span><span class="tags"><i>said</i><i class="priv">private</i></span></div>
+    <div class="more">Continuing the idea from the night before. The word that stuck was <b>reversible</b>: every shortened version keeps the way back to the words.</div>
+  </div></div>
+  <div class="day"><b>1 September</b>Monday</div>
+  <div class="en" data-open="everything.html" data-k="said pub" data-life="2026-09-01" data-log="2026-09-01"><div class="t" data-stamp="1 Sep">1 Sep</div><div>
+    <div class="x"><span class="s">Every entry is one sentence that stands on its own, with the full story behind it.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Said late that night as "it is all lines" — a timeline, a logline, a tagline at three lengths.</div>
+  </div></div>
+  <div class="en" data-open="entry.html" data-k="said pub" data-life="2026-09-01" data-log="2026-09-02" data-about="building neolog|what I record"><div class="t" data-stamp="1 Sep">1 Sep</div><div>
+    <div class="x"><span class="s">Worked on neolog with Claude for three and a half hours. Decided it should hold everything I put in, not just recordings.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Seventeen things said over the session, kept separately. Among them: the first definition of reduction in your own words, "it's all lines," and "it has to come out of me."</div>
+  </div></div>
+  <div class="en" data-open="e-dream.html" data-k="said priv" data-life="2026-09-01" data-log="2026-09-01" data-about="ordinary days"><div class="t" data-stamp="1 Sep">1 Sep</div><div>
+    <div class="x"><span class="s">Woke from a dream: a museum, Christopher Nolan, made him laugh, a party, a dog, a tall woman, something about an elevator.</span><span class="tags"><i>said</i><i class="priv">private</i></span></div>
+    <div class="more">Said on waking, exactly as remembered. Later that morning, a second thought about it in the shower — attached to this entry rather than made into a new one.<div class="lay-row"><span>reflected · later that morning</span>thoughts about the dream, in the shower — what it was probably about</div></div>
+  </div></div>
+  <div class="en" data-open="e-trust.html" data-k="said pub" data-life="2026-09-01" data-log="2026-09-01" data-about="agents and design"><div class="t" data-stamp="1 Sep">1 Sep</div><div>
+    <div class="x"><span class="s">"I need to be able to throw in weird thoughts and some fucked-up stuff and trust that it will do right by me."</span><span class="tags"><i>said</i></span></div>
+    <div class="more">The first rule for the design. Everything else depends on whether this is a safe place to be honest.</div>
+  </div></div>
+  <div class="day"><b>Late August</b>the week before</div>
+  <div class="en" data-open="vlog.html" data-k="did pub" data-life="2026-08-19" data-log="2026-08-19" data-about="agents and design|what I record"><div class="t" data-stamp="19 Aug">19 Aug</div><div>
+    <div class="x"><span class="s">Recorded twenty-two minutes while driving, mostly about coding agents and design.</span><span class="tags"><i>did</i></span></div>
+    <div class="pics"><span class="vid" aria-label="The recording" style=""><span class="play"></span><span class="dur">22:08</span></span><span class="cap">the whole thing, kept</span></div>
+    <div class="more">Two things that week had annoyed me, and a position came out of them.</div>
+  </div></div>
+  <div class="en" data-open="batch.html" data-k="did pub" data-life="2026-08-24" data-log="2026-08-24" data-about="the deck"><div class="t" data-stamp="24 Aug">24 Aug</div><div>
+    <div class="x"><span class="s">Built a deck. The ledger board took a whole weekend.</span><span class="tags"><i>did</i></span></div>
+    <div class="pics"><span class="tile" style="background:radial-gradient(circle at 58% 44%,rgba(200,150,64,.28),transparent 65%),#141414"></span><span class="tile" style="background:radial-gradient(circle at 36% 58%,rgba(132,177,111,.26),transparent 65%),#131313"></span><span class="tile more2">+7</span><span class="cap">9 photos from that afternoon</span></div>
+    <div class="more">Nine photos from that afternoon, all within a few hundred metres.</div>
+  </div></div>
+  <div class="en" data-open="e-silent.html" data-k="auto pub" data-life="2026-08-24" data-log="2026-08-24" data-about="the deck|building neolog"><div class="t" data-stamp="24 Aug">24 Aug</div><div>
+    <div class="x"><span class="s">Filmed forty seconds of the deck going in. Nobody talking.</span><span class="tags"><i>arrived</i></span></div>
+    <div class="pics"><span class="vid" aria-label="Forty seconds"><span class="play"></span><span class="dur">0:41</span></span><span class="cap">no speech in this one</span></div>
+    <div class="more">No words to transcribe, so the log looked at the frames instead and wrote one line. Marked as the log's.</div>
+  </div></div>
+  <div class="en" data-open="e-dupes.html" data-k="auto pub" data-life="2026-08-24" data-log="2026-08-24"><div class="t" data-stamp="24 Aug">24 Aug</div><div>
+    <div class="x"><span class="s">Took nine photos of the same board, five seconds apart.</span><span class="tags"><i>arrived</i></span></div>
+    <div class="pics"><span class="tile" style="background:radial-gradient(circle at 50% 45%,rgba(200,150,64,.24),transparent 65%),#151515"></span><span class="cap">1 of 9 · <a href="dupes.html">the other eight</a></span></div>
+    <div class="more">Shown as one moment. All nine are kept; none was deleted.</div>
+  </div></div>
+  <div class="en" data-open="e-job.html" data-k="did pub" data-life="2026-08-31" data-log="2026-08-31" data-about="building neolog|the job"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">Started a new job.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">Said on the 31st as "last week," so the log has the week, not the day. The job stays unnamed until you name it.</div>
+  </div></div>
+  <div class="en" data-open="e-calendar.html" data-k="auto pub" data-life="2026-08-31" data-log="2026-08-31" data-about="the job"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">Sat in a kickoff meeting at 14:00. Three people.</span><span class="tags"><i>arrived</i></span></div>
+    <div class="more">From the calendar, not typed. It sits on the day whether or not I said anything about it.</div>
+  </div></div>
+  <div class="en" data-open="e-firstday.html" data-k="said pub" data-life="2026-08-31" data-log="2026-08-31" data-about="the deck|the job"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">First morning. Nobody told me where anything was, so I sat and read the last two years of decks.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Which turned out to be the most useful thing I did all week.</div>
+  </div></div>
+  <div class="en" data-open="e-badge.html" data-k="auto held priv" data-life="2026-08-31" data-log="2026-08-31" data-about="building neolog|the job"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">Took a photo of my building pass.</span><span class="tags"><i>arrived</i><i class="held">held back</i></span></div>
+    <div class="pics"><span class="still"><span class="lbl2">not shown</span></span><span class="cap">held · publish it if you want</span></div>
+    <div class="more">Held back for the same reason as the licence — a name and a number on a card. It is a building pass. The log was wrong, honestly.</div>
+  </div></div>
+  <div class="en" data-open="e-lunch.html" data-k="said pub" data-life="2026-08-31" data-log="2026-08-31" data-about="the job|being cited"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">"Everyone here is fifteen years younger than me and nobody has mentioned it."</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Noted without conclusion.</div>
+  </div></div>
+  <div class="en" data-open="e-parking.html" data-k="said priv" data-life="2026-08-29" data-log="2026-08-31" data-about="agents and design"><div class="t" data-stamp="29 Aug">29 Aug</div><div>
+    <div class="x"><span class="s">"I want to start parking stuff here. Phone pics and videos. I end up deleting it all."</span><span class="tags"><i>said</i><i class="priv">private</i></span></div>
+    <div class="more">The first plain statement of the problem, said before the product was redesigned around it.</div>
+  </div></div>
+  <div class="en" data-open="e-haircut.html" data-k="did pub" data-life="2026-08-29" data-log="2026-08-29" data-about="building neolog"><div class="t" data-stamp="29 Aug">29 Aug</div><div>
+    <div class="x"><span class="s">Cut my hair.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">The shortest entry on the log. It still gets a date and a page, like everything else.</div>
+  </div></div>
+  <div class="en" data-open="e-seventeen.html" data-k="said pub" data-life="2026-08-31" data-log="2026-08-31" data-about="building neolog|the pattern"><div class="t fz" data-stamp="late Aug">late Aug</div><div>
+    <div class="x"><span class="s">"For seventeen years I made an account, ran it a year, rebranded, deleted it."</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Instagram, Twitter, the rest. This is the pattern the log exists to end.</div>
+  </div></div>
+  <div class="en" data-open="e-deck1.html" data-k="did pub" data-life="2026-08-22" data-log="2026-08-22" data-about="the deck"><div class="t" data-stamp="22 Aug">22 Aug</div><div>
+    <div class="x"><span class="s">Ordered the lumber for the deck.</span><span class="tags"><i>did</i></span></div>
+    <div class="more">Six weeks of this to come.</div>
+  </div></div>
+  <div class="en" data-open="e-deck2.html" data-k="said pub" data-life="2026-08-23" data-log="2026-08-23" data-about="the deck"><div class="t" data-stamp="23 Aug">23 Aug</div><div>
+    <div class="x"><span class="s">"The span tables say I need a beam I cannot lift."</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Solved two days later by asking a neighbour.</div>
+  </div></div>
+  <div class="en" data-open="e-deck3.html" data-k="auto pub" data-life="2026-08-25" data-log="2026-08-25" data-about="the deck"><div class="t" data-stamp="25 Aug">25 Aug</div><div>
+    <div class="x"><span class="s">Took four photos of the footings, before the pour.</span><span class="tags"><i>arrived</i></span></div>
+    <div class="pics"><span class="tile" style="background:radial-gradient(circle at 58% 44%,rgba(200,150,64,.28),transparent 65%),#141414"></span><span class="tile" style="background:radial-gradient(circle at 36% 58%,rgba(132,177,111,.26),transparent 65%),#131313"></span><span class="tile more2">+2</span><span class="cap">4 photos · the footings</span></div>
+    <div class="more">Taken because I did not trust myself to remember the spacing.</div>
+  </div></div>
+  <div class="en" data-open="e-longline.html" data-k="said pub" data-life="2026-08-20" data-log="2026-08-20" data-about="what I record"><div class="t" data-stamp="20 Aug">20 Aug</div><div>
+    <div class="x"><span class="s">Watched the twenty-two minutes back and realised I say "the thing is" eleven times, which is not a verbal tic so much as a way of buying three seconds to work out what I actually think.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">Not going to fix it. Worth knowing it is there.</div>
+  </div></div>
+  <div class="en" data-open="e-return.html" data-k="said pub" data-life="2026-08-03" data-log="2026-08-03" data-about="building neolog"><div class="t" data-stamp="3 Aug">3 Aug</div><div>
+    <div class="x"><span class="s">Two weeks of nothing. Not a bad two weeks — just nothing I wrote down.</span><span class="tags"><i>said</i></span></div>
+    <div class="more">The log shows the gap rather than smoothing it. That is the point of it.</div>
+  </div></div>
+  <div class="en" data-open="e-july.html" data-k="auto pub" data-life="2026-07-20" data-log="2026-07-20" data-about="the job"><div class="t" data-stamp="20 Jul">20 Jul</div><div>
+    <div class="x"><span class="s">Recorded a voice note about the agency idea, before it had a name.</span><span class="tags"><i>arrived</i></span></div>
+    <div class="pics"><div class="aud" data-dur="0:47">
+      <button class="pb" aria-label="Play"><span class="tri"></span></button>
+      <span class="wv"><i style="height:34%"></i><i style="height:52%"></i><i style="height:70%"></i><i style="height:44%"></i><i style="height:86%"></i><i style="height:62%"></i><i style="height:96%"></i><i style="height:58%"></i><i style="height:40%"></i><i style="height:74%"></i><i style="height:90%"></i><i style="height:50%"></i><i style="height:66%"></i><i style="height:82%"></i><i style="height:46%"></i><i style="height:94%"></i><i style="height:56%"></i><i style="height:38%"></i><i style="height:72%"></i><i style="height:88%"></i><i style="height:48%"></i><i style="height:64%"></i><i style="height:80%"></i><i style="height:42%"></i><i style="height:92%"></i><i style="height:54%"></i><i style="height:36%"></i><i style="height:68%"></i><i style="height:84%"></i><i style="height:44%"></i><i style="height:90%"></i><i style="height:60%"></i><i style="height:76%"></i><i style="height:50%"></i><i style="height:86%"></i><i style="height:42%"></i><i style="height:58%"></i><i style="height:32%"></i><span class="prog"></span></span>
+      <span class="tm">0:47</span><span class="cap">transcribed later</span>
+    </div></div>
+    <div class="more">Found retroactively when the job entry was made. I did not log this at the time.</div>
+  </div></div>
+  <div class="en" data-open="e-buried.html" data-k="said pub" data-life="2026-08-26" data-log="2026-08-26" data-about="building neolog"><div class="t fz" data-stamp="late Aug">late Aug</div><div>
+    <div class="x"><span class="s">Buried a false start — a version of this that went nowhere.</span><span class="tags"><i>buried</i></span></div>
+    <div class="more">Out of the feed, still in the log. Burying is not deleting.</div>
+  </div></div>
+  <div class="en" data-open="repo.html" data-k="auto priv" data-life="2026-08-31" data-log="2026-08-31" data-about="building neolog|agents and design"><div class="t" data-stamp="31 Aug">31 Aug</div><div>
+    <div class="x"><span class="s">Read the code repository. At the time, the product was an AI video-essay studio with three sections: Subjects, Topics, Spark.</span><span class="tags"><i>arrived</i><i class="priv">private</i></span></div>
+    <div class="more">The version this redesign started from. Written by the log when it read the code.</div>
+  </div></div>
+  <div class="day"><b>2026</b>the year so far</div>
+  <div class="en" data-open="footage.html" data-k="mem pub" data-life="2026-01-01" data-log="2026-08-31" data-about="building neolog|what I record"><div class="t fz" data-stamp="2026">2026</div><div>
+    <div class="x"><span class="s">Started vlogging. About four hundred recordings by late summer; none posted.</span><span class="tags"><i>from memory</i></span></div>
+    <div class="more">Said on 31 August. The number is a guess until the log counts the files. Some were too raw to post, and you knew it while recording.</div>
+  </div></div>
+  <div class="en" data-open="e-2007.html" data-k="mem pub" data-life="2007-06-15" data-log="2007-06-15" data-about="Infinite-ads"><div class="t fz" data-stamp="2007">2007</div><div>
+    <div class="x"><span class="s">Twenty-two people. The year it stopped being fun.</span><span class="tags"><i>from memory</i></span></div>
+    <div class="more">No month. I remember the feeling of that year more clearly than any event in it.</div>
+  </div></div>
+  <div class="en" data-open="e-2005.html" data-k="mem pub" data-life="2005-01-01" data-log="2005-01-01" data-about="building neolog|Infinite-ads"><div class="t fz" data-stamp="2005">2005</div><div>
+    <div class="x"><span class="s">The Toronto real-estate account. It paid for everything for two years.</span><span class="tags"><i>from memory</i></span></div>
+    <div class="more">2004 or 2005 — I still cannot place it, and the log keeps it as a span rather than picking one.</div>
+  </div></div>
+  <div class="en" data-open="e-2002.html" data-k="mem pub" data-life="2002-01-01" data-log="2002-01-01" data-about="building neolog|Infinite-ads"><div class="t fz" data-stamp="2002">2002</div><div>
+    <div class="x"><span class="s">Met Freddie. Probably online, probably gaming — I genuinely do not know.</span><span class="tags"><i>from memory</i></span></div>
+    <div class="more">An open question that may never close. The log keeps it open rather than guessing.</div>
+  </div></div>
+  <div class="day"><b>Before 2026</b>undated</div>
+  <div class="en" data-open="e-substack.html" data-k="mem pub" data-life="2024-06-01" data-log="2026-08-31" data-about="building neolog"><div class="t fz" data-stamp="~2024">~2024</div><div>
+    <div class="x"><span class="s">neolog begins as a Substack alternative that allows HTML.</span><span class="tags"><i>from memory</i></span></div>
+    <div class="more">The first version of neolog. The year isn't on the log yet; that's one of the open questions.</div>
+  </div></div>
+  </div>
+</main>
+<aside class="rail">
+  <div class="rc" id="questions"><div class="h">Open questions <span id="waitn"></span></div>
+    <div class="i ask"><b>When did you first build neolog?</b><em>The Substack version has no date. A year would do.</em>
+      <div class="ans">
+        <div class="opts"><span>2022</span><span>2023</span><span class="p">2024</span><span>2025</span><span class="d">don't remember</span></div>
+        <div class="or"><span class="mic"></span><input placeholder="or say it, or type it — rough is fine"></div>
+        <em>answered here, not somewhere else · the answer becomes an entry dated to the year you pick, marked from memory</em>
+      </div></div>
+    <div class="i"><b>What's the new job?</b><em>Logged as "a new job" since 31 August. Unnamed until you name it.</em><div class="a"><button class="p">Name it</button><a href="#">leave it</a></div></div>
+    <div class="i"><b>How did Infinite-ads end?</b><em>The log has that it closed in 2008. Not how.</em><div class="a"><button class="p">Talk it out</button><a href="#">not now</a><a href="#">don't remember</a></div></div>
+  </div>
+  <div class="rc">
+    <div class="h">What it's about <span id="aboutn"></span></div>
+    <div class="i" id="aboutlist" style="padding:6px 6px 8px"></div>
+  </div>
+  <div class="rc">
+    <div class="h">Written down <span>2001 – 2026 · click a year</span></div>
+    <div class="yrs" id="yrs"></div>
+    <div class="yl"><span>2001</span><span>2026</span></div>
+    <div class="i">39% of your life has anything on it. <b>Eight years under ten percent.</b> Click one to see what's there and what's being asked about it.<em>this is where filling in the past starts — not on another page</em></div>
+  </div>
+  <div class="rc">
+    <div class="h"><a href="batch.html" style="color:inherit;border-bottom:1px solid var(--line-2)">Arrived on its own</a> <span id="auton"></span></div>
+    <div class="i" id="autobody"></div>
+  </div>
+</aside>
+</div>
+<div class="asview"><span>Everything above is public unless marked otherwise.</span><a href="public-log.html">See it as a stranger does →</a></div>
+<footer class="ft"><span>neolog · the log · private</span><span class="r"><a href="now.html">now</a><a href="public-log.html">what's public</a><a href="index.html">everything</a></span></footer>
+</div></div>
+</body></html>

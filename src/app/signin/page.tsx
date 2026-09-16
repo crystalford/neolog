@@ -80,7 +80,7 @@ export default function SignInPage() {
             />
           </div>
 
-          <button type="submit" className="canon-btn primary" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 14 }}>
+          <button type="submit" className="btn primary" style={{ width: '100%', justifyContent: 'center', padding: 12, fontSize: 14 }}>
             Send PIN →
           </button>
         </form>

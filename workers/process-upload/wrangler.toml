@@ -59,7 +59,8 @@ PIPELINE_URL = "https://neolog-pipeline.eda2e9bbd9acc42699027cfdcb50f998.workers
 # Secrets (set via wrangler secret put):
 #   R2_ACCESS_KEY_ID
 #   R2_SECRET_ACCESS_KEY
-#   ANTHROPIC_API_KEY     — Claude calls for sonnet-4.6 escalation
+# ⚠️ ANTHROPIC_API_KEY was listed here for "sonnet-4.6 escalation". There is
+# no escalation and nothing on this worker reads that key.
 #   HEARTBEAT_TOKEN       — shared with neolog-pipeline; authenticates POST /event
 
 [observability]

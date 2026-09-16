@@ -1,0 +1,120 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;
+  --fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;
+  --steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--sage:#84b16f;--terra:#e6634a;
+  --body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+input{font:inherit;background:none;border:0;outline:none;color:var(--fg)}
+.page{position:relative;min-height:100vh;background:radial-gradient(ellipse 1000px 560px at 50% -10%,rgba(78,161,213,.04),transparent 62%),var(--bg)}
+.wrap{max-width:1140px;margin:0 auto;padding:0 44px;position:relative}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}
+.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg)}.mk svg{width:100%;height:100%;display:block}
+.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}
+.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap;flex-shrink:0}
+.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}.mh nav a:hover,.mh nav a.on{color:var(--fg)}
+
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:48px;align-items:start}
+
+/* search is the front door */
+.ask{margin-top:26px;display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--line-1);border-radius:10px;background:var(--bg-1)}
+.ask svg{width:14px;height:14px;stroke:var(--fg-4);fill:none;stroke-width:1.6;flex-shrink:0}
+.ask input{flex:1;font-size:15px;min-width:0}.ask input::placeholder{color:var(--fg-4)}
+.ask .n{font-size:11.5px;color:var(--fg-4);white-space:nowrap}
+
+.tabs{display:flex;gap:18px;margin-top:18px;border-bottom:1px solid var(--line)}
+.tabs button{font-size:13px;color:var(--fg-3);padding:0 0 9px;border-bottom:1.5px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button.on{color:var(--fg);border-bottom-color:var(--fg)}
+.tabs .r{margin-left:auto;font-size:11.5px;color:var(--fg-4);padding-bottom:9px;white-space:nowrap}
+.tabs .r .srt{font-size:11.5px;color:var(--fg-2);border-bottom:1px solid var(--line-2)}
+.tabs .r .srt:hover{color:var(--fg)}
+.views{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:12px 0 0}
+.views .k{font-size:11px;color:var(--fg-4);margin-right:6px;white-space:nowrap}
+.views button{font-size:12px;color:var(--fg-2);padding:5px 10px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap}
+.views button:hover{color:var(--fg);border-color:var(--line-3)}
+.views button.new{border-style:dashed;color:var(--fg-4)}
+
+/* ---- the fold: a row is a day, a month or a year, depending on how far back ---- */
+.row{display:grid;grid-template-columns:96px 1fr;gap:24px;padding:14px 0;border-bottom:1px solid var(--line)}
+.row.has{cursor:pointer}
+.row:hover{background:var(--bg-1)}
+.row .t{text-align:right;padding-top:2px}
+.row .t .d{font-family:var(--mono);font-size:10.5px;color:var(--fg-3);white-space:nowrap}
+.row .t .n{display:block;font-size:11px;color:var(--fg-4);margin-top:3px;white-space:nowrap}
+.row .x{font-size:16px;font-weight:300;line-height:1.45;color:var(--fg);letter-spacing:-0.25px;text-wrap:pretty}
+.row .x b{font-weight:450}
+.row .x em{font-style:normal;color:var(--fg-4);font-size:12px;margin-left:8px;white-space:nowrap}
+.row .sub{margin-top:5px;font-size:13px;color:var(--fg-3);line-height:1.5}
+/* open day: its entries */
+.row.open{background:var(--bg-1);cursor:default}
+.row .ents{display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
+.row.open .ents{display:block}
+.le{display:grid;grid-template-columns:54px 1fr;gap:16px;padding:9px 0;border-bottom:1px solid var(--line)}
+.le:last-child{border-bottom:0}
+.le .tm{font-family:var(--mono);font-size:10.5px;color:var(--fg-4);text-align:right;padding-top:3px}
+.le .x{font-size:14.5px;color:var(--fg-1)}
+.le .x em{font-size:11.5px}
+/* month: one line + the day count, entries behind */
+.row.mo .x{font-size:15px;color:var(--fg-1)}
+.row .ents .le.day .tm{font-size:10.5px;color:var(--fg-3)}
+/* year: one line, faint, big span */
+.row.yr{padding:18px 0}
+.row.yr .t .d{font-size:11px;color:var(--fg-2)}
+.row.yr .x{font-size:15px;color:var(--fg-2)}
+.row.yr .x b{color:var(--fg-1)}
+/* the seam */
+.seam{display:grid;grid-template-columns:96px 1fr;gap:24px;padding:22px 0 8px}
+.seam span{grid-column:2;font-size:11.5px;color:var(--fg-4);white-space:nowrap}
+/* a page folded: many mentions, one row */
+.row.subj .x b{color:var(--ochre)}
+.row.subj .t .d{color:var(--ochre)}
+
+/* rail */
+.rail{position:sticky;top:64px;display:flex;flex-direction:column;gap:22px;padding-top:26px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between;white-space:nowrap}
+.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px}
+.rc .i{padding:11px 14px;font-size:13px;line-height:1.5;color:var(--fg-2)}
+.rc .i+.i{border-top:1px solid var(--line)}
+.rc .i b{color:var(--fg);font-weight:450}
+.rc .i em{font-style:normal;display:block;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+.rc .i .a{display:flex;gap:8px;margin-top:8px;align-items:center}
+.rc .i .a a,.rc .i .a button{white-space:nowrap;font-size:11.5px}
+.rc .i .a .p{padding:5px 10px;border-radius:6px;background:var(--fg);color:#000}
+.rc .i .a a:not(.p){color:var(--fg-4)}
+.yrs{display:flex;align-items:flex-end;gap:2px;height:38px;padding:0 14px 6px}
+.yrs i{flex:1;min-height:2px;display:block;border-radius:1px 1px 0 0}
+.yl{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--fg-4);padding:0 14px 11px}
+.ft{margin-top:70px;padding:26px 0 56px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;font-family:var(--mono);font-size:10.5px;color:var(--fg-4)}
+.ft span,.ft a{white-space:nowrap}.ft .r{display:flex;gap:18px}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

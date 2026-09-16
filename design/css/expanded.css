@@ -1,0 +1,61 @@
+:root{--bg:#000;--bg-1:#0a0a0a;--bg-2:#101010;--bg-3:#161616;--line:#1c1c1c;--line-1:#252525;--line-2:#2f2f2f;--line-3:#454545;--fg:#fafafa;--fg-1:#e4e4e7;--fg-2:#a3a3ab;--fg-3:#9a9aa4;--fg-4:#8a8a94;--steel:#4ea1d5;--teal:#34c1a8;--ochre:#c89640;--violet:#7e7be3;--sage:#84b16f;--body:'Geist',system-ui,sans-serif;--mono:'JetBrains Mono',monospace}
+*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--fg-1);font-family:var(--body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}a{color:inherit;text-decoration:none}button{font:inherit;background:none;border:0;color:inherit;cursor:pointer}
+.wrap{max-width:1140px;margin:0 auto;padding:0 44px}
+.mh{padding:18px 0 16px;display:flex;align-items:center;gap:22px;border-bottom:1px solid var(--line)}.lock{display:flex;align-items:center;gap:10px}.mk{width:22px;height:22px;color:var(--fg)}.mk svg{width:100%;height:100%;display:block}.wm{font-size:15.5px;font-weight:500;letter-spacing:-0.5px;color:var(--fg)}.mh .pv{font-size:11.5px;color:var(--fg-4);padding:3px 9px;border:1px solid var(--line-1);border-radius:100px;white-space:nowrap}.mh nav{margin-left:auto;display:flex;gap:20px;font-size:13px;color:var(--fg-3)}.mh nav a.on{color:var(--fg)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:44px;align-items:start;padding-top:22px}
+.day{font-size:11.5px;color:var(--fg-4);padding:18px 0 8px;display:flex;gap:12px;align-items:baseline}.day b{font-weight:450;color:var(--fg-2);font-size:12.5px}.day::after{content:'';flex:1;height:1px;background:var(--line)}
+/* collapsed entry — one line */
+.en{display:grid;grid-template-columns:64px 1fr;gap:20px;padding:12px 10px 12px 0;border-radius:8px;cursor:pointer}.en:hover{background:var(--bg-1)}
+.en .t{font-family:var(--mono);font-size:11px;color:var(--fg-4);padding-top:3px}.en .x{font-size:15px;color:var(--fg-1);line-height:1.5}.en .x i{font-style:normal;font-size:11.5px;color:var(--fg-4);margin-left:8px}.en .x i.pub{color:var(--teal)}
+/* expanded entry — the one shape */
+.ex{border:1px solid var(--line-1);border-radius:12px;background:var(--bg-1);margin:4px 0 10px;overflow:hidden}
+.ex .hd{display:grid;grid-template-columns:64px 1fr auto;gap:20px;padding:14px 18px 12px;border-bottom:1px solid var(--line);align-items:baseline}
+.ex .hd .t{font-family:var(--mono);font-size:11px;color:var(--fg-3)}.ex .hd .x{font-size:16px;color:var(--fg);line-height:1.45;letter-spacing:-0.2px}.ex .hd .x b{font-weight:450}
+.ex .hd .m{font-size:11.5px;color:var(--fg-4);white-space:nowrap;display:flex;gap:10px}.ex .hd .m .pub{color:var(--teal)}.ex .hd .m .who{color:var(--fg-3)}.ex .hd .m button{color:var(--fg-4)}.ex .hd .m button:hover{color:var(--fg)}
+.ex .body{padding:14px 18px 14px 102px}
+/* kind bodies */
+.vid{aspect-ratio:16/9;max-width:640px;border-radius:9px;background:radial-gradient(ellipse at 42% 38%,rgba(78,161,213,.18),transparent 62%),linear-gradient(150deg,#141414,#050505);position:relative;border:1px solid var(--line-1)}.vid::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:0;height:0;border-left:16px solid rgba(250,250,250,.9);border-top:10px solid transparent;border-bottom:10px solid transparent;margin-left:4px}.vid span{position:absolute;left:12px;bottom:10px;font-family:var(--mono);font-size:10.5px;color:var(--fg-1);background:rgba(0,0,0,.65);border-radius:4px;padding:2px 7px}
+.scrub{max-width:640px;margin-top:8px;height:5px;border-radius:3px;background:var(--bg-3);position:relative}.scrub i{position:absolute;top:0;bottom:0;background:rgba(52,193,168,.55)}.scrub em{position:absolute;top:-2px;width:2px;height:9px;background:var(--violet)}
+.tr{margin-top:12px;max-width:640px}.ln{display:grid;grid-template-columns:48px 1fr;gap:12px;padding:5px 0;font-size:14px;color:var(--fg-2);line-height:1.55}.ln .tm{font-family:var(--mono);font-size:10.5px;color:var(--fg-4);text-align:right;padding-top:3px}.ln.used{color:var(--fg-1)}.ln.used .tm{color:var(--violet)}.ln mark{background:none;color:var(--fg);border-bottom:1.5px solid var(--violet)}
+.more{font-size:12px;color:var(--fg-4);margin-top:6px}.more a{color:var(--fg-3);border-bottom:1px solid var(--line-2)}
+.img{max-width:640px;aspect-ratio:16/10;border-radius:9px;border:1px solid var(--line-1);background:radial-gradient(ellipse at 58% 46%,rgba(132,177,111,.25),transparent 62%),linear-gradient(150deg,#161616,#050505);cursor:zoom-in}
+.cap{margin-top:10px;font-size:14px;color:var(--fg-1);line-height:1.5;max-width:640px}.cap i{font-style:normal;display:block;font-size:11.5px;color:var(--fg-4);margin-top:3px}.cap i b{color:var(--teal);font-weight:450}
+.msg{display:grid;grid-template-columns:60px 1fr;gap:12px;padding:6px 0;font-size:14px;line-height:1.5;max-width:640px}.msg .w{font-size:11.5px;padding-top:3px}.msg .w.y{color:var(--steel)}.msg .w.o{color:var(--ochre)}.msg .x{color:var(--fg-1)}.msg.them .x{color:var(--fg-2)}.msg .x mark{background:none;color:var(--fg);border-bottom:1.5px solid var(--violet)}
+.said{font-size:16px;font-weight:300;color:var(--fg);line-height:1.6;max-width:640px;letter-spacing:-0.2px}.said mark{background:none;color:var(--fg);border-bottom:1.5px solid var(--violet);font-weight:400}.said i{display:block;font-style:normal;font-size:12px;color:var(--fg-4);margin-top:6px;font-weight:400}
+/* the same foot for every kind */
+.ft2{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);border-top:1px solid var(--line);margin-left:102px}
+.ft2>div{background:var(--bg-1);padding:11px 14px;font-size:12.5px;color:var(--fg-2);line-height:1.5}.ft2 .k{font-size:11px;color:var(--fg-4);display:block;margin-bottom:3px}.ft2 a{color:var(--fg-1);border-bottom:1px solid var(--line-2)}.ft2 .q{color:var(--ochre)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;padding:10px 18px 12px 102px;border-top:1px solid var(--line)}.acts a{font-size:12px;padding:6px 11px;border-radius:7px;border:1px solid var(--line-1);color:var(--fg-2);white-space:nowrap}.acts a:hover{color:var(--fg);border-color:var(--line-3)}.acts .cl{margin-left:auto;color:var(--fg-4);border-color:transparent}
+.rail{position:sticky;top:20px;display:flex;flex-direction:column;gap:16px}
+.rc{border:1px solid var(--line);border-radius:10px;overflow:hidden}.rc .h{padding:10px 14px;border-bottom:1px solid var(--line);background:var(--bg-1);font-size:12.5px;font-weight:450;color:var(--fg);display:flex;justify-content:space-between}.rc .h span{font-weight:400;color:var(--fg-4);font-size:11.5px}.rc .i{padding:11px 14px;font-size:13px;color:var(--fg-2);line-height:1.5}.rc .i+.i{border-top:1px solid var(--line)}.rc .i b{color:var(--fg);font-weight:450}.rc .i em{display:block;font-style:normal;font-size:11.5px;color:var(--fg-4);margin-top:3px}
+
+/* one frame, every page. Wrap 1140, padding 44 → 1052 inner. A page with a rail
+   spends that as 708 + 48 gap + 296 rail. A page without one caps its content at the
+   same 708 and leaves the 344 to the right empty. Masthead, owner bar, stamp and
+   footer always span the full 1052. Nothing reframes when you click. */
+.wrap{max-width:1140px!important;padding:0 44px!important}
+.wrap>:not(.mh):not(.owner):not(.stamp):not(.ft):not(.grid):not(.rail):not(script){max-width:708px}
+.grid{grid-template-columns:minmax(0,1fr) 296px!important;gap:48px!important}
+
+/* tags copied out of a feed row keep their meaning, not their old selector.
+   In the feed they are styled by .en .x .tags i — a selector that cannot reach
+   them here. Fourth time this session that copied markup lost its styling, so
+   this is set on the class, not the instance. */
+.meta i{font-style:normal;white-space:nowrap;color:var(--fg-4)}
+.meta i.pub{color:var(--teal)}.meta i.priv{color:var(--ochre)}.meta i.held{color:var(--terra)}
+.meta i.ch{color:var(--steel)}
+.back a,.back span{white-space:nowrap;flex-shrink:0}
+
+/* under ~900px the rail stops competing with the reading column and moves below it.
+   Desktop browsers ignore the viewport width hint, so the real column can be far
+   narrower than the frame assumes. */
+@media (max-width:920px){
+  .grid{grid-template-columns:minmax(0,1fr)!important;gap:32px!important}
+  .rail{position:static!important;top:auto!important}
+  .rail .rc{max-width:none}
+  .media .still,.player{width:100%!important}
+  .row,.ex .detail .row{grid-template-columns:100px minmax(0,1fr)!important;gap:16px!important}
+  .chain a,.chain .self{grid-template-columns:62px 66px minmax(0,1fr)!important;gap:10px!important}
+  .ends{grid-template-columns:1fr!important;gap:12px!important;text-align:left}
+  .ends .nx{text-align:left!important}
+}

@@ -38,8 +38,220 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # A wrong column name is a runtime error, so tsc and next build are
+      # both blind to it. On 7 Sep the feed selected `vlogs.transcript`
+      # (the column is `transcript_text`); everything was green and
+      # /api/v2/log returned 500 for every request.
+      - name: SQL columns exist
+        run: node scripts/check-sql-columns.mjs
+
+      # The recordings in R2 are the only data this product preserves, so an
+      # R2 delete is the one unrecoverable action in the codebase. Three
+      # handlers had one on the morning of 8 Sep, including a bulk one.
+      - name: Nothing can delete a recording
+        run: node scripts/check-r2-safety.mjs
+
+      # Same class of blind spot: a fetch to a renamed or never-built path is
+      # a runtime 404 that renders as "no data yet" rather than as an error.
+      - name: Fetched API paths have routes
+        run: node scripts/check-routes.mjs
+
+      # And the third: a RIGHT column with a WRONG value. The column exists,
+      # the type is TEXT, tsc and the column checker are both green, and the
+      # only symptom is behaviour — the walk shipped comparing `relation` to
+      # 'reflection' when the value is 'reflects', so a reflection rendered
+      # on a route as an event.
+      - name: Column values are ones the column can hold
+        run: node scripts/check-enum-values.mjs
+
+      # The logic where a bug corrupts the log silently: whether a line is
+      # attributed to the operator, what a date means, and which model
+      # sentences he is shown.
+      - name: Log logic
+        run: node scripts/test/log-logic.mjs
+
+      # A false positive here splits his own writing into turns that were
+      # never turns, and can put a model's sentence behind author='operator'.
+      - name: Conversation splitting
+        run: node --experimental-strip-types scripts/test/conversation.mjs
+
+      # A seam the model invented must not become a part — the anchors it
+      # returns are located in the transcript, never trusted as text.
+      - name: Note splitting
+        run: node --experimental-strip-types scripts/test/split-note.mjs
+
+      # Reading a recording onto the log is now the whole path from a file
+      # to his words on a page, with no model in it. A dropped or invented
+      # word here is not recoverable; a boundary in the wrong place is.
+      - name: Reading a recording
+        run: node scripts/test/read-recording.mjs
+
+      # The one kind with someone else in it. A wrong split files another
+      # person's sentence as something HE said; a wrong public view
+      # publishes words nobody agreed to publish.
+      - name: Correspondence
+        run: node scripts/test/correspondence.mjs
+
+      # One of the three piles is offered for burying in bulk. Another
+      # person's words, and anything the log does not recognise, must never
+      # land in it.
+      - name: Screenshot sort
+        run: node scripts/test/screenshots.mjs
+
+      # A wrong band boundary silently hides years of the log behind a line
+      # that claims to cover them.
+      - name: The fold
+        run: node scripts/test/fold.mjs
+
+      # MIGRATIONS is append-only, so the fifty-three that built the
+      # extraction engine's tables are still in the array after those tables
+      # were dropped — and each one fails with `no such table`. A failure is
+      # not recorded as applied, so before this was fixed every cold Worker
+      # isolate re-ran all fifty-three on its first request, forever. The
+      # line that must hold: `no such table` is benign for a table dropped
+      # on purpose and for nothing else, or a table that failed to create
+      # gets silently marked done.
+      - name: Obsolete migrations, and only those
+        run: node scripts/test/migrations.mjs
+
+      # A week that overlaps the one before it shows an entry twice; a gap
+      # between two hides one completely. Neither looks like an error — the
+      # page renders and the counts are plausible — so the assertions are
+      # about coverage across 48 months, not about the boundaries.
+      - name: Every day in exactly one week
+        run: node scripts/test/month.mjs
+
+      # Splitting an entry is the only place a NEW entry's text comes out of
+      # an existing entry's, so it is the easiest place to lose a word at the
+      # seam — and losing one is invisible: two entries appear, both read
+      # plausibly, and nothing else objects. It also guards the other end:
+      # a transcript fix rebuilds only `grounded = 1` entries, without which
+      # fixing a misheard word anywhere in the original span rewrites both
+      # halves from the transcript and the split quietly comes undone.
+      - name: A cut loses no words, and nothing rebuilds over one
+        run: node scripts/test/split-entry.mjs
+
+      # Five files each held their own copy of "what counts as in flight",
+      # and two were short by `reading` — the pipeline's last step. The healer
+      # is the only thing that makes a four-hundred-recording run
+      # self-recover, and it could not see a recording wedged in that step.
+      # Every copy was internally valid and one was short, which is why the
+      # only defence is that there be one copy.
+      - name: One list of pipeline statuses, imported everywhere
+        run: node scripts/test/pipeline-status.mjs
+
+      # The same shape as check-unreached-routes.mjs, one level down.
+      # src/lib/vision.ts had NO importer: both functions written, tested
+      # against the schema, reached by nothing — so vision_status stayed
+      # 'pending' on every recording and /footage's second index had no data
+      # at all, while three files and CLAUDE.md described it as live.
+      - name: Every library has an importer
+        run: node scripts/check-unreached-lib.mjs
+
+      # The third of these, one level further out. A `.logpage.pg-<page>`
+      # block with no page that renders it parses, resolves every var, and
+      # is read by check-design-css.mjs as though it were the live page — so
+      # /now reported 4 rules out of the design when the stylesheet that
+      # actually renders it was 9 out, and wrong.html's 84 rules sat complete
+      # behind a page that had never been built. 350 rules over four scopes.
+      - name: Every page scope is rendered by a page
+        run: node scripts/check-unreached-css.mjs
+
+      # The blind spot `check-sql-columns.mjs` structurally cannot cover.
+      # MIGRATIONS is append-only, so the statements that BUILT the
+      # extraction engine's tables are still in the array and their columns
+      # are still "known" long after the tables were dropped — a query
+      # against one passes the column checker and throws `no such table` on
+      # every request. Nine of them were live on 9 Sep, including the dry run
+      # behind the button that transcribes four hundred recordings.
+      # Also: columns on tables that SURVIVED, holding the deleted engine's
+      # output. A dropped table announces itself; `vlogs.title` and
+      # `vlogs.summary` did not — they rendered perfectly, marked as the
+      # log's, as the largest text on /vlog/[id] and the line under every
+      # recording on the home feed. Nothing has written either since 8 Sep.
+      - name: No live SQL against a dropped table, or a column the engine wrote
+        run: node scripts/check-dropped-tables.mjs
+
+      # workers/ffmpeg/server.js is plain JS and excluded from
+      # tsconfig.workers.json, so nothing here typechecks it, and `node
+      # --check` only parses — a call to an undefined function is a runtime
+      # error, not a syntax one. Removing seven dead endpoints from that file
+      # took three LIVE helpers with them (downloadToTmp, runFfmpeg,
+      # sweepStaleTmpDirs) and every check in this repo stayed green.
+      - name: Every function the container server calls is defined
+        run: node scripts/check-container-server.mjs
+
+      # SPEC §0.2 — a held entry gives up nothing, in any sense, on any
+      # surface. /entry/[id] and /triage both put `class="blur"` on a live
+      # `<img src>` and gave a held audio note a working `<audio src>`: a CSS
+      # filter over bytes the browser had already fetched. The feed had
+      # withheld properly since it was built, so the rule was two-thirds
+      # kept and nothing said which third was missing.
+      - name: A held entry gives up nothing
+        run: node scripts/test/held.mjs
+
+      # §0 rule 5 is "necessity before schema". Its mirror is a kind in the
+      # schema no real entry can BE, and `ideas` was exactly that: in
+      # ENTRY_KINDS, in the feed's filter, in KIND_WORD and in the schema
+      # map, with no INSERT anywhere setting it. The log offered a filter for
+      # a kind it could not hold.
+      - name: Every kind on the log is reachable
+        run: node scripts/test/kinds.mjs
+
+      # Five routes answer without signing in. A sixth is not an error
+      # anywhere — it builds, typechecks, deploys, and serves whatever it
+      # queries to anyone who asks. And being open is not itself the bug:
+      # /sitemap.xml was open on purpose and published the wrong SET, because
+      # `entry_count > 0` counts private entries too. So this checks both —
+      # that the list of open routes is the recorded one, and that an open
+      # route reading the log filters it.
+      - name: Nothing new answers without signing in
+        run: node scripts/check-auth-surface.mjs
+
+      # check-routes.mjs covers a fetch to a path that was never built. This
+      # is the other direction, and it hides differently: a route with no
+      # caller is not an error anywhere — it builds, it typechecks, it
+      # deploys, and the feature it was written for is on no screen. PATCH
+      # /api/v2/vlogs/[id]/transcript-words was complete for a week with
+      # nothing calling it, so half of fix.html was API-only.
+      - name: Every route has a caller
+        run: node scripts/check-unreached-routes.mjs
+
+      # How far each page has drifted from the design it is supposed to be.
+      # The home page and the feed were built close to the package and every
+      # other page was written in a vocabulary that RESEMBLED it — and
+      # nothing in the repo could tell the two apart, which is how the
+      # deployed site still looked like the old product weeks later. The
+      # budgets in that file are debts; the real number is zero.
+      # A CSS variable that resolves to nothing does not fail — the build is
+      # green, the page renders, and a colour or a font is silently wrong.
+      # Twenty-four installed page stylesheets were in that state for an
+      # afternoon because the design names its variables --steel and --body
+      # and this repo named the same values --t-steel and --font-body.
+      - name: Every CSS variable resolves
+        run: node scripts/check-css-vars.mjs
+
+      # And the other half: for every selector the design defines, does the
+      # value match? Normalising variable aliases and !important took the
+      # home page from 21 differences to 3, and all three that remained were
+      # real — including a bare `.rail` from the old sidebar layout putting a
+      # border and a filled background on every rail in the product.
+      - name: Stylesheets have not drifted from the design
+        run: node scripts/check-design-css.mjs
+
+      - name: Pages have not drifted from the design
+        run: node scripts/check-design.mjs
+
       - name: TypeScript type check (no emit)
         run: pnpm exec tsc --noEmit
+
+      # The root tsconfig excludes `workers/`, so until 8 Sep nothing
+      # typechecked them — and the first time this ran it found both workers
+      # still importing a library that had been deleted, which would have
+      # failed at deploy. `wrangler deploy` transpiles with esbuild and does
+      # not typecheck either, so this is the only thing that looks.
+      - name: TypeScript type check — workers
+        run: pnpm exec tsc --noEmit -p tsconfig.workers.json
 
       - name: Next.js build (catches Next-specific type errors)
         run: pnpm exec next build --no-lint

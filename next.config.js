@@ -2,14 +2,12 @@
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   typescript: { ignoreBuildErrors: false },
-  async redirects() {
-    return [
-      // Legacy /dashboard/* routes funnel into /timeline during cutover so old
-      // bookmarks keep working until the operator's session naturally moves on.
-      { source: '/dashboard/:path*', destination: '/timeline', permanent: false },
-      { source: '/dashboard',        destination: '/timeline', permanent: false },
-    ]
-  },
+  // ⚠️ No redirects, on purpose. `/dashboard/*` used to funnel into
+  // `/timeline` "so old bookmarks keep working" — and `/timeline` was removed
+  // on 8 Sep with the rest of the video-essay studio, so the redirect sent a
+  // bookmark from one page that does not exist to another. CLAUDE.md's rule
+  // for every removed surface: they do not redirect, because a redirect
+  // preserves a bookmark to a product that no longer exists.
   async headers() {
     return [
       {

@@ -1,0 +1,294 @@
+'use client'
+
+/**
+ * The intake, as a hook — shared by the log's composer and the full-screen
+ * `now` page.
+ *
+ * Both surfaces do exactly the same thing to a thing you put in: read its
+ * own clock in the browser, upload it straight to R2, then post one intake
+ * with the keys. Only the chrome around it differs — the composer answers
+ * with a receipt line, `now` answers with the slab settling and one word.
+ * Keeping the mechanics here means the two can't drift apart, which is what
+ * happened to the two feeds the design package spent a week undoing.
+ *
+ * The rule this enforces on both: uploads start the moment something is
+ * attached, so pressing Enter is instant however big the file is, and
+ * nothing is ever asked at the moment of input.
+ */
+
+import { useCallback, useRef, useState } from 'react'
+import type { DatePrecision } from '@/lib/log-entry'
+
+export interface Pending {
+  key: string
+  file: File
+  /** SHA-256 of the original, so the log can verify what it stored. */
+  checksum?: string
+  r2_key?: string
+  uploading: boolean
+  error?: string
+  happened_at?: string
+  date_source?: string
+  duration_seconds?: number
+}
+
+export interface IntakeReceipt {
+  line: string
+  batch: string
+  /** Recordings this act registered — undo has to take these too. */
+  vlogIds: string[]
+}
+
+/**
+ * Run `fn` over `items`, at most `n` in flight. Plain and local — a pool
+ * this small does not need a dependency, and the alternative (all of them at
+ * once) is what it exists to prevent.
+ */
+async function pool<T>(items: T[], n: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0
+  const runners = Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) {
+      const i = next++
+      await fn(items[i])
+    }
+  })
+  await Promise.all(runners)
+}
+
+export function useIntake(onDone?: () => void) {
+  const [text, setText] = useState('')
+  const [pending, setPending] = useState<Pending[]>([])
+  const [recording, setRecording] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [receipt, setReceipt] = useState<IntakeReceipt | null>(null)
+  const recRef = useRef<{ rec: MediaRecorder; started: number } | null>(null)
+
+  /**
+   * Attach files. Each one's own clock is read before it leaves the browser
+   * — EXIF for an image, media metadata for audio and video — because the
+   * operator is never asked to date a file.
+   */
+  const attach = useCallback(async (files: FileList | File[], durationHint?: number) => {
+    const list = Array.from(files)
+    if (!list.length) return
+    const added: Pending[] = list.map((file, i) => ({
+      key: `${Date.now()}-${i}-${file.name}`,
+      file,
+      uploading: true,
+      duration_seconds: durationHint,
+    }))
+    setPending(p => [...p, ...added])
+
+    // ⚠️ FOUR AT A TIME, and it used to be all of them at once.
+    //
+    // The bulk drop is the real case — "I'm just banking all my iPhone
+    // photos" — and `Promise.all` over the whole list starts every file
+    // together. The checksum reads each one WHOLE into memory
+    // (`file.arrayBuffer()`), so a few hundred photos is a gigabyte-plus
+    // allocated before a single upload finishes and the tab goes down. The
+    // browser only opens about six connections per origin anyway, so the
+    // concurrency was never bought anything; only the memory was real.
+    //
+    // Every file still shows as pending immediately. What is bounded is how
+    // many are being HELD at once.
+    await pool(added, 4, async item => {
+      try {
+        let happened_at: string | undefined
+        let date_source: string | undefined
+        let duration_seconds = item.duration_seconds
+
+        // Hash the original before it leaves. This is what lets the log say
+        // "kept, checked, clear it" and mean it rather than meaning "the
+        // upload returned 200". Skipped above the ceiling the server can
+        // re-read, where the check is length instead and says so.
+        let checksum: string | undefined
+        if (item.file.size <= 50 * 1024 * 1024) {
+          try {
+            const buf = await item.file.arrayBuffer()
+            const digest = await crypto.subtle.digest('SHA-256', buf)
+            checksum = Array.from(new Uint8Array(digest))
+              .map(b => b.toString(16).padStart(2, '0')).join('')
+          } catch { /* no hash — the server falls back to a size check */ }
+        }
+
+        if (item.file.type.startsWith('image/')) {
+          try {
+            const { readExif } = await import('@/lib/photo-client')
+            const exif = await readExif(item.file)
+            const taken = (exif as any)?.takenAt ?? (exif as any)?.taken_at
+            if (taken) {
+              const d = new Date(taken)
+              if (!isNaN(d.getTime())) { happened_at = d.toISOString(); date_source = 'exif' }
+            }
+          } catch { /* no EXIF — the server places it and marks it approximate */ }
+        }
+        if (duration_seconds === undefined
+            && (item.file.type.startsWith('audio/') || item.file.type.startsWith('video/'))) {
+          duration_seconds = await readMediaDuration(item.file)
+        }
+        // Deliberately NOT falling back to file.lastModified. That is when
+        // the file was last written to a disk — on a download, a copy or an
+        // export it is today, and it looks exactly like a real capture date.
+        // With no EXIF and no media clock the server places the file by
+        // inference and marks it approximate, which is the honest answer.
+
+        const presign = await fetch('/api/v2/log/presign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: item.file.name, content_type: item.file.type }),
+        })
+        if (!presign.ok) throw new Error('no upload url')
+        const { url, key } = await presign.json() as { url: string; key: string }
+
+        const put = await fetch(url, {
+          method: 'PUT',
+          body: item.file,
+          headers: item.file.type ? { 'Content-Type': item.file.type } : undefined,
+        })
+        if (!put.ok) throw new Error('upload failed')
+
+        setPending(p => p.map(x => x.key === item.key
+          ? { ...x, uploading: false, r2_key: key, happened_at, date_source, duration_seconds, checksum }
+          : x))
+      } catch (err: any) {
+        setPending(p => p.map(x => x.key === item.key
+          ? { ...x, uploading: false, error: err?.message || 'failed' }
+          : x))
+      }
+    })
+  }, [])
+
+  const removePending = useCallback((key: string) => {
+    setPending(p => p.filter(x => x.key !== key))
+  }, [])
+
+  /** Talk. The recording becomes a file like any other, then transcribes. */
+  const toggleMic = useCallback(async () => {
+    if (recording) {
+      const r = recRef.current
+      if (r) { r.rec.stop(); r.rec.stream.getTracks().forEach(t => t.stop()) }
+      setRecording(false)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const rec = new MediaRecorder(stream)
+      const chunks: Blob[] = []
+      rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data) }
+      rec.onstop = () => {
+        const started = recRef.current?.started ?? Date.now()
+        const secs = Math.round((Date.now() - started) / 1000)
+        const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' })
+        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+        const file = new File([blob], `voice-${stamp}.webm`, { type: blob.type })
+        void attach([file], secs)
+      }
+      recRef.current = { rec, started: Date.now() }
+      rec.start()
+      setRecording(true)
+    } catch {
+      setRecording(false)
+    }
+  }, [recording, attach])
+
+  /** Put it in. Returns the receipt, or null if nothing went. */
+  const submit = useCallback(async (opts?: {
+    happened_at?: string
+    date_precision?: DatePrecision
+    /** The turn this came out of, when continuing a thread. */
+    led_from?: string
+    /** 'reflects' when this is a later thought rather than a new event. */
+    relation?: string
+  }): Promise<IntakeReceipt | null> => {
+    const ready = pending.filter(p => p.r2_key && !p.error)
+    if (!text.trim() && !ready.length) return null
+    if (pending.some(p => p.uploading)) return null
+    setSending(true)
+    try {
+      const res = await fetch('/api/v2/log/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: text.trim() || undefined,
+          happened_at: opts?.happened_at,
+          date_precision: opts?.date_precision,
+          led_from: opts?.led_from,
+          relation: opts?.relation,
+          files: ready.map(p => ({
+            r2_key: p.r2_key,
+            original_filename: p.file.name,
+            mime: p.file.type,
+            bytes: p.file.size,
+            happened_at: p.happened_at,
+            date_source: p.date_source,
+            duration_seconds: p.duration_seconds,
+            checksum: p.checksum,
+          })),
+        }),
+      })
+      if (!res.ok) return null
+      const data = await res.json() as {
+        batch_id: string; vlog_ids?: string[]; receipt: { line: string }
+      }
+      const r: IntakeReceipt = {
+        line: data.receipt.line,
+        batch: data.batch_id,
+        vlogIds: data.vlog_ids || [],
+      }
+      setText('')
+      setPending([])
+      setReceipt(r)
+      onDone?.()
+      return r
+    } finally {
+      setSending(false)
+    }
+  }, [text, pending, onDone])
+
+  /** The receipt's undo — takes the whole act with it. */
+  const undo = useCallback(async (batch?: string) => {
+    const id = batch ?? receipt?.batch
+    if (!id) return
+    const params = new URLSearchParams({ batch: id })
+    const vlogs = receipt?.vlogIds || []
+    if (vlogs.length) params.set('vlogs', vlogs.join(','))
+    await fetch(`/api/v2/log/intake?${params}`, { method: 'DELETE' })
+    setReceipt(null)
+    onDone?.()
+  }, [receipt, onDone])
+
+  const canSend =
+    (text.trim().length > 0 || pending.some(p => p.r2_key))
+    && !pending.some(p => p.uploading)
+    && !sending
+
+  const wordCount = text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0
+
+  return {
+    text, setText,
+    pending, attach, removePending,
+    recording, toggleMic,
+    sending, canSend, wordCount,
+    submit, receipt, setReceipt, undo,
+  }
+}
+
+/** Read a media file's duration in the browser, so the sentence can say it. */
+export function readMediaDuration(file: File): Promise<number | undefined> {
+  return new Promise(resolve => {
+    const el = document.createElement(file.type.startsWith('video/') ? 'video' : 'audio')
+    const url = URL.createObjectURL(file)
+    let done = false
+    const finish = (v?: number) => {
+      if (done) return
+      done = true
+      URL.revokeObjectURL(url)
+      resolve(v)
+    }
+    el.preload = 'metadata'
+    el.onloadedmetadata = () => finish(isFinite(el.duration) ? el.duration : undefined)
+    el.onerror = () => finish(undefined)
+    el.src = url
+    setTimeout(() => finish(undefined), 4000)
+  })
+}

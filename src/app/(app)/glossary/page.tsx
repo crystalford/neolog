@@ -1,0 +1,209 @@
+'use client'
+
+/**
+ * The glossary — every term and subject, with the sentence it was first
+ * said in.
+ *
+ * `source.html`, the unlisted list: "the same entries as the log's filters,
+ * collected." A term's point is its FIRST use, so the coining sentence is
+ * what the row shows — his words, on their date, linking to the entry.
+ *
+ * The paragraph under a name is marked when the log wrote it. It becomes his
+ * the moment he edits it on the page itself, and the mark disappears then —
+ * never before.
+ *
+ * DefinedTermSet in the source, so a machine reading this gets the same
+ * thing a person does. The schema block is generated from the rows on
+ * screen, so it can never claim something the page does not show.
+ */
+
+export const runtime = 'edge'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import Shell from '@/components/Shell'
+import { Rail } from '@/components/Rail'
+import Stamp from '@/components/Stamp'
+import OwnerStrip from '@/components/OwnerStrip'
+
+interface Item {
+  id: string; name: string; kind: string
+  summary: string | null; summary_author: 'log' | 'operator'
+  first_said: string | null; first_said_at: string | null; first_said_id: string | null
+  entry_count: number; named_by_system: boolean; href: string
+}
+
+const KIND_WORD: Record<string, string> = {
+  term: 'a word', subject: 'a subject', project: 'a project', thing: 'a thing',
+}
+
+export default function Glossary() {
+  const [items, setItems] = useState<Item[]>([])
+  const [changed, setChanged] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<string>('all')
+
+  // A filter with nothing behind it is not shown — the bar offers only the
+  // kinds that actually exist on the log (SPEC §1, kinds.html).
+  const kinds = useMemo(
+    () => Array.from(new Set(items.map(i => i.kind))).sort(),
+    [items],
+  )
+  const shown = useMemo(
+    () => (tab === 'all' ? items : items.filter(i => i.kind === tab)),
+    [items, tab],
+  )
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v2/public/glossary', { cache: 'no-store' })
+      if (res.ok) {
+        const j = await res.json() as { items: Item[]; last_changed: string | null }
+        setItems(j.items || [])
+        setChanged(j.last_changed)
+      }
+    } catch { /* the page says nothing yet */ }
+    finally { setLoading(false) }
+  }, [])
+  useEffect(() => { void load() }, [load])
+
+  // The schema is built from what is rendered, never from a second source.
+  const jsonLd = useMemo(() => JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'DefinedTermSet',
+    name: 'The glossary',
+    hasDefinedTerm: items.map(i => ({
+      '@type': 'DefinedTerm',
+      name: i.name,
+      ...(i.summary ? { description: i.summary } : {}),
+      url: i.href,
+    })),
+  }), [items])
+
+  return (
+    <Shell>
+      <div className="logpage pg-source">
+        <div className="back">
+          <Link href="/">the log</Link>
+          <Link href="/everything">everything</Link>
+        </div>
+
+        <div className="grid">
+          <main>
+
+        <section className="top">
+              <h1>The glossary — every term and subject on the log, in one list.</h1>
+            </section>
+        <OwnerStrip signedIn={!loading} />
+        <Stamp at={changed} unlisted />
+
+            <p className="self">
+              This page isn&rsquo;t in the menu. The same names are on the
+              log, on the day each was said — this is the list version, for
+              reference and for machines. Every one of them has a permanent
+              address, so a line quoted from here can be traced back to the
+              day it was said.
+            </p>
+
+            {kinds.length > 1 && (
+              <div className="tabs">
+                <button className={tab === 'all' ? 'on' : undefined} onClick={() => setTab('all')}>all</button>
+                {kinds.map(k => (
+                  <button key={k} className={tab === k ? 'on' : undefined} onClick={() => setTab(k)}>
+                    {KIND_WORD[k] || k}
+                  </button>
+                ))}
+              </div>
+            )}
+
+        {loading && <div className="none">Reading the log.</div>}
+
+        {!loading && !items.length && (
+          <div className="none">
+            Nothing has a page yet. Pages are made from the names the log
+            found in what you have already said — <Link href="/pages">the index</Link> is
+            where they are made.
+          </div>
+        )}
+
+        {shown.map(i => (
+          <div className="c" key={i.id}>
+            <div className="x"><Link href={i.href}>{i.name}</Link></div>
+
+            {/* `source.html`'s `.m` — the meta line: when, what kind, and the
+                way through to its page. This page rendered `.ty` on its own
+                and put the date inside the provenance line below, so the two
+                facts that identify a term were in different places. */}
+            <div className="m">
+              {i.first_said_at && (
+                <time dateTime={i.first_said_at}>
+                  {new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </time>
+              )}
+              <span className="ty">
+                {KIND_WORD[i.kind] || i.kind}
+                {i.entry_count > 0 && ` · ${i.entry_count} ${i.entry_count === 1 ? 'use' : 'uses'}`}
+                {i.named_by_system && ' · named by the log'}
+              </span>
+              <Link className="more" href={i.href}>its page →</Link>
+            </div>
+
+            {/* `.n` is the note body. This was rendered as `.more`, which in
+                the design is the LINK at the end of `.m` — so the paragraph
+                took the styling of a navigation affordance. */}
+            {i.summary && (
+              <div className="n">
+                {i.summary}
+                {i.summary_author === 'log' && (
+                  <em style={{ display: 'block', fontStyle: 'normal', marginTop: 7, fontSize: 12.5, color: 'var(--fg-4)' }}>
+                    written by the log
+                  </em>
+                )}
+              </div>
+            )}
+
+            {i.first_said && (
+              <div className="open">
+                {i.first_said}
+                {/* `.w` — where the sentence came from, and whether it has
+                    been quoted. A term's first use is only a fact if you can
+                    get back to the moment it was said. */}
+                <div className="w">
+                  {i.first_said_id
+                    ? <Link href={`/entry/${i.first_said_id}`}>
+                        {i.first_said_at
+                          ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : 'the entry'}
+                      </Link>
+                    : <span>undated</span>}
+                  <span>
+                    {i.entry_count > 1
+                      ? `said ${i.entry_count} times since`
+                      : 'said once so far'}
+                  </span>
+                </div>
+                <button
+                  className="copy"
+                  onClick={() => {
+                    // The date is part of the fact, so it is copied with it.
+                    void navigator.clipboard?.writeText(
+                      `"${i.first_said}" — ${i.name}, ${i.first_said_at ? new Date(i.first_said_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : 'undated'}`,
+                    )
+                  }}
+                >Copy with the date</button>
+              </div>
+            )}
+          </div>
+        ))}
+
+        {items.length > 0 && (
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
+        )}
+                </main>
+
+          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/public', label: 'the log' }, { href: '/asks', label: 'the questions' }]} />
+        </div>
+      </div>
+    </Shell>
+  )
+}

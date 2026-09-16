@@ -20,12 +20,14 @@
  *         env.CLOUDFLARE_ACCOUNT_ID + env.CF_AI_TOKEN.
  */
 
-import type { Ai } from '@cloudflare/workers-types'
 
 const MODEL = '@cf/openai/whisper-large-v3-turbo'
 
 export interface WhisperEnv {
-  AI: Ai
+  // Only `.run()` is ever used. Asking for the whole `Ai` surface made this
+  // unassignable from callers whose `Ai` global resolves against a different
+  // lib context (the DOM `Response` vs the Workers one).
+  AI: { run: (model: any, args: any) => Promise<any> }
   CLOUDFLARE_ACCOUNT_ID?: string
   // Either of these works — set whichever the deploy script puts on the
   // worker. We try CF_AI_TOKEN first because it's scoped narrower in

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — what a log publishes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@200;300;400;450;500&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+</head>
+<body><div class="wrap">
+<header class="mh">
+  <a class="lock" href="index.html"><span class="mk"></span><span class="wm">neolog</span></a>
+  <span class="pv">research · 5 sep 2026 · what a personal log publishes, settled</span>
+  <nav><a href="log.html">home</a><a href="index.html">everything</a></nav>
+</header><div class="specnote">A page from the spec — one mechanic, shown. <a href="expanded.html">The product itself is the log and the expanded entry.</a></div>
+<div class="grid">
+<main>
+<section class="top">
+  <h1>Three questions, three existing answers. <b>We don't have to invent any of this.</b></h1>
+  <p>What kinds of things does a personal site publish? How finished is an idea? How sure is the author? Each has been worked out in public over a decade — by the IndieWeb community, by Gwern's essay site, and by the digital-garden movement that grew out of Mike Caulfield's 2015 talk. Together they answer the questions we kept circling: <b>whether the feed is right, what "ideas" should mean, and what the filters are.</b></p>
+</section>
+<div class="sh"><span>1 · Kinds — what a thing <em>is</em></span><b>IndieWeb post types · a decade of personal sites · a W3C Note</b></div>
+<p style="font-size:13.5px;color:var(--fg-3);margin:12px 0 6px;max-width:760px;line-height:1.6">The IndieWeb community has published and refined a list of post kinds since 2013. The key idea is that a kind is <b style="color:var(--fg-1);font-weight:450">discovered from what the post has</b>, not chosen from a menu — if it has a photo it's a photo post, if it replies to something it's a reply. That's exactly how the log already works. Their list, mapped to ours:</p>
+<table>
+<tr><th>Their kind</th><th>What it is</th><th>Ours</th><th>Filter</th><th>On the public log</th></tr>
+<tr><td>note</td><td>short content, no title — the default</td><td>an entry you said</td><td>said</td><td class="on">yes</td></tr>
+<tr><td>event · checkin</td><td>something that happened; somewhere you were</td><td>an entry that happened</td><td>happened</td><td class="on">yes</td></tr>
+<tr><td>photo · video · audio</td><td>media as the primary content</td><td>seen (and heard)</td><td>seen</td><td class="on">yes — now inline, not a link</td></tr>
+<tr><td>article <em>(written by the log)</em></td><td>long form the log drafts in your voice</td><td>a letter</td><td>—</td><td class="fence">below the fence</td></tr>
+<tr><td>quotation</td><td>a passage from elsewhere</td><td>a pull from a recording, with source</td><td>said</td><td class="on">yes, inside entries</td></tr>
+<tr><td>reply · like · repost</td><td>responding to someone else's post</td><td>elsewhere — drafted replies</td><td>—</td><td class="fence">below the fence</td></tr>
+<tr><td>bookmark · read · listen · watch</td><td>things you consumed</td><td>arrived — from connections</td><td>—</td><td class="off">private only; optional later</td></tr>
+<tr><td>—</td><td><em>they have "bookmark" and "review"; neither is this</em></td><td><b>read</b> — a thing you took in: a book, a paper, a link, an album, a film. When, and what you said about it. The source's facts are looked up and labelled; the take is yours.</td><td>read</td><td class="on">yes · <a href="read.html" style="border-bottom:1px solid var(--line-2)">one book's page</a></td></tr>
+<tr><td>article</td><td>a made thing with a body and a title — a report, a spec, a deck, a repository</td><td><b>a document</b> — under a page; who made it is a field</td><td>made</td><td class="on">yes · <a href="document.html" style="border-bottom:1px solid var(--line-2)">one document's page</a></td></tr>
+<tr><td>—</td><td><em>they have no kind for these; we do</em></td><td><b>term · position · finding</b></td><td>ideas</td><td class="on">yes</td></tr>
+<tr><td>—</td><td></td><td><b>question</b> asked and answered</td><td>questions</td><td class="on">yes</td></tr>
+</table>
+<p style="font-size:13px;color:var(--fg-3);margin-top:12px;max-width:760px;line-height:1.6"><b style="color:var(--fg-1);font-weight:450">Verdict on the filters:</b> they were already the right shape — kinds, discovered from the entry. Two things were missing: media wasn't shown (a <em>photo</em> post with no photo isn't one), and ideas had no way to say how finished they were. That's the next table.</p>
+<div class="sh"><span>2 · Status — how <em>finished</em> an idea is</span><b>Gwern's essay metadata · the digital garden's growth stages</b></div>
+<div class="two">
+  <div>
+    <h3>Gwern <span>· per essay, since 2010</span></h3>
+    <p>Every essay on gwern.net carries: <b>created</b>, <b>modified</b>, a <b>status</b> — "notes" (a pile of links), "draft" (has structure and a thesis), "in progress" (well developed), "finished"; also "abandoned" and "obsolete" — and a <b>confidence</b> word. The status is about the <em>writing's</em> completeness. It's shown at the top of the page, in plain text, and readers use it.</p>
+    <p>He also has <b>importance</b>, 1–10. <b>We don't take that one.</b> The log doesn't rank what matters; that's your rule.</p>
+  </div>
+  <div>
+    <h3>The garden <span>· seedling → budding → evergreen</span></h3>
+    <p>Digital gardens mark each note with a growth stage and show it publicly, so a reader knows whether they're reading a fresh thought or a settled one. Same idea as Gwern's status, softer words.</p>
+    <p>And the brief from 5 September proposed the same ladder for the log: <b>seed → stated → developed → placed</b>. Three sources, one shape. That's the "academic potential" you asked about — not a new page, a <b>status field on an idea</b>, shown clinically.</p>
+  </div>
+</div>
+<table style="margin-top:22px">
+<tr><th>Status</th><th>Means</th><th>Gwern's word</th><th>Garden's word</th><th>Example on the log</th></tr>
+<tr><td>seed</td><td>said once; a thought, kept</td><td>notes</td><td>seedling</td><td>most entries under <em>ideas</em></td></tr>
+<tr><td>draft</td><td>the idea is settled, the wording isn't</td><td>draft</td><td>budding</td><td>Neural Engine Optimization — "not sure about Neural"</td></tr>
+<tr><td>stated</td><td>a position you'd stand behind, with versions</td><td>in progress</td><td>—</td><td>the coding-agent position, v2</td></tr>
+<tr><td>finished</td><td>nothing more to add</td><td>finished</td><td>evergreen</td><td>"a timeline, a logline and a tagline are one thing"</td></tr>
+<tr><td>developed</td><td>built out into a letter or a cut</td><td>—</td><td>—</td><td class="fence">below the fence</td></tr>
+<tr><td>placed</td><td>sent somewhere — a preprint server, a hosting site</td><td>—</td><td>—</td><td class="fence">below the fence · the routing table in the spec</td></tr>
+<tr><td>replaced · abandoned</td><td>replaced by a later version; or dropped</td><td>obsolete · abandoned</td><td>—</td><td>v1 of the position, crossed out</td></tr>
+</table>
+<div class="sh"><span>3 · Confidence — how <em>sure</em></span><b>Gwern's Kesselman words · our date marks</b></div>
+<div class="two">
+  <div>
+    <h3>For a claim <span>· Gwern's list</span></h3>
+    <p>Gwern tags each essay with one word from the Kesselman List of Estimative Words: <b>certain · highly likely · likely · possible · unlikely · highly unlikely · remote</b>. One word, chosen by the author, shown at the top. Readers on Hacker News called it the best thing about the site — you can be convinced by an argument the author himself marks "possible."</p>
+    <p>We adopt the list as-is for positions and findings. Terms don't need it; a definition isn't a bet.</p>
+  </div>
+  <div>
+    <h3>For a date <span>· ours, already built</span></h3>
+    <p>The log already marks how sure a <em>date</em> is: <b>exact · approximate · year only · from memory · looked up</b>. <a href="blurry.html" style="color:var(--fg-1);border-bottom:1px solid var(--line-2)">Blurry stays blurry.</a> That's confidence about <em>when</em>; Gwern's is confidence about <em>whether</em>. Both belong on the entry, both in plain words, neither as a number.</p>
+  </div>
+</div>
+<div class="sh"><span>4 · The feed itself</span><b>Caulfield, 2015 · the garden and the stream</b></div>
+<div class="two">
+  <div>
+    <h3>The stream</h3>
+    <p>"A single, time-ordered path with our experience at the center." Twitter, Facebook, every feed. Caulfield's point was that the web collapsed into streams and lost something. <b>But a log is a stream by definition</b> — what happened, when, is the whole point. The public log is a stream and should be. That part of the doubt is settled: for a record, the feed is right.</p>
+  </div>
+  <div>
+    <h3>The garden</h3>
+    <p>"The web as topology… an arrangement and rearrangement of things to one another." Ideas don't live well in a stream — an idea collapses to the day it was said. <b>An idea needs a page:</b> its status, its confidence, its versions, the entries that fed it, what it's linked to. That's the garden, and it's why <em>ideas as a filter</em> felt thin: the filter is the stream view of ideas; each idea's own page is the garden view. Both exist. The glossary is the garden's index.</p>
+  </div>
+</div>
+<div class="verdict">
+  <h2>Settled. <b>The log is the stream; every idea is a garden page; the filters are kinds; status and confidence are two plain words on each idea.</b></h2>
+  <p>Nothing here is a new lens. It's what personal sites converged on over ten years, adopted rather than invented. What changes on the public log today: <b>media shows inline</b> under <em>seen</em>; the three ideas on the log carry <b>status</b> (draft · stated · finished) and, where it's a bet, <b>how sure</b>. What doesn't change: two nav words, the filters, the unlisted layer. And the one thing we decline from Gwern — <b>importance</b> — because the log never ranks.</p>
+</div>
+<p class="src">Sources · <a href="https://indieweb.org/posts">IndieWeb: posts and post kinds</a> · <a href="https://indieweb.org/post-type-discovery">Post Type Discovery (W3C Note, 2018; living standard)</a> · <a href="https://gwern.net/about">Gwern: About this website — status and confidence tags</a> · <a href="https://gwern.net/style-guide">Gwern: Manual of Style — metadata</a> · <a href="https://hapgood.us/2015/10/17/the-garden-and-the-stream-a-technopastoral/">Caulfield: The Garden and the Stream (2015)</a> · <a href="https://maggieappleton.com/garden-history">Appleton: A Brief History &amp; Ethos of the Digital Garden</a></p>
+</main>
+<aside class="rail"><div class="rc"><div class="h">On this page</div><div class="i">Gwern · per essay, since 2010</div><div class="i">The garden · seedling → budding → evergreen</div><div class="i">For a claim · Gwern's list</div><div class="i">For a date · ours, already built</div><div class="i">The stream</div><div class="i">The garden</div></div><div class="rc"><div class="h">Goes to</div><div class="i"><a href="read.html">one book's page</a></div><div class="i"><a href="document.html">one document's page</a></div><div class="i"><a href="blurry.html">Blurry stays blurry.</a></div></div><div class="rc"><div class="h">Elsewhere</div><div class="acts"><a href="log.html">the log</a><a href="portal.html">every page</a></div></div></aside>
+</div>
+<footer class="ft"><span>neolog · research · kinds, status, confidence</span><span class="r"><a href="public-log.html">the public log</a>what to steal<a href="index.html">everything</a></span></footer>
+</div></body></html>

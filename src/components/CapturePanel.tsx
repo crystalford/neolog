@@ -335,15 +335,15 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
               {!running && queuedCount > 0 && (
-                <button onClick={startQueue} className="canon-btn primary" style={{ fontSize: 12 }}>
+                <button onClick={startQueue} className="btn primary" style={{ fontSize: 12 }}>
                   Start · {queuedCount} file{queuedCount === 1 ? '' : 's'}
                 </button>
               )}
               {running && (
-                <button onClick={cancelQueue} className="canon-btn ghost" style={{ fontSize: 12 }}>Stop</button>
+                <button onClick={cancelQueue} className="btn" style={{ fontSize: 12 }}>Stop</button>
               )}
               {!running && (doneCount > 0 || skippedCount > 0) && (
-                <button onClick={clearDone} className="canon-btn ghost" style={{ fontSize: 12 }}>Clear done</button>
+                <button onClick={clearDone} className="btn" style={{ fontSize: 12 }}>Clear done</button>
               )}
             </div>
           </div>

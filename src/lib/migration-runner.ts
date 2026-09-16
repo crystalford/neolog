@@ -18,6 +18,7 @@
  */
 
 import type { D1Database } from '@cloudflare/workers-types'
+import { isDroppedTableError } from '@/lib/dropped-tables'
 
 export interface Migration {
   name: string
@@ -1076,8 +1077,592 @@ export const MIGRATIONS: Migration[] = [
     name: '2026-08-16_productions_rebuild_idx_type',
     sql: `CREATE INDEX IF NOT EXISTS idx_productions_type ON productions(production_type)`,
   },
+
+  // Status updates — the simplest possible capture: type a sentence, it
+  // lands on the timeline with a date. Deliberately minimal: text +
+  // occurred_at (editable so backlogging "got a job last Thursday" with
+  // last Thursday's date just works). No type/category taxonomy — that's
+  // unproven structure, not a necessity, and it's cheaper to add a column
+  // later than to have shipped one nobody asked for.
+  {
+    name: '2026-08-31_log_entries',
+    sql: `CREATE TABLE IF NOT EXISTS log_entries (
+      id           TEXT PRIMARY KEY,
+      operator_id  TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      text         TEXT NOT NULL,
+      occurred_at  TEXT NOT NULL,
+      deleted_at   TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-08-31_idx_log_entries_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_operator ON log_entries(operator_id, occurred_at DESC)`,
+  },
+
+  // ── The entry model (7 Sep 2026) ────────────────────────────────────────
+  // The 31 Aug table was `{ text, occurred_at }` and its comment said the
+  // taxonomy was "unproven structure". Thirty-seven design pages later it is
+  // proven, so the columns land now. Every one of these exists because a
+  // rule in SPEC §0–§1 needs somewhere to live:
+  //
+  //   two dates          — happened_at (when it occurred) + logged_at (when it
+  //                        entered the log). Both ALWAYS stored. Default sort
+  //                        is happened_at. The distance between them is itself
+  //                        a queryable signal.
+  //   date_precision     — a file with no usable clock is placed by inference
+  //                        and marked. Answers "just 2008" without inventing a
+  //                        separate precision schema: one enum column.
+  //   kind               — the seven on the log. Necessity before schema.
+  //   visibility         — public by default; 'private' is the operator's
+  //                        call, 'held' is the log's (§0.2). Only the two
+  //                        exceptions are ever marked.
+  //   held_reason        — the log SAYS WHAT IT SAW, never an unnamed reason.
+  //   author             — who wrote each line: said | log | drafted (§1).
+  //                        Set when the line is made, never reconstructed.
+  //   buried_at          — burial, not deletion. No delete action exists.
+  //   batch_id           — one act of putting-in is itself an entry with a
+  //                        manifest; its children carry its id and are each
+  //                        placed by their own clock.
+  //
+  // Columns are added one per migration so a partial failure leaves the rest
+  // applied — the runner's BENIGN_PATTERNS swallow "duplicate column name",
+  // so re-running is always safe.
+  { name: '2026-09-07_log_entries_happened_at', sql: `ALTER TABLE log_entries ADD COLUMN happened_at TEXT` },
+  { name: '2026-09-07_log_entries_logged_at', sql: `ALTER TABLE log_entries ADD COLUMN logged_at TEXT` },
+  { name: '2026-09-07_log_entries_date_precision', sql: `ALTER TABLE log_entries ADD COLUMN date_precision TEXT NOT NULL DEFAULT 'exact'` },
+  { name: '2026-09-07_log_entries_kind', sql: `ALTER TABLE log_entries ADD COLUMN kind TEXT NOT NULL DEFAULT 'said'` },
+  { name: '2026-09-07_log_entries_visibility', sql: `ALTER TABLE log_entries ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'` },
+  { name: '2026-09-07_log_entries_held_reason', sql: `ALTER TABLE log_entries ADD COLUMN held_reason TEXT` },
+  { name: '2026-09-07_log_entries_author', sql: `ALTER TABLE log_entries ADD COLUMN author TEXT NOT NULL DEFAULT 'operator'` },
+  { name: '2026-09-07_log_entries_buried_at', sql: `ALTER TABLE log_entries ADD COLUMN buried_at TEXT` },
+  { name: '2026-09-07_log_entries_batch_id', sql: `ALTER TABLE log_entries ADD COLUMN batch_id TEXT` },
+  { name: '2026-09-07_log_entries_source_kind', sql: `ALTER TABLE log_entries ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'text'` },
+  { name: '2026-09-07_log_entries_detail', sql: `ALTER TABLE log_entries ADD COLUMN detail TEXT` },
+  { name: '2026-09-07_log_entries_r2_key', sql: `ALTER TABLE log_entries ADD COLUMN r2_key TEXT` },
+  { name: '2026-09-07_log_entries_mime', sql: `ALTER TABLE log_entries ADD COLUMN mime TEXT` },
+  { name: '2026-09-07_log_entries_bytes', sql: `ALTER TABLE log_entries ADD COLUMN bytes INTEGER` },
+  { name: '2026-09-07_log_entries_duration', sql: `ALTER TABLE log_entries ADD COLUMN duration_seconds REAL` },
+  { name: '2026-09-07_log_entries_transcript', sql: `ALTER TABLE log_entries ADD COLUMN transcript TEXT` },
+  { name: '2026-09-07_log_entries_link_url', sql: `ALTER TABLE log_entries ADD COLUMN link_url TEXT` },
+  { name: '2026-09-07_log_entries_original_filename', sql: `ALTER TABLE log_entries ADD COLUMN original_filename TEXT` },
+
+  // Backfill the two dates for every row written before they existed. An
+  // entry typed on 31 Aug happened when it said it happened and was logged
+  // when the row was created — both facts are already on the row, they just
+  // had no column of their own.
+  {
+    name: '2026-09-07_log_entries_backfill_dates',
+    sql: `UPDATE log_entries
+             SET happened_at = COALESCE(happened_at, occurred_at, created_at),
+                 logged_at   = COALESCE(logged_at, created_at, occurred_at)
+           WHERE happened_at IS NULL OR logged_at IS NULL`,
+  },
+
+  // Default sort is happened_at, so that's the index. The second index
+  // serves the "when I logged it" toggle on the toolbar.
+  {
+    name: '2026-09-07_idx_log_entries_happened',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_happened ON log_entries(operator_id, happened_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_logged',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_logged ON log_entries(operator_id, logged_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_batch',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_batch ON log_entries(batch_id)`,
+  },
+
+  // ── Relog (7 Sep 2026) ──────────────────────────────────────────────────
+  // Three hundred-odd vlogs are already transcribed and already extracted.
+  // What the operator actually SAID in them lives in `threads` — each row a
+  // take, with its verbatim key_quotes and a transcript span. In the feed a
+  // vlog is one line ("Recorded 22 minutes of video"); the twelve things he
+  // said inside it are not on the log at all.
+  //
+  // Relog turns each of those into a dated entry, placed at
+  // `recorded_at + transcript_span_start` so a day's entries sit in the
+  // order they were spoken.
+  //
+  // `source_ref` makes it idempotent: 'thread:<id>' is unique, so a re-run
+  // inserts nothing it has already inserted. The index is partial because
+  // almost every row is a typed entry with no source_ref, and NULLs are
+  // distinct under a plain UNIQUE index anyway.
+  { name: '2026-09-07_log_entries_source_ref', sql: `ALTER TABLE log_entries ADD COLUMN source_ref TEXT` },
+  { name: '2026-09-07_log_entries_vlog_id', sql: `ALTER TABLE log_entries ADD COLUMN vlog_id TEXT` },
+  {
+    name: '2026-09-07_uidx_log_entries_source_ref',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_log_entries_source_ref
+            ON log_entries(operator_id, source_ref) WHERE source_ref IS NOT NULL`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_vlog',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_vlog ON log_entries(vlog_id)`,
+  },
+
+  // ── Pages — the index (7 Sep 2026) ──────────────────────────────────────
+  // "There is one kind of page that gathers entries: a page." An idea, a job,
+  // a company, a person, a place, a project — anything the operator would say
+  // "the ___ page" about. The kind is a LABEL, not a different page.
+  //
+  // One mention makes a page. No threshold — "the log doesn't make you repeat
+  // yourself to be taken seriously." The count on a page describes; it never
+  // decides, and it never triggers a prompt.
+  //
+  // Why a table rather than reading `entities` the way the feed reads `vlogs`:
+  // a page is editable in ways an extraction output is not. It can be
+  // renamed, merged with another when the log made one thing into two, and
+  // its paragraph is the operator's to correct. `entities` is a pass's
+  // output; a page is a thing he owns. `source_ref` keeps the link, so
+  // seeding from entities stays idempotent.
+  {
+    name: '2026-09-07_pages',
+    sql: `CREATE TABLE IF NOT EXISTS pages (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL REFERENCES operator(id) ON DELETE CASCADE,
+      name            TEXT NOT NULL,
+      kind            TEXT NOT NULL DEFAULT 'subject',
+      -- The log's one-paragraph version, rewritten as things attach and
+      -- always the operator's to edit. Never shown as his words.
+      summary         TEXT,
+      summary_author  TEXT NOT NULL DEFAULT 'log',
+      -- first said -> last said. A job or a place may have a fixed range.
+      span_start      TEXT,
+      span_end        TEXT,
+      entry_count     INTEGER NOT NULL DEFAULT 0,
+      visibility      TEXT NOT NULL DEFAULT 'public',
+      named_by_system INTEGER NOT NULL DEFAULT 1,
+      -- 'entity:<id>' or 'cluster:<id>' when seeded; null when made by hand.
+      source_ref      TEXT,
+      -- Set when this page turned out to be the same thing as another.
+      merged_into     TEXT,
+      deleted_at      TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_pages_source_ref',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_pages_source_ref
+            ON pages(operator_id, source_ref) WHERE source_ref IS NOT NULL`,
+  },
+  {
+    name: '2026-09-07_idx_pages_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_pages_operator ON pages(operator_id, kind, name)`,
+  },
+
+  // What a page gathers. Polymorphic because the log's three row sources —
+  // a typed entry, a recording, a photo — are all attachable, and the feed
+  // already treats them as one shape.
+  {
+    name: '2026-09-07_page_entries',
+    sql: `CREATE TABLE IF NOT EXISTS page_entries (
+      page_id     TEXT NOT NULL,
+      entry_kind  TEXT NOT NULL,          -- 'entry' | 'vlog' | 'photo'
+      entry_id    TEXT NOT NULL,
+      -- how it got here: 'word' (the name appeared), 'date', 'place',
+      -- 'operator' (attached by hand). Shown so a wrong attach is one tap
+      -- to detach, and detaching leaves the entry alone.
+      attached_by TEXT NOT NULL DEFAULT 'word',
+      attached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (page_id, entry_kind, entry_id)
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_page_entries_entry',
+    sql: `CREATE INDEX IF NOT EXISTS idx_page_entries_entry ON page_entries(entry_kind, entry_id)`,
+  },
+
+  // ── Corrections (7 Sep 2026) ────────────────────────────────────────────
+  // Two rules from SPEC §1 that had nowhere to live:
+  //
+  //   "Revisions — the operator correcting his own words — are entries. Both
+  //    versions kept, dated, marked revised by you."
+  //   "Every correction is itself a dated entry, so the log keeps a record of
+  //    its own mistakes and the error rate is readable by kind over time.
+  //    This is the only honest answer to 'will it be smart enough': the
+  //    operator doesn't have to trust it, he can read it."
+  //
+  // Editing a line was destroying the previous wording, which is the one
+  // thing a record must never do. Every correction now writes a row here,
+  // and nothing overwrites without leaving the old value behind.
+  {
+    name: '2026-09-07_entry_revisions',
+    sql: `CREATE TABLE IF NOT EXISTS entry_revisions (
+      id           TEXT PRIMARY KEY,
+      operator_id  TEXT NOT NULL,
+      entry_id     TEXT NOT NULL,
+      -- what was corrected: text | date | visibility | kind | attach | bury
+      field        TEXT NOT NULL,
+      old_value    TEXT,
+      new_value    TEXT,
+      -- 'operator' always, for now: the log does not correct itself.
+      by_whom      TEXT NOT NULL DEFAULT 'operator',
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_entry_revisions_entry',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_entry
+            ON entry_revisions(entry_id, created_at DESC)`,
+  },
+  {
+    name: '2026-09-07_idx_entry_revisions_field',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_field
+            ON entry_revisions(operator_id, field, created_at DESC)`,
+  },
+
+  // A relogged line came from a span of a recording. Keeping the span means
+  // the entry can point at the second it was said rather than at the whole
+  // video — "verbatim spans are the only ground truth; every summary is an
+  // index into them" (LLM-PIPELINE §1).
+  { name: '2026-09-07_log_entries_span_start', sql: `ALTER TABLE log_entries ADD COLUMN span_start REAL` },
+  { name: '2026-09-07_log_entries_span_end', sql: `ALTER TABLE log_entries ADD COLUMN span_end REAL` },
+  // Whether this line was checked verbatim against the recording's
+  // transcript. NULL = not applicable (the operator typed it himself).
+  { name: '2026-09-07_log_entries_grounded', sql: `ALTER TABLE log_entries ADD COLUMN grounded INTEGER` },
+
+  // ── Recall (7 Sep 2026) ─────────────────────────────────────────────────
+  // "recall — filling in what was never written down — a VERB, not a place:
+  //  a question appears where it belongs (the log's rail, a page, a thin
+  //  year) and is answered there, by voice, typing, a choice, or 'don't
+  //  remember'." (SPEC §1, and the reason `recall.html` was deleted.)
+  //
+  // The rules this table exists to keep:
+  //   - The log asks roughly one question a month, straight. It never says
+  //     "you've mentioned this eleven times."
+  //   - It never asks at the moment of input.
+  //   - It asks only about parts that could sharpen. Once he says he does
+  //     not remember, it stops asking that question — for good.
+  //   - Four things it must never ask about, because a wrong guess there is
+  //     the tool putting words in his mouth: what a recording MEANS, WHY he
+  //     did something, whether something was GOOD, and who someone IS to
+  //     him. Question generation only ever produces date and name gaps.
+  {
+    name: '2026-09-07_recall_questions',
+    sql: `CREATE TABLE IF NOT EXISTS recall_questions (
+      id            TEXT PRIMARY KEY,
+      operator_id   TEXT NOT NULL,
+      -- 'entry_date' | 'thin_year' | 'page_name'
+      kind          TEXT NOT NULL,
+      -- The question, and the one line saying what the log already has. Both
+      -- are composed from real rows, never written by a model.
+      question      TEXT NOT NULL,
+      because       TEXT,
+      -- What it is about, so the answer can attach to the right thing.
+      target_kind   TEXT,
+      target_id     TEXT,
+      -- open | answered | dont_remember | dismissed
+      status        TEXT NOT NULL DEFAULT 'open',
+      -- The entry the answer became. An answer is an entry like any other.
+      answer_entry_id TEXT,
+      -- Stable across regeneration, so the same gap is one question forever
+      -- and a dismissed one never comes back.
+      dedupe_key    TEXT NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      answered_at   TEXT
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_recall_dedupe',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_recall_dedupe
+            ON recall_questions(operator_id, dedupe_key)`,
+  },
+  {
+    name: '2026-09-07_idx_recall_status',
+    sql: `CREATE INDEX IF NOT EXISTS idx_recall_status
+            ON recall_questions(operator_id, status, created_at DESC)`,
+  },
+
+  // ── Threads (7 Sep 2026) ────────────────────────────────────────────────
+  // "A thread adds ONE thing: each turn carries a `led_from` pointing at the
+  //  turn it came out of. Loops allowed. Turns from outside the note
+  //  (reading the log and reacting) are turns. Stays open." (SPEC §1)
+  //
+  // One column, because that is genuinely all a thread is. There is no
+  // thread table, no thread id, no membership: a thread is what you get by
+  // following `led_from` from any turn, in either direction. Nothing has to
+  // be created, named, closed, or joined.
+  //
+  // Deliberately NOT at /thread/[id]: that route already serves a row of the
+  // extraction `threads` table, which is a different thing with the same
+  // word, and this repo has already paid once for a naming collision
+  // (productions vs projects). The mechanic lives on the entry page, where
+  // both directions are visible at the same time.
+  // Whisper returns timed segments and the intake threw them away, so a
+  // voice note's transcript was one undifferentiated blob you could not
+  // point at. LLM-PIPELINE §1: "verbatim spans are the only ground truth" —
+  // a span you cannot address is not much of a span.
+  { name: '2026-09-07_log_entries_segments', sql: `ALTER TABLE log_entries ADD COLUMN transcript_segments TEXT` },
+  { name: '2026-09-07_log_entries_led_from', sql: `ALTER TABLE log_entries ADD COLUMN led_from TEXT` },
+  // What `led_from` MEANS. SPEC §1 distinguishes two things that both point
+  // at an earlier entry:
+  //
+  //   a turn      — a new event that came out of an earlier one. Its own row,
+  //                 its own date, its own place on the log.
+  //   a reflection — "A later thought about an earlier event attaches to that
+  //                 entry as a `reflected` layer. **It never becomes a second
+  //                 event.**"
+  //
+  // One column rather than two relationships, because the difference is what
+  // the pointer means, not what it points at. Default 'led_from' so every
+  // row written before this reads as a turn, which is what they were.
+  { name: '2026-09-07_log_entries_relation', sql: `ALTER TABLE log_entries ADD COLUMN relation TEXT NOT NULL DEFAULT 'led_from'` },
+
+  // ── Safe to clear your phone (7 Sep 2026) ───────────────────────────────
+  // clear.html calls this "the loop the log exists to close", and it is the
+  // original problem in the operator's own words: the phone fills up, he
+  // deletes, the record is gone.
+  //
+  // The log only fixes that if it can say, per file, "kept, checked, you can
+  // clear this" — and MEAN it. So:
+  //
+  //   "'Clear it' means verified, not uploaded. Uploaded isn't kept. The log
+  //    checks the stored bytes against the phone's before it says so."
+  //
+  // Four states, and only one of them means delete it locally:
+  //   pending   still uploading or queued — don't touch it on the phone
+  //   checking  stored; the log is confirming the copy
+  //   checked   stored and verified — the only state that means clear it
+  //   mismatch  the copy differs; the log re-sends and says so. Never clear.
+  //
+  // `checksum` is the client's SHA-256 of the original. `verified_by` records
+  // WHICH check was done, because claiming a byte check that was really a
+  // size check is exactly the lie this feature exists not to tell.
+  { name: '2026-09-07_log_entries_checksum', sql: `ALTER TABLE log_entries ADD COLUMN checksum TEXT` },
+  { name: '2026-09-07_log_entries_keep_state', sql: `ALTER TABLE log_entries ADD COLUMN keep_state TEXT` },
+  { name: '2026-09-07_log_entries_verified_by', sql: `ALTER TABLE log_entries ADD COLUMN verified_by TEXT` },
+  { name: '2026-09-07_log_entries_verified_at', sql: `ALTER TABLE log_entries ADD COLUMN verified_at TEXT` },
+  // The entry this one turned out to be a copy of. "The log never deletes a
+  // copy" (dupes.html) — the second arrival attaches to the first and notes
+  // where it came from, so there is one thing with two sources rather than
+  // two things.
+  { name: '2026-09-07_log_entries_copy_of', sql: `ALTER TABLE log_entries ADD COLUMN copy_of TEXT` },
+  {
+    name: '2026-09-07_idx_log_entries_checksum',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_checksum
+            ON log_entries(operator_id, checksum)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_keep_state',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_keep_state
+            ON log_entries(operator_id, keep_state)`,
+  },
+
+  // ── A month, as a place (7 Sep 2026) ────────────────────────────────────
+  // month.html: "The month in one paragraph · written by the log from the 47
+  // entries · rewritten as things arrive" and, underneath it, the rule that
+  // makes it safe: "Every sentence above points at entries below. Nothing in
+  // it is from outside the month."
+  //
+  // This is the reduction mechanic as a place. The paragraph is stored rather
+  // than regenerated per view, because it costs a model call and because the
+  // operator can edit it — and once he has, it is his and must not be
+  // silently rewritten.
+  {
+    name: '2026-09-07_month_summaries',
+    sql: `CREATE TABLE IF NOT EXISTS month_summaries (
+      id           TEXT PRIMARY KEY,          -- operator_id + ':' + YYYY-MM
+      operator_id  TEXT NOT NULL,
+      ym           TEXT NOT NULL,             -- YYYY-MM
+      -- The paragraph, with [n] citations pointing at cited_json.
+      summary      TEXT,
+      -- The entries each [n] refers to, in order.
+      cited_json   TEXT,
+      -- 'log' until he edits it; 'operator' after, and then it is left alone.
+      author       TEXT NOT NULL DEFAULT 'log',
+      -- How many entries it was written from, so a stale one is detectable.
+      built_from   INTEGER NOT NULL DEFAULT 0,
+      built_at     TEXT,
+      updated_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_uidx_month_summaries',
+    sql: `CREATE UNIQUE INDEX IF NOT EXISTS uidx_month_summaries
+            ON month_summaries(operator_id, ym)`,
+  },
+
+  // Going through what arrived (triage.html). "Everything that arrives is
+  // placed by date before you see it. This is optional... Skipping the whole
+  // pile costs nothing — it's still on the log, still searchable."
+  //
+  // So this column records only that he has LOOKED at something. It is not a
+  // queue, nothing is blocked on it, and an untriaged entry is in no way
+  // lesser — it is filed exactly the same.
+  { name: '2026-09-07_log_entries_triaged_at', sql: `ALTER TABLE log_entries ADD COLUMN triaged_at TEXT` },
+  {
+    name: '2026-09-07_idx_log_entries_triaged',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_triaged
+            ON log_entries(operator_id, triaged_at)`,
+  },
+  {
+    name: '2026-09-07_idx_log_entries_led_from',
+    sql: `CREATE INDEX IF NOT EXISTS idx_log_entries_led_from ON log_entries(led_from)`,
+  },
+
+  // ── Correspondence (`messages.html`) ──────────────────────────────────
+  // The one kind with someone else in it. A thread has two owners: his side
+  // is entries under the normal rules, their side is kept here and never
+  // becomes an entry, because an entry carries author='operator'.
+  {
+    name: '2026-09-07_correspondence',
+    sql: `CREATE TABLE IF NOT EXISTS correspondence (
+      id              TEXT PRIMARY KEY,
+      operator_id     TEXT NOT NULL,
+      -- The person's page. Their consent lives there, not here, so one
+      -- answer governs every thread they appear in.
+      person_page_id  TEXT,
+      person_name     TEXT NOT NULL,
+      -- 'text' | 'email' | 'chat' — what he forwarded, as he said it was.
+      medium          TEXT NOT NULL DEFAULT 'text',
+      started_at      TEXT,
+      ended_at        TEXT,
+      message_count   INTEGER NOT NULL DEFAULT 0,
+      -- The whole paste, kept. Nothing is reconstructed from the parts.
+      raw             TEXT,
+      created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at      TEXT
+    )`,
+  },
+  {
+    name: '2026-09-07_correspondence_messages',
+    sql: `CREATE TABLE IF NOT EXISTS correspondence_messages (
+      id           TEXT PRIMARY KEY,
+      thread_id    TEXT NOT NULL,
+      operator_id  TEXT NOT NULL,
+      -- 'operator' | 'other'. There is no third side.
+      side         TEXT NOT NULL,
+      speaker      TEXT,
+      text         TEXT NOT NULL,
+      sent_at      TEXT,
+      -- Whether the timestamp came from the paste or from the order alone.
+      sent_at_source TEXT NOT NULL DEFAULT 'order',
+      position     INTEGER NOT NULL DEFAULT 0,
+      -- Set only on his side: the entry this message became.
+      entry_id     TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_correspondence_messages',
+    sql: `CREATE INDEX IF NOT EXISTS idx_corr_msgs_thread
+            ON correspondence_messages(thread_id, position)`,
+  },
+  {
+    name: '2026-09-07_idx_correspondence_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_corr_operator
+            ON correspondence(operator_id, started_at)`,
+  },
+  // Their answer, on their page. Four states, and the default is the most
+  // private one — everyone starts at 'kept_private' without being asked,
+  // because the log cannot ask on their behalf.
+  { name: '2026-09-07_pages_consent', sql: `ALTER TABLE pages ADD COLUMN consent TEXT NOT NULL DEFAULT 'kept_private'` },
+  // When they said it and how. "Their yes is a fact on the log. Not a
+  // checkbox." A state with no record of how it was given is a checkbox.
+  { name: '2026-09-07_pages_consent_at', sql: `ALTER TABLE pages ADD COLUMN consent_at TEXT` },
+  { name: '2026-09-07_pages_consent_note', sql: `ALTER TABLE pages ADD COLUMN consent_note TEXT` },
+
+  // ── Documents (`writing.html`) ────────────────────────────────────────
+  // A made thing. "a document is a document · kind and who-made-it are
+  // fields" — one table for an essay, a report, a repository, a cut, a
+  // voice-over, a deck, a design and an export, because they differ only in
+  // those two fields and in what the body points at.
+  {
+    name: '2026-09-07_documents',
+    sql: `CREATE TABLE IF NOT EXISTS documents (
+      id            TEXT PRIMARY KEY,
+      operator_id   TEXT NOT NULL,
+      kind          TEXT NOT NULL DEFAULT 'essay',
+      title         TEXT NOT NULL,
+      -- The text itself, whole. A document is never split into entries.
+      body          TEXT,
+      -- What the body points at when it is not text: a video, audio, slides.
+      body_r2_key   TEXT,
+      body_url      TEXT,
+      -- Disclosed, always, and in the file when it is published.
+      made_by       TEXT NOT NULL DEFAULT 'operator',
+      status        TEXT NOT NULL DEFAULT 'draft',
+      word_count    INTEGER NOT NULL DEFAULT 0,
+      draft_count   INTEGER NOT NULL DEFAULT 1,
+      -- The page it sits under, and the entry it shows as on the feed.
+      page_id       TEXT,
+      entry_id      TEXT,
+      visibility    TEXT NOT NULL DEFAULT 'private',
+      published_at  TEXT,
+      finished_at   TEXT,
+      created_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at    TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      deleted_at    TEXT
+    )`,
+  },
+  // Every draft kept and dated. A new draft never overwrites the one before
+  // it — the same rule `entry_revisions` enforces for a line.
+  {
+    name: '2026-09-07_document_drafts',
+    sql: `CREATE TABLE IF NOT EXISTS document_drafts (
+      id           TEXT PRIMARY KEY,
+      document_id  TEXT NOT NULL,
+      operator_id  TEXT NOT NULL,
+      n            INTEGER NOT NULL,
+      body         TEXT,
+      word_count   INTEGER NOT NULL DEFAULT 0,
+      -- In his words, why this draft happened. Never the log's.
+      note         TEXT,
+      created_at   TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`,
+  },
+  {
+    name: '2026-09-07_idx_document_drafts',
+    sql: `CREATE INDEX IF NOT EXISTS idx_document_drafts_doc
+            ON document_drafts(document_id, n)`,
+  },
+  {
+    name: '2026-09-07_idx_documents_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_documents_operator
+            ON documents(operator_id, created_at)`,
+  },
+
+  // ── Footage (`footage.html`) ──────────────────────────────────────────
+  // The record as material. `usable` is HIS mark, not a score the log
+  // computed — null means he has not said, which is different from "no".
+  { name: '2026-09-07_vlogs_usable', sql: `ALTER TABLE vlogs ADD COLUMN usable INTEGER` },
+  { name: '2026-09-07_vlogs_usable_note', sql: `ALTER TABLE vlogs ADD COLUMN usable_note TEXT` },
+  // When he corrects what the log said was in the frame, the correction is
+  // his and the log's original stays in vision_description — the same
+  // both-versions-kept rule as everywhere else.
+  { name: '2026-09-07_vlogs_frame_note', sql: `ALTER TABLE vlogs ADD COLUMN frame_note TEXT` },
+
+  // When the log last read this recording's transcript onto the log.
+  // `src/lib/read-recording.ts` — no model in that path.
+  { name: '2026-09-08_vlogs_read_at', sql: `ALTER TABLE vlogs ADD COLUMN read_at TEXT` },
+
+  // The corrections record reads every revision the operator has, newest
+  // first, across all entries. The existing indexes are (entry_id, …) for an
+  // entry's own history and (operator_id, field, …) for one kind — neither
+  // orders the whole set, so the log-wide list was a scan that grows with
+  // every correction ever made.
+  {
+    name: '2026-09-09_idx_entry_revisions_operator',
+    sql: `CREATE INDEX IF NOT EXISTS idx_entry_revisions_operator
+            ON entry_revisions(operator_id, created_at DESC)`,
+  },
+
+  // Where else to find him. `dossier.html`: "so a machine knows these are
+  // all one person" — it is `sameAs` in the Person schema, and /facts had no
+  // source for it. He types them; nothing is looked up, and there is no
+  // connector. A JSON array of { kind, url }, on the operator row, because
+  // it is one fact about one person and a table for it would be schema
+  // before necessity.
+  { name: '2026-09-09_operator_same_as', sql: `ALTER TABLE operator ADD COLUMN same_as_json TEXT` },
 ]
 
+// `no such table` is deliberately NOT here. That is how a table which failed
+// to create gets caught. The one table it is allowed to name is a table this
+// product dropped on purpose — see `isDroppedTableError`.
 const BENIGN_PATTERNS = [
   /duplicate column name/i,
   /already exists/i,
@@ -1086,7 +1671,8 @@ const BENIGN_PATTERNS = [
 
 export interface MigrationResult {
   name: string
-  status: 'applied' | 'skipped_already_recorded' | 'skipped_already_present' | 'failed'
+  status: 'applied' | 'skipped_already_recorded' | 'skipped_already_present'
+        | 'skipped_table_dropped' | 'failed'
   error?: string
 }
 
@@ -1135,6 +1721,16 @@ export async function runMigrations(db: D1Database): Promise<MigrationResult[]> 
           `INSERT INTO schema_migrations (name) VALUES (?) ON CONFLICT(name) DO NOTHING`,
         ).bind(m.name).run()
         results.push({ name: m.name, status: 'skipped_already_present', error: msg })
+      } else if (isDroppedTableError(msg)) {
+        // The table this migration alters was dropped on purpose (8 Sep).
+        // MIGRATIONS is append-only, so the entry stays in the array — but
+        // it can never apply again, and leaving it unrecorded made every
+        // cold isolate re-run fifty-three failing statements on its first
+        // request. Record it and stop asking.
+        await db.prepare(
+          `INSERT INTO schema_migrations (name) VALUES (?) ON CONFLICT(name) DO NOTHING`,
+        ).bind(m.name).run()
+        results.push({ name: m.name, status: 'skipped_table_dropped', error: msg })
       } else {
         results.push({ name: m.name, status: 'failed', error: msg })
       }

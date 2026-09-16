@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1240"><title>neolog — safe to clear your phone</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;450;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="plain.css">
+</head>
+<body><div class="wrap">
+<header class="mh"><a class="lock" href="log.html"><span class="mk"></span><span class="wm">neolog</span></a><span class="pv">private · the loop the log exists to close</span><nav><a href="log.html">home</a><a href="search.html">search</a><a href="headings.html">index</a></nav></header><div class="specnote">A page from the spec — one mechanic, shown. <a href="expanded.html">The product itself is the log and the expanded entry.</a></div>
+<div class="grid">
+<main>
+<section class="top"><h1>Your phone is full. <b>Here's the moment the log tells you it's safe to empty it.</b></h1><p>This is the original problem: the phone fills up, you delete, the record is gone. The log fixes it only if it can say, per file, <b>"kept, checked, you can clear this"</b> — and mean it. So every arrived file carries that state, the phone shows the total, and clearing is one honest button.</p></section>
+<div class="grid">
+<main>
+  <div class="sh"><span>Every file's state, on the log</span><b>four states · only one means "clear it"</b></div>
+  <div class="fl"><span class="d">24 Aug</span><span class="x">The ledger board, 9 photos<i>burst · grouped</i></span><span class="s ok">kept · checked · clear it</span></div>
+  <div class="fl"><span class="d">19 Aug</span><span class="x">Driving home, 22:08<i>1.4 GB · transcribed</i></span><span class="s ok">kept · checked · clear it</span></div>
+  <div class="fl"><span class="d">today</span><span class="x">Six photos from the walk<i>arrived 08:02</i></span><span class="s chk">kept · checking…</span></div>
+  <div class="fl"><span class="d">today</span><span class="x">A 31-minute recording<i>uploading · 61%</i></span><span class="s wait">not here yet</span></div>
+  <div class="fl"><span class="d">2 Sep</span><span class="x">Voice 0231.m4a — the hour with Leif<i>58 MB</i></span><span class="s no">didn't match · re-sending</span></div>
+  <div class="states">
+    <div><b style="color:var(--fg-4)">Not here yet</b><p>Still uploading, or queued. Don't touch it on the phone.</p></div>
+    <div><b style="color:var(--steel)">Kept · checking</b><p>Stored. The log is confirming the copy is byte-for-byte the original. Seconds to a minute.</p></div>
+    <div><b style="color:var(--teal)">Kept · checked · clear it</b><p>Stored, verified, in the export. <b>The only state that means delete locally.</b></p></div>
+    <div><b style="color:var(--ochre)">Didn't match</b><p>The copy differs from the original. The log re-sends on its own and says so. Never clear a file in this state.</p></div>
+  </div>
+  <div class="rules"><div><b>"Clear it" means verified, not uploaded.</b><p>Uploaded isn't kept. The log checks the stored bytes against the phone's before it says so — and the state lives on the file, not in a notification you might miss.</p></div><div><b>The phone shows the total, then one button.</b><p>How many are safe, how much space that is, and the ones that aren't yet — listed, not hidden. Clearing removes only the verified ones.</p></div><div><b>Nothing is cleared from the log. Ever.</b><p>This page is about the phone. The log's copy is the record; clearing the phone is the point of having it.</p></div></div>
+</main>
+<aside class="ph"><div class="scr">
+  <div class="big"><b>312</b> photos and videos<br>are safely in the log.</div>
+  <div class="sub">Each one stored, checked against the original, and in your export. Clearing them from this phone frees <b style="color:var(--fg)">14.2 GB</b>.</div>
+  <div class="row"><span>Safe to clear</span><b>312 · 14.2 GB</b></div>
+  <div class="row"><span>Still checking</span><b>6</b></div>
+  <div class="row"><span>Still uploading</span><b>1 · 31 min video</b></div>
+  <div class="row"><span>Didn't match · re-sending</span><b>1</b></div>
+  <div class="warn">The 8 that aren't verified stay on the phone. They'll show here when they are.</div>
+  <div class="btn">Clear the 312 from this phone</div>
+  <div class="no">Nothing is removed from the log.</div>
+</div></aside>
+</div>
+</main>
+<aside class="rail"><div class="rc"><div class="h">Elsewhere</div><div class="acts"><a href="log.html">the log</a><a href="portal.html">every page</a></div></div></aside>
+</div>
+<footer class="ft"><span>neolog · safe to clear</span><span class="r"><a href="dupes.html">duplicates</a><a href="takeout.html">everything, out</a><a href="index.html">everything</a></span></footer>
+</div></body></html>

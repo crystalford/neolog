@@ -8,8 +8,13 @@
  * the runner backfill. Clearing the label stops the misleading UI and stops
  * the healer from re-kicking / eventually failing them.
  *
- * Safe: only touches rows with an active extraction_runs row (i.e. genuinely
- * already-extracted) and never touches 'failed' rows.
+ * Safe: only touches rows that already carry WORD TIMINGS — the thing that
+ * proves Whisper finished on them — and never touches 'failed' rows.
+ *
+ * ⚠️ The guard used to be "an active `extraction_runs` row", and that table
+ * was dropped on 8 Sep, so this UPDATE threw `no such table` and reset
+ * nothing. It also stopped meaning anything: there is no extraction. What
+ * makes a recording genuinely finished now is `transcript_words`.
  */
 
 import { type NextRequest, NextResponse } from 'next/server'
@@ -32,11 +37,11 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDb(env)
-  // Restore already-extracted vlogs (real transcript content) to complete,
+  // Restore already-transcribed vlogs (real word timings) to complete,
   // regardless of whatever stuck/in-flight/archived label the wedged DO
   // dispatch or a terminate-all left them in. The transcript-length guard
-  // preserves genuine silent b-roll (transcript_text='' from no-audio-skip)
-  // and never touches operator-archived imports (no active extraction_run).
+  // preserves a genuinely silent recording (transcript_text='' from the
+  // no-audio skip) and never touches an operator-archived import.
   const res = await db.prepare(
     `UPDATE vlogs
         SET pipeline_status = 'complete',
@@ -46,16 +51,16 @@ export async function POST(req: NextRequest) {
             updated_at = CURRENT_TIMESTAMP
       WHERE operator_id = ?
         AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing','archived','uploaded')
+        AND pipeline_status IN ('transcoding','processing','extracting','reading','transcribing','archived','uploaded')
         AND LENGTH(COALESCE(transcript_text, '')) > 0
-        AND EXISTS (SELECT 1 FROM extraction_runs r WHERE r.vlog_id = vlogs.id AND r.is_active = 1)`,
+        AND EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = vlogs.id)`,
   ).bind(operator.id).run()
 
   const remaining = await findOne<{ c: number }>(
     db,
     `SELECT COUNT(*) AS c FROM vlogs
       WHERE operator_id = ? AND deleted_at IS NULL
-        AND pipeline_status IN ('transcoding','processing','extracting','transcribing')
+        AND pipeline_status IN ('transcoding','processing','extracting','reading','transcribing')
         AND LENGTH(COALESCE(transcript_text, '')) > 0`,
     operator.id,
   )

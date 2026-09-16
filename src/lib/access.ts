@@ -63,7 +63,11 @@ export interface Operator {
   background: string | null
   current_focus: string | null
   tz: string
-  default_voice_profile_id: string | null
+  // ⚠️ `default_voice_profile_id` was here, typed and read by nothing. It
+  // points at `voice_profiles`, dropped on 8 Sep with voice cloning. The
+  // column still exists on the row — an ALTER cannot be undone and
+  // MIGRATIONS is append-only — and `SELECT *` still returns it; what is
+  // gone is the typed field, which is what invites something to use it.
   public_share_enabled: number
   created_at: string
   updated_at: string

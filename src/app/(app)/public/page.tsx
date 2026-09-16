@@ -1,0 +1,177 @@
+'use client'
+
+/**
+ * The public log — what a stranger sees.
+ *
+ * SPEC §0.1, settled 6 Sep: **there is one log.** Public is a flag on an
+ * entry, not a section of the site. This page is the same feed as `/`,
+ * filtered to the entries marked public — generated from it, never authored
+ * separately.
+ *
+ * The reason that rule exists, in the package's own words: it was built the
+ * other way until 6 September, as two hand-authored feeds, and "nine public
+ * entries were absent from the private log." A record cannot be missing what
+ * it published. So this page holds no content of its own. It calls
+ * `/api/v2/log?filter=pub` and renders it plainer.
+ *
+ * ── Why this is a preview and not a public URL ───────────────────────────
+ *
+ * Nothing here is reachable without signing in, and that is deliberate.
+ *
+ * Under SPEC §0.2 everything the operator writes is public by default — the
+ * feed marks only the exceptions. That is the right default for a record he
+ * is building deliberately. It is the wrong thing to point at the open web
+ * without him having looked, because relog puts hundreds of lines from three
+ * hundred existing recordings onto the log in one click, and none of them
+ * were written with a reader in mind.
+ *
+ * Making this genuinely public is one deliberate act — a Cloudflare Access
+ * bypass app for this path, added to the bootstrap workflow the way
+ * `/podcast.xml` and `/p/*` already are. That act is the operator's, not
+ * mine, and this page says so at the top rather than quietly implying it is
+ * already live.
+ */
+
+export const runtime = 'edge'
+
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
+import Shell from '@/components/Shell'
+import { LogDays } from '@/components/LogRow'
+import { Rail } from '@/components/Rail'
+import OwnerStrip from '@/components/OwnerStrip'
+import {
+  type LogEntry, type FeedFilter,
+} from '@/lib/log-entry'
+
+const FILTERS: { k: FeedFilter; label: string }[] = [
+  { k: 'pub',  label: 'everything' },
+  { k: 'said', label: 'what I said' },
+  { k: 'did',  label: 'what I did' },
+  { k: 'auto', label: 'arrived on its own' },
+  { k: 'mem',  label: 'from memory' },
+]
+
+export default function PublicLog() {
+  const [items, setItems] = useState<LogEntry[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<FeedFilter>('pub')
+  const [order, setOrder] = useState<'happened' | 'logged'>('happened')
+  const [q, setQ] = useState('')
+
+  // Filters what is on the page; it never asks the log anything.
+  const shown = useMemo(() => {
+    const needle = q.trim().toLowerCase()
+    if (!needle) return items
+    return items.filter(e =>
+      e.sentence.toLowerCase().includes(needle)
+      || (e.detail || '').toLowerCase().includes(needle)
+      || (e.searchable || '').toLowerCase().includes(needle))
+  }, [items, q])
+
+  const load = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ order, filter, limit: '200' })
+      const res = await fetch(`/api/v2/log?${params}`, { cache: 'no-store' })
+      if (!res.ok) { setItems([]); return }
+      const data = await res.json() as { items: LogEntry[] }
+      // Belt and braces: whatever the filter did, nothing private or held
+      // back renders on the page that exists to show what a stranger sees.
+      setItems((data.items || []).filter(e => e.visibility === 'public'))
+    } catch { setItems([]) }
+    finally { setLoading(false) }
+  }, [order, filter])
+  useEffect(() => { void load() }, [load])
+
+  // Same grouping as the private feed, so the two cannot disagree about
+  // which day something happened on.
+  // Grouping into days was done here and is LogDays' job now — the whole
+  // point of using the feed's component is that this page holds no row
+  // rendering of its own to drift from it.
+
+  return (
+    <Shell>
+      <div className="logpage publog pg-public-log">
+        {/* `public-log.html`: the owner strip, and nothing else above the
+            bar. The private log's header does not belong on the page that
+            is meant to be what a stranger sees. */}
+        <OwnerStrip signedIn={!loading} />
+
+        <div className="notlive">
+          <b>Nobody can see this yet.</b> This page needs signing in, like
+          every other page. Everything you write is public by default and the
+          log marks only the exceptions, so this is what would go out — but
+          it is not out. Putting it on the open web is one deliberate change
+          to the Cloudflare Access rules, and it is yours to make once you
+          have read what is on this page.
+        </div>
+
+        <div className="grid">
+          <main>
+        {/* SPEC §3: "The public log gets a quiet search." Quiet meaning it
+            filters what is already on the page — it does not ask the log a
+            question, which is /search and has its own citation discipline. */}
+        <div className="ask">
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="find something on this page"
+            aria-label="Find something on this page"
+          />
+          {q && <span className="ans">{shown.length} of {items.length}</span>}
+        </div>
+
+        <div className="bar">
+          <div className="f">
+            {FILTERS.map(f => (
+              <button
+                key={f.k}
+                className={filter === f.k ? 'on' : ''}
+                onClick={() => setFilter(f.k)}
+              >{f.label}</button>
+            ))}
+          </div>
+          <div className="r">
+            <span>order:</span>
+            <button className={order === 'happened' ? 'on' : ''} onClick={() => setOrder('happened')}>
+              when it happened
+            </button>
+            <button className={order === 'logged' ? 'on' : ''} onClick={() => setOrder('logged')}>
+              when I logged it
+            </button>
+          </div>
+        </div>
+
+            {/* The same rows and day dividers as the feed. SPEC §3:
+                "one design, two views — nothing is designed twice." The
+                public view is the private view minus what isn't public. */}
+            <LogDays items={shown} order={order} />
+
+            {!loading && shown.length === 0 && (
+              <div className="none">
+                {q ? 'Nothing on this page matches that.' : 'Nothing is public yet.'}
+              </div>
+            )}
+          </main>
+
+          <Rail goesTo={[
+            { href: '/', label: 'your log' },
+            { href: '/facts', label: 'the facts' },
+            { href: '/everything', label: 'everything' },
+          ]} />
+        </div>
+
+        <footer className="ft">
+          <span>neolog · the public log</span>
+          <span className="r">
+            <Link href="/">the log</Link>
+            <Link href="/facts">the facts</Link>
+            <Link href="/pages">the index</Link>
+            <Link href="/export">export</Link>
+            <Link href="/everything">everything</Link>
+          </span>
+        </footer>
+      </div>
+    </Shell>
+  )
+}

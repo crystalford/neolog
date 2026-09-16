@@ -25,7 +25,8 @@
  *   {
  *     vlog_ids?: string[]           // explicit list (client provides per-chunk)
  *     scope?: 'incomplete' | 'all'  // only used when dry_run + no vlog_ids
- *     mode: 'cheap' | 'premium'
+ *                                   // incomplete = no word timings, or the
+ *                                   // pipeline never finished
  *     dry_run?: boolean             // resolve list only, don't dispatch
  *     skip_in_flight?: boolean      // default true
  *   }
@@ -43,6 +44,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRequestContext } from '@cloudflare/next-on-pages'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { IN_FLIGHT_STATUSES, statusList } from '@/lib/pipeline-status'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -61,7 +63,7 @@ const MAX_LIST_RESOLVE = 1000
 
 // In-flight grace: if pipeline_status is one of these AND updated_at is
 // within this window, treat the vlog as already running and skip.
-const IN_FLIGHT_STATUSES = ['transcoding', 'transcribing', 'extracting']
+
 const IN_FLIGHT_WINDOW_MIN = 15
 
 function noStore(body: unknown, init: number | ResponseInit = 200): NextResponse {
@@ -89,7 +91,6 @@ export async function POST(req: NextRequest) {
     return noStore({ error: 'Invalid JSON body' }, 400)
   }
 
-  const mode: 'cheap' | 'premium' = body?.mode === 'premium' ? 'premium' : 'cheap'
   const scope: 'incomplete' | 'all' = body?.scope === 'all' ? 'all' : 'incomplete'
   const dryRun = body?.dry_run === true
   const skipInFlight = body?.skip_in_flight !== false
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest) {
           const all = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
             `SELECT id,
-                    CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
+                    CASE WHEN pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
                               AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                          THEN 1 ELSE 0 END AS in_flight,
                     CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
@@ -167,7 +168,7 @@ export async function POST(req: NextRequest) {
         // right DO entry point per vlog. ORDER BY id keeps the list
         // stable across the dry-run/dispatch handoff.
         const inFlightWhere = skipInFlight
-          ? `AND NOT (v.pipeline_status IN ('transcoding','transcribing','extracting')
+          ? `AND NOT (v.pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
                 AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes'))`
           : ''
         rows = await findMany<{ id: string; has_transcript: number }>(
@@ -181,28 +182,32 @@ export async function POST(req: NextRequest) {
                   ${inFlightWhere}
                 ORDER BY id
                 LIMIT ${MAX_LIST_RESOLVE}`
-            // "Incomplete" includes three failure modes:
-            //   1. Pipeline never finished (status != 'complete')
-            //   2. No active extraction_runs row at all
-            //   3. Active extraction_runs row exists but total_items=0
-            //      AND the transcript is substantial (>= 200 chars).
-            //      Short-transcript zero-item runs are b-roll — those
-            //      are terminal, NOT eligible for re-dispatch.
-            //   4. extraction_runs.model = 'short-transcript-skip' is
-            //      explicitly the b-roll marker; never re-dispatch.
+            // ⚠️ "Incomplete" used to mean "the extraction engine did not
+            // finish", resolved by LEFT JOINing `extraction_runs` — a table
+            // dropped on 8 Sep. Every dry run threw `no such table`, and
+            // this is the endpoint behind the button that transcribes four
+            // hundred recordings. `check-sql-columns.mjs` could not see it:
+            // MIGRATIONS is append-only, so that table's columns are still
+            // "known" long after the table is gone.
+            //
+            // What incomplete MEANS now is one thing, and it is the only
+            // thing `read-recording.ts` needs: **no word timings**. A
+            // recording with none writes nothing at all rather than dating
+            // its passages by guess, so it is exactly the set that has to go
+            // back through Whisper. `transcript_text` is not the test — an
+            // older run could leave prose with no timings, and that
+            // recording can never be read.
+            //
+            // A recording the pipeline never finished is included too, since
+            // its words may be missing for a reason upstream of Whisper.
             : `SELECT v.id AS id,
                       CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
                            THEN 1 ELSE 0 END AS has_transcript
                   FROM vlogs v
-                  LEFT JOIN extraction_runs r
-                    ON r.vlog_id = v.id AND r.is_active = 1
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
                   AND (v.pipeline_status != 'complete'
-                       OR r.id IS NULL
-                       OR (
-                         COALESCE(r.total_items, 0) = 0
-                         AND COALESCE(r.model, '') != 'short-transcript-skip'
-                         AND LENGTH(COALESCE(v.transcript_text, '')) >= 200
+                       OR NOT EXISTS (
+                         SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id
                        ))
                   ${inFlightWhere}
                 ORDER BY v.id
@@ -216,7 +221,7 @@ export async function POST(req: NextRequest) {
               db,
               `SELECT COUNT(*) AS n FROM vlogs
                 WHERE operator_id = ? AND deleted_at IS NULL
-                  AND pipeline_status IN ('transcoding','transcribing','extracting')
+                  AND pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
                   AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')`,
               operator.id,
             )
@@ -232,12 +237,14 @@ export async function POST(req: NextRequest) {
       return noStore({
         total: ids.length,
         ids,
-        // Split for cost-aware UI: transcribed → /reextract (~$0.02/vlog),
-        // untranscribed → /start (~$0.10/vlog, full pipeline incl. FFmpeg).
+        // A recording with a transcript jumps to the last step; one without
+        // takes the full run through FFmpeg and Whisper. Counted, not
+        // priced — see /api/v2/admin/pipeline-state for why there is no
+        // dollar figure left to quote.
         transcribed_count: transcribed_ids.length,
         untranscribed_count: untranscribed_ids.length,
         skipped_in_flight: inFlightCount,
-        mode, scope,
+        scope,
       })
     } catch (err: any) {
       return noStore(
@@ -264,7 +271,7 @@ export async function POST(req: NextRequest) {
     owned = await findMany<{ id: string; pipeline_status: string; in_flight: number; has_transcript: number }>(
       db,
       `SELECT id, pipeline_status,
-              CASE WHEN pipeline_status IN ('transcoding','transcribing','extracting')
+              CASE WHEN pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
                         AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                    THEN 1 ELSE 0 END AS in_flight,
               CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
@@ -348,7 +355,7 @@ export async function POST(req: NextRequest) {
 
       try {
         const res = await dispatchPipeline(env, {
-          vlog_id, operator_id: operator.id, mode,
+          vlog_id, operator_id: operator.id,
           reset: false, // already done above in the batch
           useStart,
         })

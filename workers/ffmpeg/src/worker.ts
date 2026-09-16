@@ -8,8 +8,9 @@
  *
  * The actual ffmpeg work lives in ../server.js inside the container image.
  * The container listens on port 8080; this Worker forwards requests
- * (transcode-h264 / extract-thumb / extract-audio / trim / concat) to it
- * and streams responses back to the calling Worker (the main app Worker).
+ * (transcode-h264 / extract-thumb / extract-thumb-mini-transcode /
+ * extract-audio / concat-audio) to it and streams responses back to the
+ * calling Worker (the main app Worker).
  *
  * Called from the main app via Service Binding: env.FFMPEG.fetch(...)
  */

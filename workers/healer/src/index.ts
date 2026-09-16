@@ -1,19 +1,31 @@
 /**
- * Cron-triggered auto-healing sweep for the post-upload pipeline.
+ * Auto-healing sweep for the post-upload pipeline.
  *
- * Runs every 5 minutes. Finds vlogs that have been "in a step" for longer
- * than the step's healthy checkpoint window, then either:
- *   - re-dispatches the workflow if pipeline_restart_count < MAX_RESTARTS
+ * Finds vlogs that have been "in a step" for longer than the step's healthy
+ * checkpoint window, then either:
+ *   - re-dispatches if pipeline_restart_count < MAX_RESTARTS
  *   - marks the row failed with a clear message otherwise
  *
- * This replaces the manual "Restart pipeline" / "Reset stuck transcoding
- * rows" buttons that used to ride on /uploads. Stuck workflows now
- * self-recover; the operator only sees failures that genuinely need
- * attention.
+ * ⚠️ **IT DOES NOT RUN ON A SCHEDULE.** `crons = []` in this worker's
+ * wrangler.toml, disabled deliberately: a five-minute sweep is 8,640
+ * invocations a month of ambient cost on a single-operator app. This header
+ * said "Runs every 5 minutes… stuck workflows now self-recover" until
+ * 9 Sep, and four other files described it the same way. It was not true,
+ * and the sentence being in five places is why nobody noticed.
  *
- * Concurrency: cron handlers are single-instance per minute boundary,
- * so two healer runs can't race on the same row. Each row is processed
- * sequentially within a single invocation.
+ * The equivalent from the app side is `POST /api/v2/admin/reset-stuck` — a
+ * pure D1 UPDATE, no model calls, no container starts — and it is a button
+ * on `/settings` ("wedged half-way"), which is the shape every maintenance
+ * job takes here because the operator has no terminal. This worker stays
+ * deployed for the case where the DO itself needs re-arming, and its `fetch`
+ * handler runs the same sweep on demand.
+ *
+ * If a four-hundred-recording run is coming, turning the cron back on for
+ * the duration is the operator's call and one line in the toml.
+ *
+ * Concurrency: cron handlers are single-instance per minute boundary, so two
+ * healer runs can't race on the same row. Each row is processed sequentially
+ * within a single invocation.
  */
 
 import type {
@@ -22,6 +34,8 @@ import type {
   ScheduledController,
 } from '@cloudflare/workers-types'
 
+import { IN_FLIGHT_STATUSES } from '../../../src/lib/pipeline-status'
+
 interface Env {
   DB: D1Database
   PROCESS_UPLOAD: { fetch: (req: string | Request, init?: RequestInit) => Promise<Response> }
@@ -29,7 +43,20 @@ interface Env {
   HEARTBEAT_TOKEN?: string
 }
 
-const STUCK_STATUSES = ['transcoding', 'transcribing', 'extracting'] as const
+/**
+ * ⚠️ Imported, never re-declared. This list was one of five copies and it was
+ * short: `reading` — the pipeline's last step since the read path replaced
+ * extraction on 8 Sep — was missing, and the healer is the only thing that
+ * makes a four-hundred-recording run self-recover. A recording that hung on
+ * the way onto the log stayed hung, forever, with nothing re-dispatching it,
+ * and nothing anywhere reported it: every copy was internally valid and one
+ * was short. `src/lib/pipeline-status.ts` is the one list now.
+ *
+ * ⚠️ `IN_FLIGHT_STATUSES`, not `OCCUPIED_STATUSES`. This job RE-DISPATCHES,
+ * and `uploaded` covers a row the browser is still pushing bytes into —
+ * re-dispatching there turns a slow upload into a broken one.
+ */
+const STUCK_STATUSES = IN_FLIGHT_STATUSES
 // Base stuck threshold. Large files (>500 MB) get a longer grace window
 // since their FFmpeg audio extract + Whisper transcribe can legitimately
 // take 15-20 min on a 1+ GB vlog.
@@ -118,9 +145,15 @@ async function sweep(env: Env): Promise<{
                   updated_at = CURRENT_TIMESTAMP
             WHERE id = ?`,
         ).bind(
+          // ⚠️ This used to say "Click Re-extract on the vlog page", and
+          // that button went with the extraction dashboard on 8 Sep. A
+          // failure message naming a control that does not exist is worse
+          // than one naming none. What DOES retry this row is Settings →
+          // transcribe the untranscribed: a failed row is not 'complete',
+          // so the dry run picks it up.
           `Auto-restart limit reached (${MAX_RESTARTS} attempts). ` +
           `Was stuck in '${row.pipeline_status}' since ${row.updated_at}. ` +
-          `Click Re-extract on the vlog page to retry manually.`,
+          `Settings → "transcribe the untranscribed" will send it again.`,
           row.id,
         ).run()
         result.marked_failed.push(row.id)
