@@ -1,636 +1,216 @@
 {
-  "requested_at": "2026-09-16T23:20:10Z",
-  "method": "GET",
-  "path": "/api/v2/admin/runtime-state?status=started&step=audio_extract&limit_events=20&nonce=1789600798",
+  "requested_at": "2026-09-16T23:23:45Z",
+  "method": "POST",
+  "path": "/api/v2/admin/reset-stuck",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3c3999eedd75bc0-SJC\r|",
-  "body": "{\"generated_at\":\"2026-09-16T23:20:10.270Z\",\"operator_id\":\"01KRCXWYTRN0BYTR3452ZTSXXJ\",\"filters\":{\"limit\":20,\"status\":\"started\",\"step\":\"audio_extract\",\"vlog_id\":null},\"aggregates\":{\"vlogs\":{\"total\":420,\"complete\":225,\"failed\":2,\"processing\":193,\"archived\":0,\"has_transcoded\":228,\"has_thumb\":415},\"events_by_step_status_24h\":[{\"step\":\"audio_extract\",\"status\":\"ok\",\"n\":2},{\"step\":\"audio_extract\",\"status\":\"skipped\",\"n\":26},{\"step\":\"audio_extract\",\"status\":\"started\",\"n\":80},{\"step\":\"extract\",\"status\":\"failed\",\"n\":409},{\"step\":\"extract\",\"status\":\"ok\",\"n\":409},{\"step\":\"extract\",\"status\":\"started\",\"n\":818},{\"step\":\"transcode\",\"status\":\"failed\",\"n\":3},{\"step\":\"transcode\",\"status\":\"skipped\",\"n\":224},{\"step\":\"transcode\",\"status\":\"started\",\"n\":1402},{\"step\":\"transcribe\",\"status\":\"failed\",\"n\":2},{\"step\":\"transcribe\",\"status\":\"ok\",\"n\":38},{\"step\":\"transcribe\",\"status\":\"skipped\",\"n\":1},{\"step\":\"transcribe\",\"status\":\"started\",\"n\":74}]},\"ffmpeg\":{\"ok\":true,\"running\":false,\"state\":\"idle\",\"status\":200,\"latency_ms\":646},\"recent_failures\":[{\"vlog_id\":\"01KRCXXBDEJ85EQV08DZMR4FRT\",\"original_filename\":\"1774887236745_PXL_20260213_220023444.mp4\",\"step\":\"transcode\",\"error_full_text\":\"ffmpeg /transcode-h264 fetch failed: The operation was aborted\\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\\n    at async VlogPipelineDO.alarm (index.js:1048:11)\",\"started_at\":\"2026-09-16 21:19:34\"},{\"vlog_id\":\"01KRCXXBH79WHTPA3CCE7KJY4H\",\"original_filename\":\"1774887236780_PXL_20260212_164723409.mp4\",\"step\":\"transcode\",\"error_full_text\":\"ffmpeg /transcode-h264 fetch failed: The operation was aborted\\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\\n    at async VlogPipelineDO.alarm (index.js:1048:11)\",\"started_at\":\"2026-09-16 21:19:21\"},{\"vlog_id\":\"01KRCXXBFFHTCC88CYR0WTJ985\",\"original_filename\":\"1774887236761_PXL_20260213_205820983.mp4\",\"step\":\"transcode\",\"error_full_text\":\"ffmpeg /transcode-h264 fetch failed: The operation was aborted\\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\\n    at async VlogPipelineDO.alarm (index.js:1048:11)\",\"started_at\":\"2026-09-16 21:19:21\"},{\"vlog_id\":\"01KRMW0NDKBZ8KA6H31BPG1EV4\",\"original_filename\":\"DJI_20260509183621_0063_D.MP4\",\"step\":\"transcribe\",\"error_full_text\":\"audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KRMW0NDKBZ8KA6H31BPG1EV4/mp3.full\\nError: audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KRMW0NDKBZ8KA6H31BPG1EV4/mp3.full\\n    at VlogPipelineDO.stepTranscribe (index.js:1397:23)\\n    at async VlogPipelineDO.alarm (index.js:1040:11)\",\"started_at\":\"2026-09-16 19:52:42\"},{\"vlog_id\":\"01KY04EZQEZXPFAGGYDGESKWM4\",\"original_filename\":\"DJI_20260611112213_0014_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:58\"},{\"vlog_id\":\"01KY016ARTEZV3N5QVD783MRBV\",\"original_filename\":\"DJI_20260601091632_0003_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:57\"},{\"vlog_id\":\"01KY0292XRJVBF1485FFTY8CTR\",\"original_filename\":\"DJI_20260617134935_0036_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:57\"},{\"vlog_id\":\"01KY005PW7NBJRX4EJVPVTS8CJ\",\"original_filename\":\"DJI_20260601101022_0009_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:56\"},{\"vlog_id\":\"01KXZWDQX524KCF4KHC18B69VM\",\"original_filename\":\"DJI_20260611120814_0015_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:56\"},{\"vlog_id\":\"01KXZZ568THTEG5HTVBCVJKNK5\",\"original_filename\":\"DJI_20260601090626_0002_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:55\"},{\"vlog_id\":\"01KXZY7CXK8MQXCCGYQCWY6MX1\",\"original_filename\":\"DJI_20260617123914_0031_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:54\"},{\"vlog_id\":\"01KXZXA21FYKBBH6P7C3Z1VJKG\",\"original_filename\":\"DJI_20260601100034_0008_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:53\"},{\"vlog_id\":\"01KXZTRQ4WD2FFCYA14YA5YZ74\",\"original_filename\":\"DJI_20260619120123_0042_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:52\"},{\"vlog_id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"original_filename\":\"DJI_20260627095001_0047_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:52\"},{\"vlog_id\":\"01KXZRPY3DS8394K4VBY6QF89N\",\"original_filename\":\"DJI_20260601085914_0001_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:51\"},{\"vlog_id\":\"01KXZRFKQFZSZ1ZRK95Y11Y18E\",\"original_filename\":\"DJI_20260617140317_0037_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:51\"},{\"vlog_id\":\"01KXZRZ32VX8JPT71NRYF9N5PQ\",\"original_filename\":\"DJI_20260601102130_0010_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:51\"},{\"vlog_id\":\"01KXZS7JX7C6XXEP3Y9XKBSF9D\",\"original_filename\":\"DJI_20260617121715_0027_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:51\"},{\"vlog_id\":\"01KXZR0GGBMEEWNG9BEA85RVNM\",\"original_filename\":\"DJI_20260612073317_0021_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:50\"},{\"vlog_id\":\"01KXZR8CN6Z9MNW46WPA23J0KZ\",\"original_filename\":\"DJI_20260601092737_0004_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:50\"},{\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"original_filename\":\"DJI_20260702095405_0062_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:49\"},{\"vlog_id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"original_filename\":\"DJI_20260627101931_0048_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:49\"},{\"vlog_id\":\"01KXZPJ8FEYX50KNT019FFEA0B\",\"original_filename\":\"DJI_20260612071638_0018_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:48\"},{\"vlog_id\":\"01KXZPQQYVG7YG5ABGYQ81CF0C\",\"original_filename\":\"DJI_20260612070955_0017_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:43:48\"},{\"vlog_id\":\"01KXZMVJCYBNN93NPDH6F6PN6F\",\"original_filename\":\"DJI_20260702095211_0061_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:33\"},{\"vlog_id\":\"01KXZMHC1D36RCKNE2V0B47FP0\",\"original_filename\":\"DJI_20260627184311_0050_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:29\"},{\"vlog_id\":\"01KXZPCTWA7R27Z7GAENV4RAAM\",\"original_filename\":\"DJI_20260617123133_0030_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:22\"},{\"vlog_id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"original_filename\":\"DJI_20260617124932_0032_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:21\"},{\"vlog_id\":\"01KXZP37NKX2MFRN011EN91SGY\",\"original_filename\":\"DJI_20260601093344_0005_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:21\"},{\"vlog_id\":\"01KXZNT00QGKDKX9ZS5BEJS1C0\",\"original_filename\":\"DJI_20260612084902_0025_D.MP4\",\"step\":\"extract\",\"error_full_text\":null,\"started_at\":\"2026-09-16 19:42:20\"}],\"events\":[{\"id\":\"83d9fc5b-0e40-4265-9c1f-2daaeceb1d5c\",\"vlog_id\":\"01KRMW8JT8JRR6VXABRRGCPQ5Q\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:07\",\"completed_at\":\"2026-09-16 21:07:07\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"1dccdee4-fdf1-4800-ad44-212f3dc64246\",\"vlog_id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:05\",\"completed_at\":\"2026-09-16 21:07:05\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"2503b6c9-184b-4c19-8c34-94fb7dd1825a\",\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:04\",\"completed_at\":\"2026-09-16 21:07:04\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"d220b1e0-3996-4fe9-9399-b0f1e3694af1\",\"vlog_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:03\",\"completed_at\":\"2026-09-16 21:07:03\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"f3d2b585-90b9-4b07-b76b-851fe349b4ec\",\"vlog_id\":\"01KRMW6EC9K5J2N8BN6MN0YX07\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:02\",\"completed_at\":\"2026-09-16 21:07:02\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"09e6fbb2-ef17-4b25-b7ef-5428373cdd30\",\"vlog_id\":\"01KRMWQ9XF3DCBV14QKF2PPAGA\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:07:01\",\"completed_at\":\"2026-09-16 21:07:01\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"a6dc0707-c137-46a4-81b3-0067f7cb897b\",\"vlog_id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:06:58\",\"completed_at\":\"2026-09-16 21:06:58\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"e16576f8-52e4-4c29-bb6a-b9e11a83b297\",\"vlog_id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:05:25\",\"completed_at\":\"2026-09-16 21:05:25\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"78ce147d-565d-4109-9b06-f117bcf3f2d8\",\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:05:18\",\"completed_at\":\"2026-09-16 21:05:18\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"fb7b2fe1-6f79-4a05-a528-2baf9cba5300\",\"vlog_id\":\"01KRCXXCZKVGCV02R45HRY94CJ\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:01:07\",\"completed_at\":\"2026-09-16 21:01:07\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"52d0aea7-35e8-4670-8462-ba4cdb0d918b\",\"vlog_id\":\"01KRCXXCT1MAEYA7DP6XQK9ZAY\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 21:01:07\",\"completed_at\":\"2026-09-16 21:01:07\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"beab78b5-adca-44e2-8629-3d5c0ba9e988\",\"vlog_id\":\"01KRMWQ9XF3DCBV14QKF2PPAGA\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:55\",\"completed_at\":\"2026-09-16 20:50:55\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"fa4f0e18-1e71-4238-9fa3-a614fa3cb9fc\",\"vlog_id\":\"01KRMW8JT8JRR6VXABRRGCPQ5Q\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:51\",\"completed_at\":\"2026-09-16 20:50:51\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"d769cb8d-164a-4318-8a15-4f2363b21e7f\",\"vlog_id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:50\",\"completed_at\":\"2026-09-16 20:50:50\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"b5793d5a-3e82-4c08-847c-daa8518d4c1f\",\"vlog_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:50\",\"completed_at\":\"2026-09-16 20:50:50\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"ae8e8b09-2ed9-4957-9ac7-03e6bdc4eb1e\",\"vlog_id\":\"01KRMW6EC9K5J2N8BN6MN0YX07\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:48\",\"completed_at\":\"2026-09-16 20:50:48\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"36961b4e-69d1-45d5-ad35-c31d62ccfeaa\",\"vlog_id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:48\",\"completed_at\":\"2026-09-16 20:50:48\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"f80b7a69-9db4-4a15-91b2-b80989eb2847\",\"vlog_id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:50:48\",\"completed_at\":\"2026-09-16 20:50:48\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"98a52e55-293a-48ab-8574-ae5b0b39ea09\",\"vlog_id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:49:09\",\"completed_at\":\"2026-09-16 20:49:09\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1},{\"id\":\"89a2eb0d-e7aa-4d51-b7f1-ffd7e06551bd\",\"vlog_id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"step\":\"audio_extract\",\"sub_step\":null,\"status\":\"started\",\"runtime\":\"pipeline\",\"worker_version\":\"pipeline-do-2026-05-18\",\"request_id\":null,\"started_at\":\"2026-09-16 20:49:09\",\"completed_at\":\"2026-09-16 20:49:09\",\"duration_ms\":null,\"error_full_text\":null,\"detail_json\":\"{\\\"attempt\\\":1,\\\"state\\\":\\\"starting\\\"}\",\"attempt\":1}]}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3c39ee1eb19ce4c-SJC\r|",
+  "body": "{\"reset\":0,\"dry_run\":true,\"would_reset\":190,\"scope\":\"in_flight\",\"stuck_minutes\":30,\"sample_ids\":[{\"id\":\"01KRCXXBJX7W41RH7DH39RWTV3\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCDJ8G7RJTYN8F6V9KEE\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXBSQ1ND3Z5T6GD3K3ZFV\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXBPAXQCGA79DBYRQ2QE5\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCH3RCH2PKCTY5HCA3VA\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCBV3THHH0P9T8AYJ4CR\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCMWDTHDHVGRYKEHF8R0\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXBR0GTHZB3SRBYV9MN59\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCPGR55BVGXQVMCGCG35\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXC1BK0Q1H1238AP7217V\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXC8CJ812XHZ5E2M2XBPK\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXD8TRHZFNQPD41VNJNFX\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDQHF2M48VA8WFAGY152\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXE1T305J43FCGCWC2AQH\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDAMJFV4SVBEJTF06C2W\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDE4N2J21PWNC8F7FBTE\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXE3KZJH19CA2GHA8VEH3\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCT1MAEYA7DP6XQK9ZAY\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXCZKVGCV02R45HRY94CJ\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDKR6H73FCYYG36ZKV9R\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDCCH2BM6XJNCE8TAF8S\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDFW8ERACNE9MJ4V6X09\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDS48GRHR4DJG3ZB0A5F\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXD505J7DP7EJ94WX5KCQ\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXD39VV70K3CXNWEFAB97\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDWM8S46FT69317GS8NV\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDNGVQF4BTQH0EN3QRVR\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXE047GF4Y0QX3M6SJTJ1\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXECT8CGRS41SJC6FD678\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDTXDBY7VXPV3R0EHE3V\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXEVEPF1NT2HNXMWNRHN7\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXESHZPP3HN1100SWXCPC\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFD74J8T4H40PJACY3FK\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXDYCJ8RCXBTVMYKFKAFZ\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXF9P00G04AEBSVAJE6EV\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXEEJCX3EPEEH8S929S5P\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXEJ104DMZMV35HMQEKVK\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFJBZFTYWNS470A3EX0V\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFSEFZCT8642DY77E9PX\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXF67ZYZ1PS261CRTK00R\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFQGRFQK7PB8D13RVMVS\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXJ054HXDSFFXFQBD9Q3X\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXC36QRMQ5045TN8XKS9S\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXGF1DQJXQ1VAKEDWTQQW\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXG0CBEQ5AC9Q45SS7CH2\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFYPZSMXRFGBRKHQPY0D\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXG9CZ00PTDVV2M0VG8PS\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXGVDBMRCQMCW3H66S5TK\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFV6EMZJEKSW2FNXHGW0\",\"was\":\"transcoding\"},{\"id\":\"01KRCXXFWTRYZQGM7WSP2KNGZ9\",\"was\":\"transcoding\"}]}",
   "body_json": {
-    "generated_at": "2026-09-16T23:20:10.270Z",
-    "operator_id": "01KRCXWYTRN0BYTR3452ZTSXXJ",
-    "filters": {
-      "limit": 20,
-      "status": "started",
-      "step": "audio_extract",
-      "vlog_id": null
-    },
-    "aggregates": {
-      "vlogs": {
-        "total": 420,
-        "complete": 225,
-        "failed": 2,
-        "processing": 193,
-        "archived": 0,
-        "has_transcoded": 228,
-        "has_thumb": 415
-      },
-      "events_by_step_status_24h": [
-        {
-          "step": "audio_extract",
-          "status": "ok",
-          "n": 2
-        },
-        {
-          "step": "audio_extract",
-          "status": "skipped",
-          "n": 26
-        },
-        {
-          "step": "audio_extract",
-          "status": "started",
-          "n": 80
-        },
-        {
-          "step": "extract",
-          "status": "failed",
-          "n": 409
-        },
-        {
-          "step": "extract",
-          "status": "ok",
-          "n": 409
-        },
-        {
-          "step": "extract",
-          "status": "started",
-          "n": 818
-        },
-        {
-          "step": "transcode",
-          "status": "failed",
-          "n": 3
-        },
-        {
-          "step": "transcode",
-          "status": "skipped",
-          "n": 224
-        },
-        {
-          "step": "transcode",
-          "status": "started",
-          "n": 1402
-        },
-        {
-          "step": "transcribe",
-          "status": "failed",
-          "n": 2
-        },
-        {
-          "step": "transcribe",
-          "status": "ok",
-          "n": 38
-        },
-        {
-          "step": "transcribe",
-          "status": "skipped",
-          "n": 1
-        },
-        {
-          "step": "transcribe",
-          "status": "started",
-          "n": 74
-        }
-      ]
-    },
-    "ffmpeg": {
-      "ok": true,
-      "running": false,
-      "state": "idle",
-      "status": 200,
-      "latency_ms": 646
-    },
-    "recent_failures": [
+    "reset": 0,
+    "dry_run": true,
+    "would_reset": 190,
+    "scope": "in_flight",
+    "stuck_minutes": 30,
+    "sample_ids": [
       {
-        "vlog_id": "01KRCXXBDEJ85EQV08DZMR4FRT",
-        "original_filename": "1774887236745_PXL_20260213_220023444.mp4",
-        "step": "transcode",
-        "error_full_text": "ffmpeg /transcode-h264 fetch failed: The operation was aborted\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\n    at async VlogPipelineDO.alarm (index.js:1048:11)",
-        "started_at": "2026-09-16 21:19:34"
+        "id": "01KRCXXBJX7W41RH7DH39RWTV3",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KRCXXBH79WHTPA3CCE7KJY4H",
-        "original_filename": "1774887236780_PXL_20260212_164723409.mp4",
-        "step": "transcode",
-        "error_full_text": "ffmpeg /transcode-h264 fetch failed: The operation was aborted\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\n    at async VlogPipelineDO.alarm (index.js:1048:11)",
-        "started_at": "2026-09-16 21:19:21"
+        "id": "01KRCXXCDJ8G7RJTYN8F6V9KEE",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KRCXXBFFHTCC88CYR0WTJ985",
-        "original_filename": "1774887236761_PXL_20260213_205820983.mp4",
-        "step": "transcode",
-        "error_full_text": "ffmpeg /transcode-h264 fetch failed: The operation was aborted\nError: ffmpeg /transcode-h264 fetch failed: The operation was aborted\n    at VlogPipelineDO.stepTranscode (index.js:1309:15)\n    at async VlogPipelineDO.alarm (index.js:1048:11)",
-        "started_at": "2026-09-16 21:19:21"
+        "id": "01KRCXXBSQ1ND3Z5T6GD3K3ZFV",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KRMW0NDKBZ8KA6H31BPG1EV4",
-        "original_filename": "DJI_20260509183621_0063_D.MP4",
-        "step": "transcribe",
-        "error_full_text": "audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KRMW0NDKBZ8KA6H31BPG1EV4/mp3.full\nError: audio missing from R2: 01KRCXWYTRN0BYTR3452ZTSXXJ/audio/01KRMW0NDKBZ8KA6H31BPG1EV4/mp3.full\n    at VlogPipelineDO.stepTranscribe (index.js:1397:23)\n    at async VlogPipelineDO.alarm (index.js:1040:11)",
-        "started_at": "2026-09-16 19:52:42"
+        "id": "01KRCXXBPAXQCGA79DBYRQ2QE5",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KY04EZQEZXPFAGGYDGESKWM4",
-        "original_filename": "DJI_20260611112213_0014_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:58"
+        "id": "01KRCXXCH3RCH2PKCTY5HCA3VA",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KY016ARTEZV3N5QVD783MRBV",
-        "original_filename": "DJI_20260601091632_0003_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:57"
+        "id": "01KRCXXCBV3THHH0P9T8AYJ4CR",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KY0292XRJVBF1485FFTY8CTR",
-        "original_filename": "DJI_20260617134935_0036_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:57"
+        "id": "01KRCXXCMWDTHDHVGRYKEHF8R0",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KY005PW7NBJRX4EJVPVTS8CJ",
-        "original_filename": "DJI_20260601101022_0009_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:56"
+        "id": "01KRCXXBR0GTHZB3SRBYV9MN59",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZWDQX524KCF4KHC18B69VM",
-        "original_filename": "DJI_20260611120814_0015_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:56"
+        "id": "01KRCXXCPGR55BVGXQVMCGCG35",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZZ568THTEG5HTVBCVJKNK5",
-        "original_filename": "DJI_20260601090626_0002_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:55"
+        "id": "01KRCXXC1BK0Q1H1238AP7217V",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZY7CXK8MQXCCGYQCWY6MX1",
-        "original_filename": "DJI_20260617123914_0031_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:54"
+        "id": "01KRCXXC8CJ812XHZ5E2M2XBPK",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZXA21FYKBBH6P7C3Z1VJKG",
-        "original_filename": "DJI_20260601100034_0008_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:53"
+        "id": "01KRCXXD8TRHZFNQPD41VNJNFX",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZTRQ4WD2FFCYA14YA5YZ74",
-        "original_filename": "DJI_20260619120123_0042_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:52"
+        "id": "01KRCXXDQHF2M48VA8WFAGY152",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZVK86V2MMSNQCTF9K1J9BJ",
-        "original_filename": "DJI_20260627095001_0047_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:52"
+        "id": "01KRCXXE1T305J43FCGCWC2AQH",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZRPY3DS8394K4VBY6QF89N",
-        "original_filename": "DJI_20260601085914_0001_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:51"
+        "id": "01KRCXXDAMJFV4SVBEJTF06C2W",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZRFKQFZSZ1ZRK95Y11Y18E",
-        "original_filename": "DJI_20260617140317_0037_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:51"
+        "id": "01KRCXXDE4N2J21PWNC8F7FBTE",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZRZ32VX8JPT71NRYF9N5PQ",
-        "original_filename": "DJI_20260601102130_0010_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:51"
+        "id": "01KRCXXE3KZJH19CA2GHA8VEH3",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZS7JX7C6XXEP3Y9XKBSF9D",
-        "original_filename": "DJI_20260617121715_0027_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:51"
+        "id": "01KRCXXCT1MAEYA7DP6XQK9ZAY",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZR0GGBMEEWNG9BEA85RVNM",
-        "original_filename": "DJI_20260612073317_0021_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:50"
+        "id": "01KRCXXCZKVGCV02R45HRY94CJ",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZR8CN6Z9MNW46WPA23J0KZ",
-        "original_filename": "DJI_20260601092737_0004_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:50"
+        "id": "01KRCXXDKR6H73FCYYG36ZKV9R",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
-        "original_filename": "DJI_20260702095405_0062_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:49"
+        "id": "01KRCXXDCCH2BM6XJNCE8TAF8S",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZQTFA63BN68T7E93Q0N1P7",
-        "original_filename": "DJI_20260627101931_0048_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:49"
+        "id": "01KRCXXDFW8ERACNE9MJ4V6X09",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZPJ8FEYX50KNT019FFEA0B",
-        "original_filename": "DJI_20260612071638_0018_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:48"
+        "id": "01KRCXXDS48GRHR4DJG3ZB0A5F",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZPQQYVG7YG5ABGYQ81CF0C",
-        "original_filename": "DJI_20260612070955_0017_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:43:48"
+        "id": "01KRCXXD505J7DP7EJ94WX5KCQ",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZMVJCYBNN93NPDH6F6PN6F",
-        "original_filename": "DJI_20260702095211_0061_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:33"
+        "id": "01KRCXXD39VV70K3CXNWEFAB97",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZMHC1D36RCKNE2V0B47FP0",
-        "original_filename": "DJI_20260627184311_0050_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:29"
+        "id": "01KRCXXDWM8S46FT69317GS8NV",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZPCTWA7R27Z7GAENV4RAAM",
-        "original_filename": "DJI_20260617123133_0030_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:22"
+        "id": "01KRCXXDNGVQF4BTQH0EN3QRVR",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZP7Z3B7G9E3K0BX5MSCK6M",
-        "original_filename": "DJI_20260617124932_0032_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:21"
+        "id": "01KRCXXE047GF4Y0QX3M6SJTJ1",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZP37NKX2MFRN011EN91SGY",
-        "original_filename": "DJI_20260601093344_0005_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:21"
+        "id": "01KRCXXECT8CGRS41SJC6FD678",
+        "was": "transcoding"
       },
       {
-        "vlog_id": "01KXZNT00QGKDKX9ZS5BEJS1C0",
-        "original_filename": "DJI_20260612084902_0025_D.MP4",
-        "step": "extract",
-        "error_full_text": null,
-        "started_at": "2026-09-16 19:42:20"
-      }
-    ],
-    "events": [
-      {
-        "id": "83d9fc5b-0e40-4265-9c1f-2daaeceb1d5c",
-        "vlog_id": "01KRMW8JT8JRR6VXABRRGCPQ5Q",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:07",
-        "completed_at": "2026-09-16 21:07:07",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXDTXDBY7VXPV3R0EHE3V",
+        "was": "transcoding"
       },
       {
-        "id": "1dccdee4-fdf1-4800-ad44-212f3dc64246",
-        "vlog_id": "01KRMVDQGMDETMRRE19GP1WQWP",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:05",
-        "completed_at": "2026-09-16 21:07:05",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXEVEPF1NT2HNXMWNRHN7",
+        "was": "transcoding"
       },
       {
-        "id": "2503b6c9-184b-4c19-8c34-94fb7dd1825a",
-        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:04",
-        "completed_at": "2026-09-16 21:07:04",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXESHZPP3HN1100SWXCPC",
+        "was": "transcoding"
       },
       {
-        "id": "d220b1e0-3996-4fe9-9399-b0f1e3694af1",
-        "vlog_id": "01KRMW7V19YAQCV9R5FADF7CTT",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:03",
-        "completed_at": "2026-09-16 21:07:03",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFD74J8T4H40PJACY3FK",
+        "was": "transcoding"
       },
       {
-        "id": "f3d2b585-90b9-4b07-b76b-851fe349b4ec",
-        "vlog_id": "01KRMW6EC9K5J2N8BN6MN0YX07",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:02",
-        "completed_at": "2026-09-16 21:07:02",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXDYCJ8RCXBTVMYKFKAFZ",
+        "was": "transcoding"
       },
       {
-        "id": "09e6fbb2-ef17-4b25-b7ef-5428373cdd30",
-        "vlog_id": "01KRMWQ9XF3DCBV14QKF2PPAGA",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:07:01",
-        "completed_at": "2026-09-16 21:07:01",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXF9P00G04AEBSVAJE6EV",
+        "was": "transcoding"
       },
       {
-        "id": "a6dc0707-c137-46a4-81b3-0067f7cb897b",
-        "vlog_id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:06:58",
-        "completed_at": "2026-09-16 21:06:58",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXEEJCX3EPEEH8S929S5P",
+        "was": "transcoding"
       },
       {
-        "id": "e16576f8-52e4-4c29-bb6a-b9e11a83b297",
-        "vlog_id": "01KRMNWSQRGP60YVTP4CJPZMFS",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:05:25",
-        "completed_at": "2026-09-16 21:05:25",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXEJ104DMZMV35HMQEKVK",
+        "was": "transcoding"
       },
       {
-        "id": "78ce147d-565d-4109-9b06-f117bcf3f2d8",
-        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:05:18",
-        "completed_at": "2026-09-16 21:05:18",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFJBZFTYWNS470A3EX0V",
+        "was": "transcoding"
       },
       {
-        "id": "fb7b2fe1-6f79-4a05-a528-2baf9cba5300",
-        "vlog_id": "01KRCXXCZKVGCV02R45HRY94CJ",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:01:07",
-        "completed_at": "2026-09-16 21:01:07",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFSEFZCT8642DY77E9PX",
+        "was": "transcoding"
       },
       {
-        "id": "52d0aea7-35e8-4670-8462-ba4cdb0d918b",
-        "vlog_id": "01KRCXXCT1MAEYA7DP6XQK9ZAY",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 21:01:07",
-        "completed_at": "2026-09-16 21:01:07",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXF67ZYZ1PS261CRTK00R",
+        "was": "transcoding"
       },
       {
-        "id": "beab78b5-adca-44e2-8629-3d5c0ba9e988",
-        "vlog_id": "01KRMWQ9XF3DCBV14QKF2PPAGA",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:55",
-        "completed_at": "2026-09-16 20:50:55",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFQGRFQK7PB8D13RVMVS",
+        "was": "transcoding"
       },
       {
-        "id": "fa4f0e18-1e71-4238-9fa3-a614fa3cb9fc",
-        "vlog_id": "01KRMW8JT8JRR6VXABRRGCPQ5Q",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:51",
-        "completed_at": "2026-09-16 20:50:51",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXJ054HXDSFFXFQBD9Q3X",
+        "was": "transcoding"
       },
       {
-        "id": "d769cb8d-164a-4318-8a15-4f2363b21e7f",
-        "vlog_id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:50",
-        "completed_at": "2026-09-16 20:50:50",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXC36QRMQ5045TN8XKS9S",
+        "was": "transcoding"
       },
       {
-        "id": "b5793d5a-3e82-4c08-847c-daa8518d4c1f",
-        "vlog_id": "01KRMW7V19YAQCV9R5FADF7CTT",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:50",
-        "completed_at": "2026-09-16 20:50:50",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXGF1DQJXQ1VAKEDWTQQW",
+        "was": "transcoding"
       },
       {
-        "id": "ae8e8b09-2ed9-4957-9ac7-03e6bdc4eb1e",
-        "vlog_id": "01KRMW6EC9K5J2N8BN6MN0YX07",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:48",
-        "completed_at": "2026-09-16 20:50:48",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXG0CBEQ5AC9Q45SS7CH2",
+        "was": "transcoding"
       },
       {
-        "id": "36961b4e-69d1-45d5-ad35-c31d62ccfeaa",
-        "vlog_id": "01KRMV83PP9YPQQCF23NE7MX65",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:48",
-        "completed_at": "2026-09-16 20:50:48",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFYPZSMXRFGBRKHQPY0D",
+        "was": "transcoding"
       },
       {
-        "id": "f80b7a69-9db4-4a15-91b2-b80989eb2847",
-        "vlog_id": "01KRMVDQGMDETMRRE19GP1WQWP",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:50:48",
-        "completed_at": "2026-09-16 20:50:48",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXG9CZ00PTDVV2M0VG8PS",
+        "was": "transcoding"
       },
       {
-        "id": "98a52e55-293a-48ab-8574-ae5b0b39ea09",
-        "vlog_id": "01KRMNWSQRGP60YVTP4CJPZMFS",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:49:09",
-        "completed_at": "2026-09-16 20:49:09",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXGVDBMRCQMCW3H66S5TK",
+        "was": "transcoding"
       },
       {
-        "id": "89a2eb0d-e7aa-4d51-b7f1-ffd7e06551bd",
-        "vlog_id": "01KRMN2EW5STACT7XP07VBM35Q",
-        "step": "audio_extract",
-        "sub_step": null,
-        "status": "started",
-        "runtime": "pipeline",
-        "worker_version": "pipeline-do-2026-05-18",
-        "request_id": null,
-        "started_at": "2026-09-16 20:49:09",
-        "completed_at": "2026-09-16 20:49:09",
-        "duration_ms": null,
-        "error_full_text": null,
-        "detail_json": "{\"attempt\":1,\"state\":\"starting\"}",
-        "attempt": 1
+        "id": "01KRCXXFV6EMZJEKSW2FNXHGW0",
+        "was": "transcoding"
+      },
+      {
+        "id": "01KRCXXFWTRYZQGM7WSP2KNGZ9",
+        "was": "transcoding"
       }
     ]
   }
