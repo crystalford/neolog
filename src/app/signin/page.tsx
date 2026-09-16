@@ -1,7 +1,15 @@
 /**
  * Sign-in — Cloudflare Access one-time PIN screen.
- * Ported from neolog-design/project/screens/signin.jsx.
  * Public route. Cloudflare Access handles the actual flow.
+ *
+ * ⚠️ Two real bugs lived here, not just style. A 40-node radial starburst
+ * animation was the only decorative background anywhere in the product —
+ * nothing else in neolog uses one, and it's gone. And the email field's
+ * `defaultValue` was `crystal@neolog.ai`, which is not the operator's
+ * address (`docs/CREDENTIALS.md`'s `OPERATOR_EMAIL`, the one Cloudflare
+ * Access is actually configured to allow, is `chrisrobtelford@gmail.com`).
+ * Pressing "Send PIN" without noticing and clearing the field would have
+ * requested a PIN for an address that was never his.
  */
 
 import { LogoMark } from '@/components/Shell'
@@ -18,32 +26,7 @@ export default function SignInPage() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      position: 'relative',
-      overflow: 'hidden',
     }}>
-      <svg viewBox="0 0 1200 800" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5, pointerEvents: 'none' }}>
-        <defs>
-          <radialGradient id="sg-bg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="rgba(59,130,246,0.10)"/>
-            <stop offset="100%" stopColor="transparent"/>
-          </radialGradient>
-        </defs>
-        <circle cx="600" cy="400" r="280" fill="url(#sg-bg)"/>
-        {Array.from({length: 40}).map((_, i) => {
-          const a = (i / 40) * Math.PI * 2
-          const r = 160 + (i % 5) * 50
-          const x = 600 + Math.cos(a) * r
-          const y = 400 + Math.sin(a) * r
-          return (
-            <g key={i}>
-              <line x1="600" y1="400" x2={x} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5"/>
-              <circle cx={x} cy={y} r="1.6" fill="var(--fg-4)"/>
-            </g>
-          )
-        })}
-        <circle cx="600" cy="400" r="10" fill="var(--sig)" opacity="0.9"/>
-      </svg>
-
       <div style={{
         width: 420, padding: 36, position: 'relative',
         background: 'var(--bg-1)', border: '1px solid var(--line)',
@@ -64,11 +47,11 @@ export default function SignInPage() {
 
         <form action="https://neolog.cloudflareaccess.com" method="get">
           <div style={{ marginBottom: 16 }}>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--fg-3)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>Email</div>
+            <div className="mono" style={{ fontSize: 11, color: 'var(--fg-3)', marginBottom: 6 }}>Email</div>
             <input
               name="email"
               type="email"
-              defaultValue="crystal@neolog.ai"
+              defaultValue="chrisrobtelford@gmail.com"
               autoComplete="email"
               style={{
                 width: '100%', padding: '11px 14px',
@@ -85,7 +68,7 @@ export default function SignInPage() {
           </button>
         </form>
 
-        <div className="mono" style={{ fontSize: 10, color: 'var(--fg-4)', letterSpacing: 0.4, textAlign: 'center', marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--line)', textTransform: 'uppercase' }}>
+        <div className="mono" style={{ fontSize: 11, color: 'var(--fg-4)', textAlign: 'center', marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
           neolog.cloudflareaccess.com · single operator
         </div>
       </div>

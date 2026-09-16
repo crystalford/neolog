@@ -172,6 +172,19 @@ jobs:
       - name: No live SQL against a dropped table, or a column the engine wrote
         run: node scripts/check-dropped-tables.mjs
 
+      # A pilot dispatch on one recording (transcript_text="You",
+      # word_count=0) found that /start always skipped BOTH audio_extract
+      # and transcribe, forever, because artifactExists() tested bare
+      # `Boolean(vlog.transcript_text)` — true for a three-character
+      # leftover from a run that never produced word timings. Nothing here
+      # could see it: the dispatch endpoint reports success regardless, and
+      # the only trace is a pipeline_events row nothing reads unless you go
+      # looking. This is the corpus-wide version of the `words_missing`
+      # distinction pipeline-state.ts already draws; this file was the one
+      # place it was missed.
+      - name: The pipeline's own artifactExists() tests real transcription
+        run: node scripts/check-pipeline-artifact-exists.mjs
+
       # workers/ffmpeg/server.js is plain JS and excluded from
       # tsconfig.workers.json, so nothing here typechecks it, and `node
       # --check` only parses — a call to an undefined function is a runtime

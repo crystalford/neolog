@@ -734,12 +734,29 @@ function ReadRecordings({ onDone }: { onDone: () => void }) {
 
   if (!status) return null
   const left = Math.max(0, status.transcribed - status.read)
-  if (left <= 0 && !running && done === 0) return null
+  // ⚠️ The old guard only looked at transcribed-vs-read, so on a fresh
+  // corpus (recordings sitting in R2, none transcribed yet — exactly the
+  // state a first sign-in with a camera-roll import is in) `transcribed`
+  // is 0, `left` is 0, and this card rendered NOTHING. The one place on the
+  // home page meant to say "there's material waiting" said nothing at the
+  // one moment that was true. `untranscribed` is the other half of the same
+  // fact, and it gets its own branch rather than folding into `left` — this
+  // card can start a READ itself; it cannot start a TRANSCRIBE, which is a
+  // bulk action in Settings, so the two states need different buttons.
+  const untranscribed = Math.max(0, status.recordings - status.transcribed)
+  if (left <= 0 && untranscribed <= 0 && !running && done === 0) return null
+
+  // Read takes priority when there's something to read RIGHT HERE; the
+  // untranscribed nudge only shows once there is truly nothing left to read
+  // — a single fact stated once, not two competing lines.
+  const showUntranscribed = !running && done === 0 && left <= 0 && untranscribed > 0
 
   return (
     <div className="rc">
       <div className="h">
-        Recordings not read <span>{status.read} of {status.transcribed}</span>
+        {showUntranscribed
+          ? <>Recordings not transcribed <span>{status.transcribed} of {status.recordings}</span></>
+          : <>Recordings not read <span>{status.read} of {status.transcribed}</span></>}
       </div>
       <div className="i">
         {running ? (
@@ -755,6 +772,14 @@ function ReadRecordings({ onDone }: { onDone: () => void }) {
               {skipped > 0 && ` ${skipped} had no word timings, so nothing was placed from them — nothing is dated by guess.`}
             </em>
           </>
+        ) : showUntranscribed ? (
+          <>
+            <b>{untranscribed} {untranscribed === 1 ? 'recording has' : 'recordings have'} not been transcribed yet.</b>
+            <em>
+              Until it is, nothing can be placed from it — and nothing is
+              dated by guess. Transcribing is a Settings action.
+            </em>
+          </>
         ) : (
           <>
             <b>{left} {left === 1 ? 'recording has' : 'recordings have'} not been read.</b>
@@ -768,6 +793,8 @@ function ReadRecordings({ onDone }: { onDone: () => void }) {
         <div className="fixrow">
           {running ? (
             <button onClick={() => { stop.current = true }}>Stop</button>
+          ) : showUntranscribed ? (
+            <Link href="/settings"><button className="p">Go to Settings</button></Link>
           ) : (
             <button className="p" onClick={() => void run()}>
               {done > 0 ? 'Check for more' : 'Read them onto the log'}

@@ -1090,18 +1090,43 @@ export class VlogPipelineDO {
     return row ?? null
   }
 
+  /**
+   * "Already transcribed" means real word timings exist — `transcript_words`
+   * rows, not merely a non-empty `transcript_text`. `read-recording.ts`
+   * cannot place a single passage without them, so a recording that has
+   * text but no timings is exactly as unread as one with no text at all.
+   */
+  private async hasRealTranscript(vlog_id: string): Promise<boolean> {
+    const row = await this.env.DB.prepare(
+      `SELECT 1 FROM transcript_words WHERE vlog_id = ? LIMIT 1`,
+    ).bind(vlog_id).first()
+    return row != null
+  }
+
   private async artifactExists(vlog: VlogRow, step: StepKey): Promise<boolean> {
     if (step === 'audio_extract') {
-      // Skip if chunks set OR mp3 already on R2 OR transcript already exists
+      // Skip if chunks set OR mp3 already on R2 OR a REAL transcript exists.
+      //
+      // ⚠️ This used to fall through to `if (vlog.transcript_text) return
+      // true` — ANY non-empty string, including a stale one-word Whisper
+      // hallucination ("You") left by a run that never produced real word
+      // timings. That is exactly the distinction `pipeline-state.ts` and
+      // `reprocess-vlogs`' scope resolution already draw (the
+      // `words_missing` bucket — "transcript_text is not the test — an
+      // older run can leave prose with no timings, and that recording can
+      // never be read"); this file was the one place it was never made, so
+      // `/start` could never re-run Whisper on any vlog carrying leftover
+      // text from before 8 Sep. Real word timings are the only thing that
+      // means "already transcribed" here.
       if (vlog.audio_chunks_json) return true
-      if (vlog.transcript_text) return true
+      if (await this.hasRealTranscript(vlog.id)) return true
       if (!vlog.mime_type.startsWith('video/')) return true // audio source: nothing to extract
       const key = `${vlog.operator_id}/audio/${vlog.id}/mp3.full`
       const head = await this.env.VIDEOS.head(key)
       return head != null
     }
     if (step === 'transcribe') {
-      return Boolean(vlog.transcript_text)
+      return this.hasRealTranscript(vlog.id)
     }
     if (step === 'extract') {
       // Has the log already read this one? `read_at` is set only when the
