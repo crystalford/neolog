@@ -1,23 +1,45 @@
 {
-  "requested_at": "2026-09-16T18:58:05Z",
-  "method": "POST",
-  "path": "/api/v2/admin/reprocess-vlogs",
+  "requested_at": "2026-09-16T19:01:01Z",
+  "method": "GET",
+  "path": "/api/v2/vlogs/01KXZMHC1D36RCKNE2V0B47FP0",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3c219b619188815-EWR\r|",
-  "body": "{\"dispatched\":1,\"failed\":0,\"skipped\":0,\"results\":[{\"vlog_id\":\"01KXZMHC1D36RCKNE2V0B47FP0\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"}],\"dispatched_start\":1,\"dispatched_reextract\":0}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3c21e038aa25024-SJC\r|",
+  "body": "{\"vlog\":{\"id\":\"01KXZMHC1D36RCKNE2V0B47FP0\",\"visibility\":\"private\",\"original_filename\":\"DJI_20260627184311_0050_D.MP4\",\"r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KXZMGFZT0ZK776Z36Z6JW6TQ/DJI_20260627184311_0050_D.MP4\",\"transcoded_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KXZMHC1D36RCKNE2V0B47FP0.mp4\",\"thumbnail_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMHC1D36RCKNE2V0B47FP0.jpg\",\"thumbnail_url\":null,\"duration_seconds\":null,\"file_size_bytes\":38342224,\"mime_type\":\"video/mp4\",\"recorded_at\":\"2026-06-27T18:43:11.000Z\",\"recorded_at_source\":\"pre_extracted\",\"created_at\":\"2026-07-20 11:28:18\",\"transcript_text\":\"You\",\"transcript_provider\":\"workers_ai_whisper\",\"transcript_completed_at\":\"2026-07-20 11:28:24\",\"pipeline_status\":\"complete\",\"extraction_outcomes\":null,\"read_at\":null,\"vision_description\":null,\"frame_note\":null,\"usable\":null,\"play_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KXZMHC1D36RCKNE2V0B47FP0.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260916%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260916T190101Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=02669bb895a1f470c0aa3ea611da24ffc5389942e8e3db8685030bdd1eb1f6d8\",\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMHC1D36RCKNE2V0B47FP0.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260916%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260916T190101Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=cf28a05f58df80a2f5155943f80ccb560f17ad9afca7575a36e14f138faf2ed7\",\"date_from\":\"read out of the filename before it uploaded\",\"transcribed_by\":\"Whisper\",\"word_count\":0},\"words\":[],\"entries\":[],\"navigation\":{\"prev_id\":\"01KXZMR8EV3ANV2FK1YGE4KN34\",\"next_id\":\"01KXZN890DX6C1HVWK09H516GV\"}}",
   "body_json": {
-    "dispatched": 1,
-    "failed": 0,
-    "skipped": 0,
-    "results": [
-      {
-        "vlog_id": "01KXZMHC1D36RCKNE2V0B47FP0",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      }
-    ],
-    "dispatched_start": 1,
-    "dispatched_reextract": 0
+    "vlog": {
+      "id": "01KXZMHC1D36RCKNE2V0B47FP0",
+      "visibility": "private",
+      "original_filename": "DJI_20260627184311_0050_D.MP4",
+      "r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KXZMGFZT0ZK776Z36Z6JW6TQ/DJI_20260627184311_0050_D.MP4",
+      "transcoded_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KXZMHC1D36RCKNE2V0B47FP0.mp4",
+      "thumbnail_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMHC1D36RCKNE2V0B47FP0.jpg",
+      "thumbnail_url": null,
+      "duration_seconds": null,
+      "file_size_bytes": 38342224,
+      "mime_type": "video/mp4",
+      "recorded_at": "2026-06-27T18:43:11.000Z",
+      "recorded_at_source": "pre_extracted",
+      "created_at": "2026-07-20 11:28:18",
+      "transcript_text": "You",
+      "transcript_provider": "workers_ai_whisper",
+      "transcript_completed_at": "2026-07-20 11:28:24",
+      "pipeline_status": "complete",
+      "extraction_outcomes": null,
+      "read_at": null,
+      "vision_description": null,
+      "frame_note": null,
+      "usable": null,
+      "play_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KXZMHC1D36RCKNE2V0B47FP0.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260916%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260916T190101Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=02669bb895a1f470c0aa3ea611da24ffc5389942e8e3db8685030bdd1eb1f6d8",
+      "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMHC1D36RCKNE2V0B47FP0.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260916%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260916T190101Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=cf28a05f58df80a2f5155943f80ccb560f17ad9afca7575a36e14f138faf2ed7",
+      "date_from": "read out of the filename before it uploaded",
+      "transcribed_by": "Whisper",
+      "word_count": 0
+    },
+    "words": [],
+    "entries": [],
+    "navigation": {
+      "prev_id": "01KXZMR8EV3ANV2FK1YGE4KN34",
+      "next_id": "01KXZN890DX6C1HVWK09H516GV"
+    }
   }
 }
