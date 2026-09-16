@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/admin/pipeline-state" }
+{ "method": "GET", "path": "/api/v2/admin/pipeline-state", "nonce": "progress-1789600640" }
