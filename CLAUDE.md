@@ -938,6 +938,44 @@ again**. `operator.profile_digest` and `operator.spark_seeds_json` are on the
 list too: a model's description of HIM, read by nothing, which is the state
 to keep.
 
+### ⚠️ `/start` could never re-run Whisper on a recording with ANY leftover text
+
+Found by dispatching one real recording before running it on the corpus,
+16 Sep — `01KXZMHC1D36RCKNE2V0B47FP0`, `transcript_text: "You"`,
+`word_count: 0`, exactly the shape of the `words_missing` bucket
+`pipeline-state.ts` exists to count. Dispatching `/start` reported success
+(`{"dispatched":1,"ok":true}`) and changed nothing: `pipeline_events` showed
+`audio_extract` and `transcribe` both `skipped` / `artifact_exists`, then
+`extract` (the read step) correctly wrote zero passages because there were
+no word timings to read.
+
+**`workers/pipeline/src/index.ts`'s `artifactExists()` tested
+`Boolean(vlog.transcript_text)`** — any non-empty string counts as "already
+transcribed," including a three-character Whisper hallucination left by a
+run that never produced real timings. `pipeline-state.ts` and
+`reprocess-vlogs`'s scope resolution both already draw the right line here
+(*"transcript_text is not the test — an older run can leave prose with no
+timings, and that recording can never be read"*) — this was the one file
+that line was never drawn in, and it is the file that actually does the
+work. Every recording carrying leftover text from before 8 Sep — the
+`words_missing` bucket, 302 of 420 at the time this was found — could be
+dispatched forever and Whisper would never run.
+
+**Nothing in the repo could have caught this without dispatching a real
+recording.** `tsc` is happy — the comparison typechecks. `check-sql-columns.mjs`
+sees no query to check. The dispatch endpoint always returns 200, because
+kicking the Durable Object's alarm IS its success condition, not what the
+alarm goes on to do. The only trace is a `pipeline_events` row nothing reads
+unless asked to.
+
+Fixed with `hasRealTranscript()` — one query against `transcript_words`,
+the same authoritative test `pipeline-state.ts` uses, called from both the
+`audio_extract` and `transcribe` branches instead of trusting the column.
+`scripts/check-pipeline-artifact-exists.mjs` holds the line: it isolates
+`artifactExists()`'s body, strips comments (so its own explanation of the
+bug doesn't trip itself — the same lesson `check-dropped-tables.mjs`
+learned), and fails on a bare `vlog.transcript_text` truthiness test. In CI.
+
 ### ⚠️ The healer could not see a recording stuck in its last step
 
 Five files each declared their own copy of "what counts as in flight", and
