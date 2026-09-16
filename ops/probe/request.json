@@ -1,1 +1,1 @@
-{ "method": "POST", "path": "/api/v2/admin/reprocess-vlogs", "body": { "vlog_ids": ["01KXZMHC1D36RCKNE2V0B47FP0"] } }
+{ "method": "GET", "path": "/api/v2/vlogs/01KXZMHC1D36RCKNE2V0B47FP0/events" }
