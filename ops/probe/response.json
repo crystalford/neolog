@@ -1,54 +1,54 @@
 {
-  "requested_at": "2026-09-16T19:46:45Z",
+  "requested_at": "2026-09-16T23:17:31Z",
   "method": "GET",
   "path": "/api/v2/admin/pipeline-state",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3c261056afb2402-SJC\r|",
-  "body": "{\"total\":420,\"by_status\":{\"read\":0,\"transcribed_only\":0,\"words_missing\":203,\"untranscribed\":19,\"stuck_in_flight\":44,\"in_flight_recent\":153,\"archived\":0,\"failed\":1},\"failure_breakdown\":{\"other\":1},\"stuck_examples\":[{\"id\":\"01KRMN2EW5STACT7XP07VBM35Q\",\"status\":\"transcoding\",\"stuck_minutes\":13},{\"id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"status\":\"transcoding\",\"stuck_minutes\":13},{\"id\":\"01KRMV83PP9YPQQCF23NE7MX65\",\"status\":\"transcoding\",\"stuck_minutes\":12},{\"id\":\"01KRMVDQGMDETMRRE19GP1WQWP\",\"status\":\"transcoding\",\"stuck_minutes\":12},{\"id\":\"01KRMVZNGFMH8N1E3EQFWGZ60Z\",\"status\":\"transcoding\",\"stuck_minutes\":12}],\"counts_for_run\":{\"needs_transcribing\":267,\"ready_to_read\":0}}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3c395c0e8ffd7aa-IAD\r|",
+  "body": "{\"total\":420,\"by_status\":{\"read\":0,\"transcribed_only\":0,\"words_missing\":206,\"untranscribed\":19,\"stuck_in_flight\":191,\"in_flight_recent\":2,\"archived\":0,\"failed\":2},\"failure_breakdown\":{\"other\":4},\"stuck_examples\":[{\"id\":\"01KRCXXBJX7W41RH7DH39RWTV3\",\"status\":\"transcoding\",\"stuck_minutes\":138},{\"id\":\"01KRCXXCDJ8G7RJTYN8F6V9KEE\",\"status\":\"transcoding\",\"stuck_minutes\":138},{\"id\":\"01KRCXXBSQ1ND3Z5T6GD3K3ZFV\",\"status\":\"transcoding\",\"stuck_minutes\":138},{\"id\":\"01KRCXXBPAXQCGA79DBYRQ2QE5\",\"status\":\"transcoding\",\"stuck_minutes\":138},{\"id\":\"01KRCXXCH3RCH2PKCTY5HCA3VA\",\"status\":\"transcoding\",\"stuck_minutes\":138}],\"counts_for_run\":{\"needs_transcribing\":418,\"ready_to_read\":0}}",
   "body_json": {
     "total": 420,
     "by_status": {
       "read": 0,
       "transcribed_only": 0,
-      "words_missing": 203,
+      "words_missing": 206,
       "untranscribed": 19,
-      "stuck_in_flight": 44,
-      "in_flight_recent": 153,
+      "stuck_in_flight": 191,
+      "in_flight_recent": 2,
       "archived": 0,
-      "failed": 1
+      "failed": 2
     },
     "failure_breakdown": {
-      "other": 1
+      "other": 4
     },
     "stuck_examples": [
       {
-        "id": "01KRMN2EW5STACT7XP07VBM35Q",
+        "id": "01KRCXXBJX7W41RH7DH39RWTV3",
         "status": "transcoding",
-        "stuck_minutes": 13
+        "stuck_minutes": 138
       },
       {
-        "id": "01KRMNWSQRGP60YVTP4CJPZMFS",
+        "id": "01KRCXXCDJ8G7RJTYN8F6V9KEE",
         "status": "transcoding",
-        "stuck_minutes": 13
+        "stuck_minutes": 138
       },
       {
-        "id": "01KRMV83PP9YPQQCF23NE7MX65",
+        "id": "01KRCXXBSQ1ND3Z5T6GD3K3ZFV",
         "status": "transcoding",
-        "stuck_minutes": 12
+        "stuck_minutes": 138
       },
       {
-        "id": "01KRMVDQGMDETMRRE19GP1WQWP",
+        "id": "01KRCXXBPAXQCGA79DBYRQ2QE5",
         "status": "transcoding",
-        "stuck_minutes": 12
+        "stuck_minutes": 138
       },
       {
-        "id": "01KRMVZNGFMH8N1E3EQFWGZ60Z",
+        "id": "01KRCXXCH3RCH2PKCTY5HCA3VA",
         "status": "transcoding",
-        "stuck_minutes": 12
+        "stuck_minutes": 138
       }
     ],
     "counts_for_run": {
-      "needs_transcribing": 267,
+      "needs_transcribing": 418,
       "ready_to_read": 0
     }
   }
