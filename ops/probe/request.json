@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/vlogs?status=complete&limit=50" }
+{ "method": "POST", "path": "/api/v2/admin/reprocess-vlogs", "body": { "dry_run": true, "scope": "incomplete" } }
