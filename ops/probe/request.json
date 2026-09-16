@@ -1,1 +1,1 @@
-{ "method": "GET", "path": "/api/v2/admin/runtime-state?status=started&step=audio_extract&limit_events=20&nonce=1789600798" }
+{ "method": "POST", "path": "/api/v2/admin/reset-stuck", "body": { "scope": "in_flight", "stuck_minutes": 30, "dry_run": true } }
