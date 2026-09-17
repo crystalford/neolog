@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs/01KRCXX9CYTQVNQQVMG7SDGMXQ/events?nonce=diag-poll-1-1758106200"
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
+  "body": {"vlog_ids": ["01KRCXX9CYTQVNQQVMG7SDGMXQ"], "dry_run": false, "skip_in_flight": true}
 }
