@@ -148,14 +148,16 @@ export async function POST(req: NextRequest) {
           const placeholders = explicitIds.map(() => '?').join(',')
           const all = await findMany<{ id: string; in_flight: number; has_transcript: number }>(
             db,
-            `SELECT id,
-                    CASE WHEN pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
-                              AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
+            // See the has_transcript comment on the dispatch-time query below —
+            // real transcript_words, never a bare transcript_text length test.
+            `SELECT v.id,
+                    CASE WHEN v.pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
+                              AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                          THEN 1 ELSE 0 END AS in_flight,
-                    CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+                    CASE WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
                          THEN 1 ELSE 0 END AS has_transcript
-               FROM vlogs
-              WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
+               FROM vlogs v
+              WHERE v.operator_id = ? AND v.id IN (${placeholders}) AND v.deleted_at IS NULL`,
             operator.id, ...explicitIds,
           )
           rows = all.filter(r => !(skipInFlight && r.in_flight))
@@ -174,13 +176,13 @@ export async function POST(req: NextRequest) {
         rows = await findMany<{ id: string; has_transcript: number }>(
           db,
           scope === 'all'
-            ? `SELECT id,
-                      CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+            ? `SELECT v.id,
+                      CASE WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
                            THEN 1 ELSE 0 END AS has_transcript
                   FROM vlogs v
-                WHERE operator_id = ? AND deleted_at IS NULL
+                WHERE v.operator_id = ? AND v.deleted_at IS NULL
                   ${inFlightWhere}
-                ORDER BY id
+                ORDER BY v.id
                 LIMIT ${MAX_LIST_RESOLVE}`
             // ⚠️ "Incomplete" used to mean "the extraction engine did not
             // finish", resolved by LEFT JOINing `extraction_runs` — a table
@@ -201,7 +203,7 @@ export async function POST(req: NextRequest) {
             // A recording the pipeline never finished is included too, since
             // its words may be missing for a reason upstream of Whisper.
             : `SELECT v.id AS id,
-                      CASE WHEN LENGTH(COALESCE(v.transcript_text, '')) >= 20
+                      CASE WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
                            THEN 1 ELSE 0 END AS has_transcript
                   FROM vlogs v
                 WHERE v.operator_id = ? AND v.deleted_at IS NULL
@@ -270,14 +272,25 @@ export async function POST(req: NextRequest) {
     const placeholders = ids.map(() => '?').join(',')
     owned = await findMany<{ id: string; pipeline_status: string; in_flight: number; has_transcript: number }>(
       db,
-      `SELECT id, pipeline_status,
-              CASE WHEN pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
-                        AND updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
+      // ⚠️ has_transcript decides /start (full pipeline, runs Whisper) vs
+      // /reextract (skips straight to the read step, which defaults to
+      // pointer='extract' and never touches transcribe again). A bare
+      // LENGTH(transcript_text)>=20 test is the exact bug hasRealTranscript()
+      // in workers/pipeline/src/index.ts was written to fix — it treats old
+      // pre-8-Sep prose with no word timings as "already transcribed," so a
+      // vlog carrying real narration but zero transcript_words got routed
+      // to /reextract forever, Whisper never ran again, and read-recording
+      // correctly (but silently) wrote nothing. What "transcribed" means
+      // here must be real transcript_words, the same test pipeline-state.ts
+      // and hasRealTranscript() already use.
+      `SELECT v.id, v.pipeline_status,
+              CASE WHEN v.pipeline_status IN (${statusList(IN_FLIGHT_STATUSES)})
+                        AND v.updated_at > datetime('now', '-${IN_FLIGHT_WINDOW_MIN} minutes')
                    THEN 1 ELSE 0 END AS in_flight,
-              CASE WHEN LENGTH(COALESCE(transcript_text, '')) >= 20
+              CASE WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
                    THEN 1 ELSE 0 END AS has_transcript
-         FROM vlogs
-        WHERE operator_id = ? AND id IN (${placeholders}) AND deleted_at IS NULL`,
+         FROM vlogs v
+        WHERE v.operator_id = ? AND v.id IN (${placeholders}) AND v.deleted_at IS NULL`,
       operator.id, ...ids,
     )
   } catch (err: any) {

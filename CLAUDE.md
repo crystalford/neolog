@@ -1060,6 +1060,37 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 17 Sep — `reprocess-vlogs` routed real narration to the path that can never transcribe it
+
+Even with the alarm-chain fix and the healer cron below, a full-corpus
+dispatch produced hundreds of `pipeline_status='complete'` recordings and
+**zero** entries (`GET /api/v2/log/read` → `{recordings:420, transcribed:0,
+read:0, entries:0}`). One `complete` vlog carried a full paragraph of real
+speech in `transcript_text` — him talking about DoorDash and Gemini, not
+drone noise — with `word_count:0` and no `transcript_words` rows at all.
+
+The cause: `reprocess-vlogs/route.ts` decides `/start` (full pipeline,
+runs Whisper) vs `/reextract` (skips straight to the read step) with
+`has_transcript = LENGTH(transcript_text) >= 20`. That is the exact bug
+`hasRealTranscript()` in `workers/pipeline/src/index.ts` was written to
+fix, in a second copy this session's earlier pass never touched: it
+treats old pre-8-Sep prose with no word timings as "already
+transcribed," so a vlog whose only problem is a missing
+`transcript_words` row got sent to `/reextract` — which defaults to
+`pointer='extract'`, skipping `transcribe` — forever. Whisper never ran
+again, `read-recording.ts` correctly refused to write entries with no
+real timings, and the vlog sailed through to `complete` having logged
+nothing. This is why the corpus reached hundreds of "complete" rows
+while `/api/v2/log/read` stayed at zero — completion and "was actually
+read" are different facts, and this bug conflated them for dispatch
+routing specifically.
+
+All three `has_transcript` computations in that file (the two dry-run
+paths and the dispatch-time ownership query) now check real
+`transcript_words` existence, the same test `hasRealTranscript()` and
+`pipeline-state.ts` already use. `dispatchPipeline()` itself was never
+wrong — it just trusts the `useStart` flag it's handed.
+
 ### ⚠️ 17 Sep — the cron is ON, because the rare event arrived
 
 Dispatching the real 420-recording corpus found a bug this repo had never
