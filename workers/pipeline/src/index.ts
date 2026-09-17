@@ -94,6 +94,26 @@ function gateBusyBackoffMs(): number {
   return 8_000 + Math.floor(Math.random() * 12_000) // 8–20s
 }
 
+// ⚠️ This used to be a bare `50` inlined at every step-to-step handoff — the
+// three-step chain (skip-if-exists, step succeeded, step's soft-terminal
+// failure) all rescheduled the alarm 50ms out. Found by dispatching the real
+// 420-recording corpus: a real fraction of DOs advanced past one step,
+// scheduled the next alarm at +50ms, and then generated NO further events,
+// ever — no retry, no failure, nothing. `pipeline_events` for one traced
+// example ends mid-chain with a clean `ok` on `extract` and never resumes at
+// `transcode`. This never showed up before because nothing had ever pushed
+// hundreds of these DOs through the same handoff simultaneously — the whole
+// corpus sat at zero entries read from day one.
+//
+// This is a mitigation, not a proven root cause: there is no way to
+// reproduce a Durable Object alarm under bulk concurrency in this
+// environment (local preview does not work on the pinned wrangler
+// toolchain — see CLAUDE.md). Giving the platform more room between one
+// alarm's storage writes settling and the next alarm being due is the
+// standard defensive move for this failure shape, and it costs at most a
+// few extra seconds across a whole recording's four-step chain.
+const STEP_CHAIN_DELAY_MS = 1_500
+
 const MAX_ATTEMPTS: Record<StepKey, number> = {
   audio_extract: 3,
   transcribe: 3,
@@ -538,7 +558,7 @@ export class VlogPipelineDO {
         await this.recordEvent(vlog_id, pointer, 'skipped', 'skip_if_exists',
           { reason: 'artifact_exists' })
         await this.advance(pointer)
-        await this.state.storage.setAlarm(Date.now() + 50)
+        await this.state.storage.setAlarm(Date.now() + STEP_CHAIN_DELAY_MS)
         return
       }
 
@@ -559,7 +579,7 @@ export class VlogPipelineDO {
       await this.state.storage.delete(`attempts:${pointer}`)
       await this.state.storage.delete(`force_${pointer}`)
       await this.advance(pointer)
-      await this.state.storage.setAlarm(Date.now() + 50)
+      await this.state.storage.setAlarm(Date.now() + STEP_CHAIN_DELAY_MS)
     } catch (e: any) {
       // Gate full → not a failure. Reschedule and re-check for a free slot
       // without consuming a retry attempt or touching the vlog's state.
@@ -583,7 +603,7 @@ export class VlogPipelineDO {
         await this.recordEvent(vlog_id, pointer, 'failed_terminal', null,
           { attempts: attempt, soft: true }, fullErr)
         await this.advance(pointer)
-        await this.state.storage.setAlarm(Date.now() + 50)
+        await this.state.storage.setAlarm(Date.now() + STEP_CHAIN_DELAY_MS)
       } else {
         await this.recordEvent(vlog_id, pointer, 'failed_terminal', null,
           { attempts: attempt }, fullErr)
