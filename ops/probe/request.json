@@ -1,1 +1,4 @@
-{ "method": "GET", "path": "/api/v2/vlogs/01KRCXXCJV4NM75PH5SV25S2YQ/events?nonce=diag-1789632348" }
+{
+  "method": "GET",
+  "path": "/api/v2/admin/pipeline-state?nonce=resume-check-1758100000"
+}
