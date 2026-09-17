@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs/01KRMX3YMQP7MRK5B91CVHJVPP?nonce=fresh-sample-1758104800"
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
+  "body": {"scope": "incomplete", "dry_run": true, "skip_in_flight": true}
 }
