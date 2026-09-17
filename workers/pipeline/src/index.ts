@@ -45,7 +45,7 @@ import type {
   Ai,
 } from '@cloudflare/workers-types'
 
-import { runWhisper, getPreferredShapeName } from '../../../src/lib/whisper'
+import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 
 export interface Env {
@@ -137,6 +137,37 @@ function backoffMs(attempt: number): number {
   const base = Math.min(60_000, 1_000 * Math.pow(2, attempt))
   const jitter = base * (0.85 + Math.random() * 0.30)
   return Math.floor(jitter)
+}
+
+/**
+ * Extract per-word timings from a Workers AI Whisper result.
+ *
+ * ⚠️ 17 Sep — `result.words` is never populated. A raw response looks like
+ * `{ transcription_info, text, word_count, segments, vtt, usage }` — the
+ * word-level timings live at `segments[].words[]`, one array per segment,
+ * not flattened to the top. `word_count` was always correct (Whisper counted
+ * them); nothing ever read them, so every recording landed with real
+ * transcript_text and zero `transcript_words` rows, and `read-recording.ts`
+ * correctly refused to write anything for want of real timings. This is why
+ * the corpus reached `pipeline_status='complete'` on hundreds of recordings
+ * while `/api/v2/log/read` stayed at zero entries — found by logging the
+ * actual response shape rather than guessing at it.
+ *
+ * `result.words` is still checked first in case a future model version (or
+ * a different input shape) flattens it there directly.
+ */
+function extractWhisperWords(result: any): Array<{ word: string; start: number; end: number }> {
+  const flat: any[] = Array.isArray(result?.words) ? result.words : []
+  const nested: any[] = Array.isArray(result?.segments)
+    ? result.segments.flatMap((s: any) => (Array.isArray(s?.words) ? s.words : []))
+    : []
+  const source = flat.length > 0 ? flat : nested
+  const out: Array<{ word: string; start: number; end: number }> = []
+  for (const w of source) {
+    if (!w?.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
+    out.push({ word: String(w.word).trim(), start: w.start, end: w.end })
+  }
+  return out
 }
 
 // ─── Host worker ────────────────────────────────────────────────────────────
@@ -884,10 +915,8 @@ export class VlogPipelineDO {
         if (text) stitched = stitched ? `${stitched} ${text}` : text
         await this.recordEvent(vlog.id, 'transcribe', 'ok', `chunk_${i}`,
           { chunk: i, of: chunks.length, chars_out: text.length })
-        const wordList: any[] = Array.isArray(result?.words) ? result.words : []
-        for (const w of wordList) {
-          if (!w.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
-          allWords.push({ word: String(w.word).trim(), start: w.start + c.start_sec, end: w.end + c.start_sec })
+        for (const w of extractWhisperWords(result)) {
+          allWords.push({ word: w.word, start: w.start + c.start_sec, end: w.end + c.start_sec })
         }
       }
     } else {
@@ -903,27 +932,7 @@ export class VlogPipelineDO {
         { bytes: bytes.byteLength, attempt: 1 })
       const result = await this.whisperWithRetry(bytes, 0, 1)
       stitched = result?.text ?? result?.transcription ?? ''
-      const wordList: any[] = Array.isArray(result?.words) ? result.words : []
-      // TEMPORARY diagnostic — 17 Sep: word_count is landing at 0 even when
-      // transcript_text carries real speech ("Let's go. Thank you."), across
-      // vlogs dispatched through the correctly-routed /start path. This logs
-      // the actual shape Whisper returned so the cause (REST fallback
-      // response missing `words`, a different key name, empty array for
-      // short clips, or something else) can be seen directly rather than
-      // guessed at. Remove once the real cause is confirmed and fixed.
-      await this.recordEvent(vlog.id, 'transcribe', 'ok', 'diag_result_shape', {
-        result_keys: result && typeof result === 'object' ? Object.keys(result) : typeof result,
-        has_words_key: 'words' in (result ?? {}),
-        words_is_array: Array.isArray(result?.words),
-        words_len: Array.isArray(result?.words) ? result.words.length : null,
-        word_count_field: result?.word_count ?? null,
-        text_len: (stitched || '').length,
-        preferred_shape: getPreferredShapeName(),
-      })
-      for (const w of wordList) {
-        if (!w.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
-        allWords.push({ word: String(w.word).trim(), start: w.start, end: w.end })
-      }
+      allWords.push(...extractWhisperWords(result))
     }
 
     if (!stitched) throw new Error('Whisper returned empty transcript')

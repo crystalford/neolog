@@ -61,13 +61,6 @@ const JSON_SHAPES: ShapeAttempt[] = [
 
 let preferredShapeName: string | null = null
 
-// Diagnostic only — lets a caller log which input shape actually won, so a
-// response-shape bug (e.g. the REST fallback returning no word timings)
-// can be told apart from a request-shape one.
-export function getPreferredShapeName(): string | null {
-  return preferredShapeName
-}
-
 export async function runWhisper(env: WhisperEnv, bytes: Uint8Array): Promise<any> {
   const ordered = preferredShapeName
     ? [
