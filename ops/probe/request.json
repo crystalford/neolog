@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/vlogs?status=complete&limit=200&nonce=complete-check-1758104400"
+  "path": "/api/v2/vlogs/01KXZMHC1D36RCKNE2V0B47FP0?nonce=transcript-check-1758104600"
 }
