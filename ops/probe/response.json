@@ -1,13 +1,23 @@
 {
-  "requested_at": "2026-09-17T19:01:58Z",
-  "method": "GET",
-  "path": "/api/v2/vlogs?status=uploaded&limit=5&nonce=pick-untranscribed-1758106000",
+  "requested_at": "2026-09-17T19:02:38Z",
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3ca5cce7fb1e702-YYZ\r|",
-  "body": "{\"vlogs\":[],\"limit\":5,\"offset\":0}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3ca5dc4c86ed19a-MCI\r|",
+  "body": "{\"dispatched\":1,\"failed\":0,\"skipped\":0,\"results\":[{\"vlog_id\":\"01KRCXX9CYTQVNQQVMG7SDGMXQ\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"}],\"dispatched_start\":1,\"dispatched_reextract\":0}",
   "body_json": {
-    "vlogs": [],
-    "limit": 5,
-    "offset": 0
+    "dispatched": 1,
+    "failed": 0,
+    "skipped": 0,
+    "results": [
+      {
+        "vlog_id": "01KRCXX9CYTQVNQQVMG7SDGMXQ",
+        "entry": "start",
+        "ok": true,
+        "backend": "pipeline_do"
+      }
+    ],
+    "dispatched_start": 1,
+    "dispatched_reextract": 0
   }
 }
