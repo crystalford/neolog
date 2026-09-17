@@ -45,7 +45,7 @@ import type {
   Ai,
 } from '@cloudflare/workers-types'
 
-import { runWhisper } from '../../../src/lib/whisper'
+import { runWhisper, getPreferredShapeName } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
 
 export interface Env {
@@ -904,6 +904,22 @@ export class VlogPipelineDO {
       const result = await this.whisperWithRetry(bytes, 0, 1)
       stitched = result?.text ?? result?.transcription ?? ''
       const wordList: any[] = Array.isArray(result?.words) ? result.words : []
+      // TEMPORARY diagnostic — 17 Sep: word_count is landing at 0 even when
+      // transcript_text carries real speech ("Let's go. Thank you."), across
+      // vlogs dispatched through the correctly-routed /start path. This logs
+      // the actual shape Whisper returned so the cause (REST fallback
+      // response missing `words`, a different key name, empty array for
+      // short clips, or something else) can be seen directly rather than
+      // guessed at. Remove once the real cause is confirmed and fixed.
+      await this.recordEvent(vlog.id, 'transcribe', 'ok', 'diag_result_shape', {
+        result_keys: result && typeof result === 'object' ? Object.keys(result) : typeof result,
+        has_words_key: 'words' in (result ?? {}),
+        words_is_array: Array.isArray(result?.words),
+        words_len: Array.isArray(result?.words) ? result.words.length : null,
+        word_count_field: result?.word_count ?? null,
+        text_len: (stitched || '').length,
+        preferred_shape: getPreferredShapeName(),
+      })
       for (const w of wordList) {
         if (!w.word || typeof w.start !== 'number' || typeof w.end !== 'number') continue
         allWords.push({ word: String(w.word).trim(), start: w.start, end: w.end })
