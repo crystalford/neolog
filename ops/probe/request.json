@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs?status=uploaded&limit=5&nonce=pick-untranscribed-1758106000"
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
+  "body": {"vlog_ids": ["01KRCXX9CYTQVNQQVMG7SDGMXQ"], "dry_run": false, "skip_in_flight": true}
 }
