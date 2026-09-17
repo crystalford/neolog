@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/log/read?nonce=user-check-1758105200"
+  "path": "/api/v2/admin/pipeline-state?nonce=user-check2-1758105300"
 }
