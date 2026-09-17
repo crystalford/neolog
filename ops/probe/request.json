@@ -1,5 +1,5 @@
 {
   "method": "POST",
   "path": "/api/v2/admin/reprocess-vlogs",
-  "body": {"scope": "incomplete", "dry_run": false, "skip_in_flight": true}
+  "body": {"scope": "incomplete", "dry_run": true, "skip_in_flight": true}
 }
