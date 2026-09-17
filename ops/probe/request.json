@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs?status=failed&limit=200&nonce=failedlist-1758100300"
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
+  "body": {"scope": "incomplete", "dry_run": false, "skip_in_flight": true}
 }
