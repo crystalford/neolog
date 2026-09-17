@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/vlogs?status=failed&limit=5&nonce=failcheck-1758100100"
+  "path": "/api/v2/vlogs/01KXZMVJCYBNN93NPDH6F6PN6F/events?nonce=eventcheck-1758100200"
 }
