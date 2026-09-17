@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/admin/runtime-state?nonce=gatecheck-1758104200"
+  "path": "/api/v2/vlogs?status=complete&limit=200&nonce=complete-check-1758104400"
 }
