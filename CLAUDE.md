@@ -1060,6 +1060,42 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 17 Sep — Whisper's word timings were never read from where they live
+
+Even after the routing fix directly below, a freshly and correctly
+dispatched vlog (`/start`, real Whisper call, confirmed via
+`pipeline_events`) came back with real speech in `transcript_text` —
+*"Let's go. Thank you."* — and still `word_count:0`, no
+`transcript_words` rows. Not a routing problem this time: the call ran,
+and the words still didn't land.
+
+A temporary diagnostic logging the raw Whisper result's shape found it
+immediately: `{ transcription_info, text, word_count, segments, vtt,
+usage }`. **There is no top-level `words` field at all.** `word_count`
+was right the whole time — Whisper counted four words — but the
+per-word timings live at `segments[].words[]`, one array per segment,
+never flattened to the top. `stepTranscribe()` in
+`workers/pipeline/src/index.ts` only ever checked `result.words`, so it
+silently found nothing, for every recording, since this pipeline was
+built.
+
+This is the deepest layer under "`pipeline_status='complete'` on
+hundreds of recordings, zero entries on the log": not the routing bug
+above (real, and necessary to fix first — it was masking this one,
+since a vlog routed to `/reextract` never called Whisper again at all
+to expose it), and not silent drone footage (some of the corpus
+genuinely is that, but this proves not all of it). Speech recognition
+was working. Nothing had ever read where it put the answer.
+
+`extractWhisperWords()` now checks `result.words` first (kept for a
+future response shape that flattens it there) and falls back to
+flattening `result.segments[].words`, used by both the chunked and
+single-blob transcribe paths — one function, so the two call sites
+can't drift the way `has_transcript` did in the fix below. No test
+script added this pass — the function takes a Whisper response
+directly and the fastest real verification was dispatching a live
+recording and reading the result back, which is what found it.
+
 ### ⚠️ 17 Sep — `reprocess-vlogs` routed real narration to the path that can never transcribe it
 
 Even with the alarm-chain fix and the healer cron below, a full-corpus
