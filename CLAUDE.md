@@ -1060,6 +1060,40 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 17 Sep — the cron is ON, because the rare event arrived
+
+Dispatching the real 420-recording corpus found a bug this repo had never
+had the chance to hit: the pipeline hands off from one step to the next by
+scheduling `state.storage.setAlarm(Date.now() + 50)` — 50 milliseconds —
+and under real bulk concurrency, a real fraction of those alarms never
+fired. No error, no retry event, nothing — `pipeline_events` for a traced
+example ends cleanly on one step's `ok` and never resumes on the next. The
+DO just goes silent, forever, with `pipeline_status` frozen at whatever it
+was mid-chain.
+
+**Nothing had ever exercised this before.** The very first count taken
+before this session touched anything showed `read: 0, transcribed_only: 0`
+across all 420 — this multi-step chain had never once run to completion for
+any recording, for any reason, under the current architecture. A bug that
+only shows up under bulk concurrency cannot show up until something
+actually runs the corpus in bulk, which nothing had.
+
+`STEP_CHAIN_DELAY_MS` in `workers/pipeline/src/index.ts` replaces the bare
+`+ 50` at all three step-handoff points with `1_500`. This is a mitigation,
+not a proven root cause — there is no way to reproduce a Durable Object
+alarm under load in this environment (local preview does not work on the
+pinned toolchain, above) — but giving the platform more room between one
+alarm's writes settling and the next alarm coming due is the standard
+defensive move for exactly this failure shape.
+
+**The cron is back on** (`workers/healer/wrangler.toml`, `crons = ["*/5 * * * *"]`)
+— the operator's call, made when told what it costs and what it was for,
+the same way this file has said it should be decided since 9 Sep. It is
+what actually recovers a DO an alarm bug orphaned mid-chain: `/heal/:id`
+just re-arms the alarm without touching the stored pointer, so the row
+resumes exactly where it stopped rather than restarting. Turn it back off
+the same way once the corpus is read.
+
 ### The backend pass — what the old engine left behind
 
 Four things survived the 8 Sep deletion because nothing imported them from a
@@ -1490,7 +1524,9 @@ not draft), where the files are kept, the recordings panel (**transcribe the
 untranscribed · read them onto the log**, with the running counts), the
 **three** maintenance jobs for a recording the pipeline dropped — *missing a
 still*, *won't play*, and ***wedged half-way*** (the healer's job, as a
-button, because its cron is off) — and last, **Start again**.
+button so the same recovery is one press away whether or not its cron
+happens to be on — see 17 Sep, above, for when and why it was) — and last,
+**Start again**.
 
 **Start again** is the one irreversible act in the product and it is a button
 because the operator has no terminal — this session is his runtime, so a

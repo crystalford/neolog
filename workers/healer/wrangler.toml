@@ -23,15 +23,17 @@ compatibility_flags = ["nodejs_compat"]
 account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 
 [triggers]
-# Cron DISABLED. Was */5 = 8,640 invocations/month — pure ambient cost on a
-# single-operator app where genuinely-stuck workflows are rare.
+# Cron ON, 17 Sep 2026 — the operator's call, for the duration of the
+# 420-recording corpus run. It was off (`crons = []`) because a five-minute
+# sweep is 8,640 invocations/month of ambient cost on a quiet log where a
+# stuck row is rare. It is not rare during this run: a real bug in the
+# pipeline's own step-to-step alarm chaining (see STEP_CHAIN_DELAY_MS in
+# workers/pipeline/src/index.ts) is silently orphaning DOs mid-chain under
+# bulk load, and this sweep is what finds and re-arms them.
 #
-# ⚠️ That trade is right for a quiet log and wrong for the one event this
-# product is built around: four hundred recordings through FFmpeg and
-# Whisper, where a stuck row is not rare. Turning it back on for the duration
-# of that run is one line here and the operator's call — it is his bill.
-# Until then the job is the "wedged half-way" button on /settings.
-crons = []
+# Turn back off (`crons = []`) once the corpus is read, the same way it was
+# reasoned about before turning it on.
+crons = ["*/5 * * * *"]
 
 [[d1_databases]]
 binding = "DB"

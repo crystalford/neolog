@@ -6,22 +6,21 @@
  *   - re-dispatches if pipeline_restart_count < MAX_RESTARTS
  *   - marks the row failed with a clear message otherwise
  *
- * ⚠️ **IT DOES NOT RUN ON A SCHEDULE.** `crons = []` in this worker's
- * wrangler.toml, disabled deliberately: a five-minute sweep is 8,640
- * invocations a month of ambient cost on a single-operator app. This header
- * said "Runs every 5 minutes… stuck workflows now self-recover" until
- * 9 Sep, and four other files described it the same way. It was not true,
- * and the sentence being in five places is why nobody noticed.
+ * ⚠️ **Whether this runs on a schedule is one line in wrangler.toml
+ * (`crons`), and it has been wrong before.** Disabled by default: a
+ * five-minute sweep is 8,640 invocations a month of ambient cost on a
+ * single-operator app where a stuck row is rare. This header said "Runs
+ * every 5 minutes… stuck workflows now self-recover" for weeks while
+ * `crons = []`, and four other files described it the same way — the
+ * sentence being in five places is why nobody noticed it was false. Check
+ * `workers/healer/wrangler.toml`'s `[triggers]` block for the current state
+ * and its dated comment for why, rather than trusting this paragraph.
  *
  * The equivalent from the app side is `POST /api/v2/admin/reset-stuck` — a
  * pure D1 UPDATE, no model calls, no container starts — and it is a button
  * on `/settings` ("wedged half-way"), which is the shape every maintenance
- * job takes here because the operator has no terminal. This worker stays
- * deployed for the case where the DO itself needs re-arming, and its `fetch`
- * handler runs the same sweep on demand.
- *
- * If a four-hundred-recording run is coming, turning the cron back on for
- * the duration is the operator's call and one line in the toml.
+ * job takes here because the operator has no terminal. This worker's `fetch`
+ * handler also runs the same sweep on demand, cron or no cron.
  *
  * Concurrency: cron handlers are single-instance per minute boundary, so two
  * healer runs can't race on the same row. Each row is processed sequentially
