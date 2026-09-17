@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs/01KRCXX9CYTQVNQQVMG7SDGMXQ?nonce=verify-fix-6-1758106900"
+  "method": "POST",
+  "path": "/api/v2/admin/reprocess-vlogs",
+  "body": {"scope": "incomplete", "dry_run": true, "skip_in_flight": true}
 }
