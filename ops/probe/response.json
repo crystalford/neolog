@@ -1,14 +1,45 @@
 {
-  "requested_at": "2026-09-17T16:07:38Z",
+  "requested_at": "2026-09-17T16:08:12Z",
   "method": "GET",
-  "path": "/api/v2/log/read?nonce=readstatus-1758104700",
+  "path": "/api/v2/vlogs/01KRMX3YMQP7MRK5B91CVHJVPP?nonce=fresh-sample-1758104800",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3c95d6c8876150f-PDX\r|",
-  "body": "{\"recordings\":420,\"transcribed\":0,\"read\":0,\"entries\":0}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3c95e3dbcd81efc-EWR\r|",
+  "body": "{\"vlog\":{\"id\":\"01KRMX3YMQP7MRK5B91CVHJVPP\",\"visibility\":\"private\",\"original_filename\":\"DJI_20260408061037_0064_D.MP4\",\"r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KRMX3RZYG2YSNDFTG1JKKSD4/DJI_20260408061037_0064_D.MP4\",\"transcoded_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMX3YMQP7MRK5B91CVHJVPP.mp4\",\"thumbnail_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMX3YMQP7MRK5B91CVHJVPP.jpg\",\"thumbnail_url\":null,\"duration_seconds\":null,\"file_size_bytes\":35933051,\"mime_type\":\"video/mp4\",\"recorded_at\":\"2026-04-08T06:10:37.000Z\",\"recorded_at_source\":\"pre_extracted\",\"created_at\":\"2026-05-15 04:08:07\",\"transcript_text\":\"Alright, so DoorDash doesn't show you the daily total. And I always was like, what the fuck is with that? You always have to go and calculate it and such. You know, you have to go through every session that you've done in that day and add it up and tally it up. And I was always like, why do they do that? That's so weird. And then I asked Gemini and Gemini was like, well, they do it because, you know, they want to hook you onto the platform. It's kind of not that great, you know, in that regard because it's kind of sneaky. But now, actually, after using it, and this is taking me, this is how long it took me to realize this. But I'm also doing less multi-app now. I'm actually just sticking to like DoorDash. I actually kind of like it because it provides just a little bit of this incentive for me to keep the session going. So that you can have that total at the end of the session of like, whatever it is, 50 bucks, let's say. Because if you want to do like four sessions a day, 50 bucks, $200 kind of thing. So it does actually, it's a very strange little incentive, like a behavioral incentive. Because it's not even the fact that, like, about the money. It's about like, in a way, also the fact that I don't, you know, I don't want to have to total up every little tiny session. And, you know, if I close the session, because I used to close the session a lot more frequently, especially when I was doing way more multi-apping. It would be like, okay, you know, you've done a 12, did a $10 run, end the session. I would end the session too just to like, you know, just to clear the cash almost. Like, I would be like, boop. So, so yeah, it's interesting. So that's all I wanted to say about that is that I'm now seeing the benefit of it. Like, there's this incentive for me to keep rolling, baby. Oh, yeah. Okay, great. Love this. Love this.\",\"transcript_provider\":\"workers_ai_whisper\",\"transcript_completed_at\":\"2026-05-20 19:31:53\",\"pipeline_status\":\"complete\",\"extraction_outcomes\":null,\"read_at\":null,\"vision_description\":null,\"frame_note\":null,\"usable\":null,\"play_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMX3YMQP7MRK5B91CVHJVPP.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260917%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260917T160812Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=d5050b6f12745bdf3840460b8241e72307c09a853e669f6eba538f9940b74720\",\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMX3YMQP7MRK5B91CVHJVPP.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260917%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260917T160812Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=fc1f8c70089c6c76d9699dc8eb40da284914fdad2da4794250d4d6d2db46b16e\",\"date_from\":\"read out of the filename before it uploaded\",\"transcribed_by\":\"Whisper\",\"word_count\":0},\"words\":[],\"entries\":[],\"navigation\":{\"prev_id\":\"01KRMX3RP3A7374ZRR96TWJWKB\",\"next_id\":\"01KRDZ3AS3MQ48M39E9MBZN6DV\"}}",
   "body_json": {
-    "recordings": 420,
-    "transcribed": 0,
-    "read": 0,
-    "entries": 0
+    "vlog": {
+      "id": "01KRMX3YMQP7MRK5B91CVHJVPP",
+      "visibility": "private",
+      "original_filename": "DJI_20260408061037_0064_D.MP4",
+      "r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KRMX3RZYG2YSNDFTG1JKKSD4/DJI_20260408061037_0064_D.MP4",
+      "transcoded_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMX3YMQP7MRK5B91CVHJVPP.mp4",
+      "thumbnail_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMX3YMQP7MRK5B91CVHJVPP.jpg",
+      "thumbnail_url": null,
+      "duration_seconds": null,
+      "file_size_bytes": 35933051,
+      "mime_type": "video/mp4",
+      "recorded_at": "2026-04-08T06:10:37.000Z",
+      "recorded_at_source": "pre_extracted",
+      "created_at": "2026-05-15 04:08:07",
+      "transcript_text": "Alright, so DoorDash doesn't show you the daily total. And I always was like, what the fuck is with that? You always have to go and calculate it and such. You know, you have to go through every session that you've done in that day and add it up and tally it up. And I was always like, why do they do that? That's so weird. And then I asked Gemini and Gemini was like, well, they do it because, you know, they want to hook you onto the platform. It's kind of not that great, you know, in that regard because it's kind of sneaky. But now, actually, after using it, and this is taking me, this is how long it took me to realize this. But I'm also doing less multi-app now. I'm actually just sticking to like DoorDash. I actually kind of like it because it provides just a little bit of this incentive for me to keep the session going. So that you can have that total at the end of the session of like, whatever it is, 50 bucks, let's say. Because if you want to do like four sessions a day, 50 bucks, $200 kind of thing. So it does actually, it's a very strange little incentive, like a behavioral incentive. Because it's not even the fact that, like, about the money. It's about like, in a way, also the fact that I don't, you know, I don't want to have to total up every little tiny session. And, you know, if I close the session, because I used to close the session a lot more frequently, especially when I was doing way more multi-apping. It would be like, okay, you know, you've done a 12, did a $10 run, end the session. I would end the session too just to like, you know, just to clear the cash almost. Like, I would be like, boop. So, so yeah, it's interesting. So that's all I wanted to say about that is that I'm now seeing the benefit of it. Like, there's this incentive for me to keep rolling, baby. Oh, yeah. Okay, great. Love this. Love this.",
+      "transcript_provider": "workers_ai_whisper",
+      "transcript_completed_at": "2026-05-20 19:31:53",
+      "pipeline_status": "complete",
+      "extraction_outcomes": null,
+      "read_at": null,
+      "vision_description": null,
+      "frame_note": null,
+      "usable": null,
+      "play_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMX3YMQP7MRK5B91CVHJVPP.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260917%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260917T160812Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=d5050b6f12745bdf3840460b8241e72307c09a853e669f6eba538f9940b74720",
+      "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMX3YMQP7MRK5B91CVHJVPP.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260917%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260917T160812Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=fc1f8c70089c6c76d9699dc8eb40da284914fdad2da4794250d4d6d2db46b16e",
+      "date_from": "read out of the filename before it uploaded",
+      "transcribed_by": "Whisper",
+      "word_count": 0
+    },
+    "words": [],
+    "entries": [],
+    "navigation": {
+      "prev_id": "01KRMX3RP3A7374ZRR96TWJWKB",
+      "next_id": "01KRDZ3AS3MQ48M39E9MBZN6DV"
+    }
   }
 }
