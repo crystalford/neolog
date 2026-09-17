@@ -1,77 +1,55 @@
 {
-  "requested_at": "2026-09-17T19:30:15Z",
-  "method": "POST",
-  "path": "/api/v2/admin/reprocess-vlogs",
+  "requested_at": "2026-09-17T19:32:16Z",
+  "method": "GET",
+  "path": "/api/v2/admin/pipeline-state?nonce=continue-check-1758107500",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3ca86290f4a8c33-EWR\r|",
-  "body": "{\"dispatched\":8,\"failed\":0,\"skipped\":2,\"results\":[{\"vlog_id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"ok\":false,\"backend\":\"none\",\"reason\":\"already_running\"},{\"vlog_id\":\"01KXZY7CXK8MQXCCGYQCWY6MX1\",\"ok\":false,\"backend\":\"none\",\"reason\":\"already_running\"},{\"vlog_id\":\"01KXZN890DX6C1HVWK09H516GV\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZN6JBGBPNPFKW0VRY02SXB\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNA77J7Z61FYYAJNDTWJ4Y\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZNC9FHTEP4TYPNKJ5CCZHX\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZPCTWA7R27Z7GAENV4RAAM\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZPJ8FEYX50KNT019FFEA0B\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KXZRZ32VX8JPT71NRYF9N5PQ\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"},{\"vlog_id\":\"01KY04EZQEZXPFAGGYDGESKWM4\",\"entry\":\"start\",\"ok\":true,\"backend\":\"pipeline_do\"}],\"dispatched_start\":8,\"dispatched_reextract\":0}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3ca8930883138c6-SEA\r|",
+  "body": "{\"total\":420,\"by_status\":{\"read\":156,\"transcribed_only\":30,\"words_missing\":9,\"untranscribed\":0,\"stuck_in_flight\":119,\"in_flight_recent\":62,\"archived\":0,\"failed\":44},\"failure_breakdown\":{\"other\":147},\"stuck_examples\":[{\"id\":\"01KXZPQQYVG7YG5ABGYQ81CF0C\",\"status\":\"transcoding\",\"stuck_minutes\":15},{\"id\":\"01KWM3MBFS17MWFA2G41T95FDF\",\"status\":\"transcoding\",\"stuck_minutes\":14},{\"id\":\"01KWN7J7Q9XMQEX5W244GR1XMB\",\"status\":\"transcoding\",\"stuck_minutes\":14},{\"id\":\"01KWM3ZPMZ1EJSMT8MA19JRMMK\",\"status\":\"transcoding\",\"stuck_minutes\":14},{\"id\":\"01KWM37HPGA7K03AJH9R327VPJ\",\"status\":\"transcoding\",\"stuck_minutes\":13}],\"counts_for_run\":{\"needs_transcribing\":172,\"ready_to_read\":30}}",
   "body_json": {
-    "dispatched": 8,
-    "failed": 0,
-    "skipped": 2,
-    "results": [
+    "total": 420,
+    "by_status": {
+      "read": 156,
+      "transcribed_only": 30,
+      "words_missing": 9,
+      "untranscribed": 0,
+      "stuck_in_flight": 119,
+      "in_flight_recent": 62,
+      "archived": 0,
+      "failed": 44
+    },
+    "failure_breakdown": {
+      "other": 147
+    },
+    "stuck_examples": [
       {
-        "vlog_id": "01KXZQTFA63BN68T7E93Q0N1P7",
-        "ok": false,
-        "backend": "none",
-        "reason": "already_running"
+        "id": "01KXZPQQYVG7YG5ABGYQ81CF0C",
+        "status": "transcoding",
+        "stuck_minutes": 15
       },
       {
-        "vlog_id": "01KXZY7CXK8MQXCCGYQCWY6MX1",
-        "ok": false,
-        "backend": "none",
-        "reason": "already_running"
+        "id": "01KWM3MBFS17MWFA2G41T95FDF",
+        "status": "transcoding",
+        "stuck_minutes": 14
       },
       {
-        "vlog_id": "01KXZN890DX6C1HVWK09H516GV",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
+        "id": "01KWN7J7Q9XMQEX5W244GR1XMB",
+        "status": "transcoding",
+        "stuck_minutes": 14
       },
       {
-        "vlog_id": "01KXZN6JBGBPNPFKW0VRY02SXB",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
+        "id": "01KWM3ZPMZ1EJSMT8MA19JRMMK",
+        "status": "transcoding",
+        "stuck_minutes": 14
       },
       {
-        "vlog_id": "01KXZNA77J7Z61FYYAJNDTWJ4Y",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZNC9FHTEP4TYPNKJ5CCZHX",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZPCTWA7R27Z7GAENV4RAAM",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZPJ8FEYX50KNT019FFEA0B",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KXZRZ32VX8JPT71NRYF9N5PQ",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
-      },
-      {
-        "vlog_id": "01KY04EZQEZXPFAGGYDGESKWM4",
-        "entry": "start",
-        "ok": true,
-        "backend": "pipeline_do"
+        "id": "01KWM37HPGA7K03AJH9R327VPJ",
+        "status": "transcoding",
+        "stuck_minutes": 13
       }
     ],
-    "dispatched_start": 8,
-    "dispatched_reextract": 0
+    "counts_for_run": {
+      "needs_transcribing": 172,
+      "ready_to_read": 30
+    }
   }
 }
