@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=nextday-check-1758150000"
+  "path": "/api/v2/vlogs?status=failed&limit=5&nonce=overnight-fail-check-1758150200"
 }
