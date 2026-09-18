@@ -74,6 +74,7 @@ interface StuckRow {
   pipeline_restart_count: number
   updated_at: string
   file_size_bytes: number | null
+  read_at: string | null
 }
 
 export default {
@@ -106,7 +107,7 @@ async function sweep(env: Env): Promise<{
   // legitimately takes ~15-20 min for FFmpeg + Whisper to finish.
   const stmt = env.DB.prepare(
     `SELECT id, operator_id, pipeline_status, pipeline_restart_count, updated_at,
-            file_size_bytes
+            file_size_bytes, read_at
        FROM vlogs
       WHERE pipeline_status IN (${placeholders})
         AND deleted_at IS NULL
@@ -137,6 +138,30 @@ async function sweep(env: Env): Promise<{
   for (const row of rows) {
     try {
       if (row.pipeline_restart_count >= MAX_RESTARTS) {
+        // ⚠️ `read_at` already set means the words are already on the log —
+        // audio_extract, transcribe and extract all had to succeed first.
+        // The only thing that can still be wedged is `transcode`, and the
+        // DO's own alarm() treats a transcode exhaustion as SOFT on purpose
+        // ("audio/transcribe/extract already succeeded... must NOT mark the
+        // vlog failed"). This sweep doesn't see which step a legacy
+        // 'transcoding' status maps to, so without this check it overrides
+        // that softness from outside: a vlog that was successfully read
+        // gets marked 'failed' anyway once healer restarts run out, hiding
+        // real entries behind a status that reads as "nothing happened."
+        // Found by dispatching the real corpus: several "failed" rows had
+        // 1-4 entries already on the log. Mark it complete instead — the
+        // work that matters is done; browser transcode stays best-effort.
+        if (row.read_at) {
+          await env.DB.prepare(
+            `UPDATE vlogs
+                SET pipeline_status = 'complete',
+                    pipeline_error = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+          ).bind(row.id).run()
+          result.restarted.push(row.id)
+          continue
+        }
         await env.DB.prepare(
           `UPDATE vlogs
               SET pipeline_status = 'failed',

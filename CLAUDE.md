@@ -1060,6 +1060,30 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 18 Sep — the healer marked already-read recordings "failed"
+
+Running the fixed pipeline against the corpus overnight moved `read` from
+156 to only 165, while `failed` jumped from 23 to 209. Pulling a few of
+those "failed" rows found several with 1–4 entries already on the log —
+the words had genuinely been read; the row was marked failed anyway.
+
+The healer sweep (`workers/healer/src/index.ts`) can't tell which step a
+legacy `pipeline_status='transcoding'` maps to — it could be
+`audio_extract`, `transcribe`, or `transcode`. The DO's own `alarm()`
+already knows `transcode` is soft and must never fail the vlog ("best-effort
+browser playback... audio/transcribe/extract already succeeded"), but that
+softness lives inside the DO. The healer's own `MAX_RESTARTS` exhaustion
+runs from outside it, sees only "stuck too long," and overrode that
+softness — a vlog that was successfully read, with only its browser-playback
+transcode still wedged, got marked `failed` from the outside once healer
+restarts ran out.
+
+The sweep now checks `read_at` before giving up: if it's set, the words are
+already on the log and whatever's stuck can only be `transcode`, so the row
+is marked `complete` instead of `failed`. A `failed` status now means what
+it says — the words never made it — rather than "something, somewhere,
+eventually gave up."
+
 ### ⚠️ 17 Sep — Whisper's word timings were never read from where they live
 
 Even after the routing fix directly below, a freshly and correctly
