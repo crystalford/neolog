@@ -19,7 +19,12 @@ on:
       - claude/integrate-filament-update-XWb1v
     paths:
       - 'ops/probe/request.json'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override target base URL (e.g. https://neolog.<sub>.workers.dev). Leave blank for https://neolog.ai."
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -31,7 +36,10 @@ jobs:
     env:
       CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-      BASE_URL: https://neolog.ai
+      # ⚠️ Manual-dispatch-only override, e.g. to verify a new Worker
+      # deploy at its *.workers.dev hostname before a domain cutover.
+      # Always https://neolog.ai on the ordinary push-triggered path.
+      BASE_URL: ${{ github.event.inputs.base_url || 'https://neolog.ai' }}
     steps:
       - uses: actions/checkout@v4
         with:
