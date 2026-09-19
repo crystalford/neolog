@@ -25,10 +25,10 @@
  * and clears pipeline_error so the UI doesn't show stale red text.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { IN_FLIGHT_STATUSES } from '@/lib/pipeline-status'
@@ -42,7 +42,7 @@ interface Env {
 
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try { operator = await requireOperator(req, env) }

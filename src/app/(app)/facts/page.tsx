@@ -22,8 +22,6 @@
  * "importance", no featured row. §0: the log never ranks.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

@@ -27,10 +27,10 @@
  * good, which is the thing the fence exists to prevent.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
@@ -56,7 +56,7 @@ async function operatorOr401(req: NextRequest, env: Env) {
 }
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
   const db = await readyDb(getDb(env), 'footage')
@@ -172,7 +172,7 @@ export async function GET(req: NextRequest) {
   // It describes what is in the FRAME and nothing else — the same reporting
   // call the hold-back check uses. It does not rank, score, or say whether a
   // clip is any good.
-  const ctx = getRequestContext()
+  const ctx = getCloudflareContext()
   ctx.ctx.waitUntil(
     visionTagVlogBacklog(env as unknown as VisionEnv, operator.id, 8)
       .catch(err => console.warn('[footage] frame descriptions:', err?.message || err)),
@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
   const db = await readyDb(getDb(env), 'footage')

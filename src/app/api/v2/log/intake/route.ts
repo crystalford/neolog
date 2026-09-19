@@ -39,10 +39,10 @@
  * the entry held.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, run, batch as d1Batch } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { getObject, type R2Env } from '@/lib/r2'
@@ -62,7 +62,7 @@ import {
   batchSentence, spokenDuration, RELATION_DEFAULT, REFLECTS,
   type DatePrecision, type Relation,
 } from '@/lib/log-entry'
-import type { D1Database } from '@cloudflare/workers-types'
+import type { D1Database, Ai } from '@cloudflare/workers-types'
 
 interface Env extends R2Env {
   DB: D1Database
@@ -108,7 +108,7 @@ function sentenceForFile(f: IncomingFile): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { env: rawEnv, ctx } = getRequestContext()
+  const { env: rawEnv, ctx } = getCloudflareContext()
   const env = rawEnv as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -705,7 +705,7 @@ async function runVerifications(
  * for as long as the receipt is on screen and it takes the whole act with it.
  */
 export async function DELETE(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

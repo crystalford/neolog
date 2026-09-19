@@ -8,8 +8,6 @@
  * actual work.
  */
 
-export const runtime = 'edge'
-
 import { MonthPageClient } from './MonthPageClient'
 
 export default async function MonthPage({ params }: { params: Promise<{ ym: string }> }) {

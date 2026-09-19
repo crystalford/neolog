@@ -7,13 +7,22 @@ name: Bootstrap Cloudflare
 #  - Workers AI binding
 #  - Cloudflare Access application + One-time PIN identity provider
 #  - Container Worker for FFmpeg deployed
-#  - Pages project linked + production deploy
+#  - The main app Worker built (OpenNext Cloudflare adapter) + deployed
+#
+# ⚠️ Deploy target changed from a Cloudflare Pages project to a Cloudflare
+# Worker with static assets. `wrangler.toml`'s bindings (D1, R2, AI,
+# services) are read natively by `wrangler deploy` now, so the REST-API
+# binding patch this file used to need under @cloudflare/next-on-pages is
+# gone — that step existed only because Pages ignored this file entirely.
+# The custom domain (neolog.ai) is NOT wired here — attaching it to the
+# Worker is a one-time, deliberately manual step done outside this
+# workflow, the same way the original Pages custom-domain attachment was.
 #
 # Trigger: manual only. From github.com → Actions → Bootstrap Cloudflare →
 # "Run workflow". This workflow runs heavy provisioning (D1 schema, container
-# worker rebuild, Pages binding patch, Access policy) so it only fires when
-# infra actually changes. The fast deploy.yml workflow handles every push to
-# main — about 60-90s for a code-only change vs ~5 min for full bootstrap.
+# worker rebuild, Access policy) so it only fires when infra actually
+# changes. The fast deploy.yml workflow handles every push to main — about
+# 60-90s for a code-only change vs ~5 min for full bootstrap.
 #
 # Required secrets (set once via github.com → repo → Settings → Secrets and variables → Actions):
 #  CLOUDFLARE_API_TOKEN   — token with Workers/D1/R2/Pages/Access edit permissions
@@ -46,7 +55,7 @@ env:
   ACCESS_TEAM:           neolog
   R2_BUCKET:             neolog-videos
   D1_NAME:               neolog
-  PAGES_PROJECT:         neolog
+  WORKER_NAME:           neolog
   CONTAINER_WORKER:      neolog-ffmpeg
 
 jobs:
@@ -213,7 +222,9 @@ jobs:
           # Apply CORS rules so the browser can PUT multipart parts directly
           # to R2 presigned URLs from neolog.ai. Without this, the preflight
           # OPTIONS request 404s and uploads fail with "Failed to fetch".
-          # Also allow the .pages.dev preview origin so preview deploys upload.
+          # ⚠️ *.neolog.pages.dev is gone from this list — it was the Pages
+          # preview-deploy origin, and there is no Pages project (and so no
+          # preview subdomain) once this app deploys as a Worker.
           response=$(curl -s -w "\n%{http_code}" -X PUT \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -H "Content-Type: application/json" \
@@ -222,7 +233,7 @@ jobs:
               "rules": [
                 {
                   "allowed": {
-                    "origins": ["https://neolog.ai", "https://*.neolog.pages.dev"],
+                    "origins": ["https://neolog.ai"],
                     "methods": ["GET", "PUT", "POST", "DELETE", "HEAD"],
                     "headers": ["*"]
                   },
@@ -238,7 +249,7 @@ jobs:
             echo "$body"
             exit 1
           fi
-          echo "✅ R2 CORS applied for neolog.ai + *.neolog.pages.dev"
+          echo "✅ R2 CORS applied for neolog.ai"
 
       - name: Configure Cloudflare Access — One-time PIN identity provider
         run: |
@@ -373,102 +384,15 @@ jobs:
           echo "Deploying neolog-healer cron worker..."
           wrangler deploy
 
-      - name: Wire Pages project bindings (D1, R2, AI, services)
-        if: hashFiles('wrangler.toml') != ''
-        env:
-          D1_UUID: ${{ steps.d1.outputs.uuid }}
-        run: |
-          set -e
-          # The @cloudflare/next-on-pages adapter does NOT read [[services]] /
-          # [[d1_databases]] / [[r2_buckets]] from the root wrangler.toml. Pages
-          # projects under that adapter take their bindings from the project's
-          # deployment_configs, which we set here via the Cloudflare API.
-          #
-          # Without this step the Pages-deployed app silently runs with
-          # env.PROCESS_UPLOAD === undefined, env.FFMPEG === undefined, etc. The
-          # `/api/v2/vlogs` POST then skips workflow dispatch — no thumbnail, no
-          # backdating, no transcribe, no extract.
-          #
-          # Idempotent: re-running rewrites the same config.
+      # ⚠️ The "Wire Pages project bindings" step that used to live here is
+      # gone. It existed only because @cloudflare/next-on-pages did not read
+      # [[services]] / [[d1_databases]] / [[r2_buckets]] from this file, so
+      # Pages needed them PATCHed in separately via the Pages Projects REST
+      # API. `wrangler deploy` for a Worker reads wrangler.toml's bindings
+      # natively — see the dry-run binding list this produces, which is the
+      # thing that step used to have to reconstruct by hand.
 
-          PROJECT_URL="https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT"
-
-          # Build the deployment_configs.production body.
-          read -r -d '' CONFIG_BODY <<JSON || true
-          {
-            "deployment_configs": {
-              "production": {
-                "compatibility_date": "2026-05-01",
-                "compatibility_flags": ["nodejs_compat"],
-                "d1_databases": {
-                  "DB": {"id": "$D1_UUID"}
-                },
-                "r2_buckets": {
-                  "VIDEOS": {"name": "$R2_BUCKET"}
-                },
-                "ai_bindings": {
-                  "AI": {}
-                },
-                "services": {
-                  "FFMPEG": {"service": "$CONTAINER_WORKER", "environment": "production"},
-                  "PROCESS_UPLOAD": {"service": "neolog-process-upload", "environment": "production"},
-                  "PIPELINE": {"service": "neolog-pipeline", "environment": "production"}
-                }
-              }
-            }
-          }
-          JSON
-
-          # Check whether the Pages project already exists.
-          status=$(curl -s -o /tmp/pages_get.json -w "%{http_code}" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            "$PROJECT_URL")
-
-          if [ "$status" = "404" ]; then
-            # Project does not exist yet — create it WITH bindings inline so the
-            # very first deploy already has the wire-up. The production_branch
-            # is required by the create endpoint; deployments target it later.
-            echo "Pages project '$PAGES_PROJECT' does not exist — creating with bindings..."
-            create_body=$(jq -n \
-              --arg name "$PAGES_PROJECT" \
-              --argjson cfg "$CONFIG_BODY" \
-              '{name: $name, production_branch: "main"} + $cfg')
-            create_resp=$(curl -s -w "\n%{http_code}" \
-              -X POST \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$create_body" \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects")
-            create_status=$(echo "$create_resp" | tail -n1)
-            create_json=$(echo "$create_resp" | sed '$d')
-            if [ "$create_status" != "200" ] && [ "$create_status" != "201" ]; then
-              echo "❌ Pages project create failed (HTTP $create_status):"
-              echo "$create_json" | jq . || echo "$create_json"
-              exit 1
-            fi
-            echo "✅ Pages project created with bindings."
-          else
-            # Project exists — PATCH bindings into deployment_configs.production.
-            echo "Pages project '$PAGES_PROJECT' exists — patching bindings..."
-            patch_resp=$(curl -s -w "\n%{http_code}" \
-              -X PATCH \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d "$CONFIG_BODY" \
-              "$PROJECT_URL")
-            patch_status=$(echo "$patch_resp" | tail -n1)
-            patch_json=$(echo "$patch_resp" | sed '$d')
-            if [ "$patch_status" != "200" ]; then
-              echo "❌ Pages project PATCH failed (HTTP $patch_status):"
-              echo "$patch_json" | jq . || echo "$patch_json"
-              exit 1
-            fi
-            # Surface the bindings the API now reports so we can verify in logs.
-            echo "✅ Pages project bindings updated. Current config:"
-            echo "$patch_json" | jq '.result.deployment_configs.production | {d1_databases, r2_buckets, ai_bindings, services}' || true
-          fi
-
-      - name: Set Pages project Worker secrets
+      - name: Set Worker secrets
         if: hashFiles('wrangler.toml') != ''
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -477,32 +401,34 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           set -e
-          # The bindings step above guarantees the Pages project exists, so
-          # these secret pushes always have a target.
+          # `wrangler secret put` reads the Worker name from wrangler.toml
+          # and is idempotent — safe to re-run every bootstrap.
           if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT"
+            echo "$ANTHROPIC_API_KEY" | wrangler secret put ANTHROPIC_API_KEY
           fi
           if [ -n "$R2_ACCESS_KEY_ID" ]; then
-            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT"
-            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT"
+            echo "$R2_ACCESS_KEY_ID" | wrangler secret put R2_ACCESS_KEY_ID
+            echo "$R2_SECRET_ACCESS_KEY" | wrangler secret put R2_SECRET_ACCESS_KEY
           fi
           if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT"
+            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler secret put CLOUDFLARE_ACCOUNT_ID
           fi
           if [ -n "$HEARTBEAT_TOKEN" ]; then
-            echo "$HEARTBEAT_TOKEN" | wrangler pages secret put HEARTBEAT_TOKEN --project-name "$PAGES_PROJECT"
+            echo "$HEARTBEAT_TOKEN" | wrangler secret put HEARTBEAT_TOKEN
           fi
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "$CLOUDFLARE_API_TOKEN" | wrangler pages secret put CLOUDFLARE_API_TOKEN --project-name "$PAGES_PROJECT"
+            echo "$CLOUDFLARE_API_TOKEN" | wrangler secret put CLOUDFLARE_API_TOKEN
           fi
 
-      - name: Build + deploy Pages project
+      - name: Build + deploy the Worker
         if: hashFiles('wrangler.toml') != '' && hashFiles('next.config.js') != ''
         run: |
           set -e
-          # next-on-pages builds the Next.js app to a Workers-runtime bundle
-          npx @cloudflare/next-on-pages
-          wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
+          # The OpenNext Cloudflare adapter builds the Next.js app to a
+          # Worker-with-static-assets bundle (.open-next/), which
+          # `wrangler deploy` then ships, reading wrangler.toml natively.
+          npx opennextjs-cloudflare build
+          npx wrangler deploy
 
       - name: Summary
         run: |
@@ -520,7 +446,7 @@ jobs:
               echo "- process-upload Workflow deployed"
             fi
             if [ -f next.config.js ]; then
-              echo "- Pages project \`$PAGES_PROJECT\` built + deployed"
+              echo "- Worker \`$WORKER_NAME\` built + deployed"
             fi
             echo ""
             echo "Next: visit neolog.ai (when DNS is pointed) and sign in via Cloudflare Access."

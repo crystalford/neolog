@@ -15,8 +15,6 @@
  * second copy of the rule that could drift from it.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'

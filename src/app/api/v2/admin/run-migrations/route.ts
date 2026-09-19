@@ -11,10 +11,10 @@
  * applied this call, which were already recorded, and which fell back to
  * "already present" (e.g. column existed before bookkeeping started).
  */
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { runMigrations } from '@/lib/migration-runner'
@@ -26,7 +26,7 @@ interface Env {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   try {
     await requireOperator(req, env)
   } catch (e) {

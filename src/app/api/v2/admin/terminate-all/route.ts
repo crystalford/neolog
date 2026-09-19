@@ -30,10 +30,10 @@
  *   }
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { OCCUPIED_STATUSES as IN_FLIGHT_STATUSES } from '@/lib/pipeline-status'
@@ -61,7 +61,7 @@ function noStore(body: unknown, status = 200): NextResponse {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try { operator = await requireOperator(req, env) }

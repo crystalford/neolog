@@ -18,8 +18,9 @@ Three things it does that nothing else does:
   against what arrived before anything tells you it is safe to delete
   locally.
 
-Everything runs on Cloudflare: Pages, R2, D1, Workers, Workers AI (Whisper),
-Access, and FFmpeg in a Container Worker. One bill.
+Everything runs on Cloudflare: Workers (with static assets), R2, D1,
+Workflows, Workers AI (Whisper), Access, and FFmpeg in a Container Worker.
+One bill.
 
 > **⚠️ There was a different product here.** Until 8 Sep 2026 this repo was an
 > AI video-essay studio — Subjects, Topics, Spark, a librarian, a production
@@ -1319,7 +1320,7 @@ several million numbers inside a Worker on the way to being rejected.
 **Two implementations of one call is the bug**; the fix is deleting the
 second one, not improving it. The REST fallback needs
 `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN`, and the bootstrap already
-pushes both to the Pages project.
+pushes both as Worker secrets.
 
 ### ⚠️ `MIGRATIONS` is append-only, so fifty-three of them can never apply
 
@@ -1350,28 +1351,104 @@ and nothing reads it. `scripts/test/migrations.mjs` — 21 assertions, in CI —
 holds both halves: every dropped table is recognised, and `log_entries`,
 `entry_revisions` and an unknown table are all still real failures.
 
-### ⚠️ Framework debt — Next 14.2.5 under a deprecated adapter
+### ⚠️ 19 Sep — the framework debt is paid: Next 15 + OpenNext Cloudflare
 
-`package.json` pins `next@14.2.5`. `@cloudflare/next-on-pages@1.13.16`
-declares `next: '>=14.3.0 && <=15.5.2'` — **we are below the adapter's own
-supported floor**, an unsupported pairing that happens to build. The adapter
-is itself deprecated in favour of the OpenNext Cloudflare adapter.
+This file carried the debt for weeks: `next@14.2.5` under
+`@cloudflare/next-on-pages@1.13.16`, an adapter that declares
+`next: '>=14.3.0 && <=15.5.2'` — **below the adapter's own supported
+floor**, an unsupported pairing that happened to build, on an adapter
+Cloudflare has deprecated in favour of OpenNext Cloudflare.
 
-This is real and it is not a cleanup. It is a framework major plus an adapter
-migration, and the Pages bindings are set by REST in the bootstrap workflow
-rather than read from `wrangler.toml` (see the lock above), so the binding
-wiring has to be re-proved on the far side. **Do it as its own pass with CI
-green at each step.** Do not bolt it onto unrelated work.
+Done as two passes, each shipped and confirmed live before the next
+started, exactly as this section used to insist on.
 
-⚠️ **Local preview does not work on the pinned toolchain, and finding that
-out costs an hour.** `wrangler@3.114` ships workerd `2025-07-18` against a
-`compatibility_date` of `2026-05-01`; `pages dev` starts, serves `/` and
-`/api/debug/whoami`, and then the runtime dies on the first request that
-touches D1 — *"The Workers runtime failed to start"*, with the request never
-reaching a log line. `--d1 DB` also creates a different local database from
-the one `wrangler d1 execute DB --local` seeds, so the first symptom is
-`no such table: operator` and the second is a hang. Verify against CI and the
-deployed site instead, until the adapter pass above lands.
+**Pass 1 — the framework major, same adapter.** `next-on-pages`'s
+`<=15.5.2` ceiling turned out to be a stale diagnostic string, never
+enforced against the actual build (confirmed in its own source) — and
+15.5.2 itself carries CVE-2025-66478, disclosed and unpatched at that
+exact version. Landed on **15.5.24** instead: the first patch clearing
+that CVE, and — usefully — `@opennextjs/cloudflare`'s own stated floor, so
+Pass 2 needed no second Next bump. Next 15 makes route handler `params`
+and page `params`/`searchParams` Promises, caught by `next build`'s own
+`PageProps` validation rather than by `tsc`. Fixed across ~20 route
+handlers by awaiting in place; three Client Component pages
+(`entry/[id]`, `page/[id]`, `month/[ym]`) that read `params.id`/`.ym`
+directly needed more — Client Components can't `await`, and Next's own
+fix (`use(params)`) needs React 19's `use()` hook, absent from React 18.3
+(pinned here, confirmed against the installed package). Each was split
+into a thin `async` Server Component `page.tsx` that awaits `params` and
+a sibling `*Client.tsx` carrying the unchanged component body. Three
+check scripts (`check-design.mjs`, `held.mjs`, `kinds.mjs`) read markup
+straight out of those `page.tsx` files by hardcoded path — updated to the
+new `*Client.tsx` siblings, same markup, same classes, nothing newly
+unmeasured.
+
+**Pass 2 — the adapter swap.** `@cloudflare/next-on-pages` out,
+`@opennextjs/cloudflare` in. `open-next.config.ts` added with no
+incremental-cache override — nothing here does ISR/static generation, D1
+is read live throughout. The 73 files calling `getRequestContext()`
+renamed to `getCloudflareContext()` (same `.env`/`.ctx` shape, a drop-in
+rename including the one `.ctx.waitUntil` call site). `export const
+runtime = 'edge'` removed from all 108 route/page files — OpenNext runs
+the Node.js runtime, not edge.
+
+Two things only showed up by actually running the build, not by reading
+docs:
+
+- `initOpenNextCloudflareForDev()` in `next.config.js` cannot be called
+  unconditionally at module load. Next's own build process exposes
+  `globalThis.AsyncLocalStorage` — exactly the signal the adapter uses to
+  tell `next dev` apart from everything else — so an unconditional call
+  also fires during `next build` and tries to open a real wrangler proxy
+  session, which fails outside an interactive shell with no
+  `CLOUDFLARE_API_TOKEN`. Gated on `NODE_ENV === 'development'` instead;
+  Next forces that value only for `next dev`.
+- Next 15 on the Node.js runtime tries to statically prerender any
+  route with no dynamic marker, and `getCloudflareContext()` throws when
+  called in sync mode during static generation. Every one of the 73 files
+  that actually calls it needs `export const dynamic = 'force-dynamic'` —
+  the explicit replacement for the "always dynamic" behaviour
+  `runtime = 'edge'` used to give for free. The other ~30 files in the old
+  edge-runtime set are pure `'use client'` shells that fetch from the API
+  at runtime (plus `/api/debug/whoami`, already auto-dynamic from reading
+  `req.headers`) — those don't call it and now render as static HTML
+  shells instead of per-request edge functions, a strict improvement with
+  identical client-side behaviour.
+
+`wrangler.toml`'s existing `[[d1_databases]]` / `[[r2_buckets]]` / `[ai]`
+/ `[[services]]` blocks — previously dead weight under Pages, which
+ignored this file entirely (that was the "DO NOT CHANGE — Pages project
+bindings" lock this section replaces) — are now what `wrangler deploy`
+reads natively. Added `main = ".open-next/worker.js"`, an `[assets]` block, and
+a `WORKER_SELF_REFERENCE` service binding to this same Worker (required
+for OpenNext's cache-revalidation path, unused today with no ISR).
+`wrangler deploy --dry-run` confirms every binding resolves, self-
+reference included.
+
+`.github/workflows/deploy.yml` and `bootstrap-cloudflare.yml` now build
+with `opennextjs-cloudflare build` and deploy with `wrangler deploy`
+against the Worker. The "Wire Pages project bindings" REST step in
+bootstrap is gone entirely — it existed only to compensate for Pages
+ignoring `wrangler.toml`. The `*.neolog.pages.dev` R2 CORS origin is
+gone too — there is no Pages preview subdomain once this is a Worker.
+The idempotent secret-repush in both workflows stayed, retargeted from
+`wrangler pages secret put --project-name` to plain `wrangler secret
+put` — that repush exists because of a real prior incident (secrets
+drifting out of sync caused 503s on bulk dispatch), and a deploy-target
+change is exactly the moment to keep that safety net, not drop it.
+
+**The custom domain (`neolog.ai`) is not touched by either workflow.**
+Both build/deploy the Worker under its Cloudflare-assigned name; wiring
+the domain to it, alongside Access, is the one deliberately manual,
+explicitly-confirmed step — a Worker deploy target change is exactly the
+kind of thing that can take the operator's daily tool offline if rushed.
+
+⚠️ **Local preview never got to be re-tried on the old toolchain, and
+does not need to be**: OpenNext's own `preview` command wraps plain
+`wrangler dev`, not the `wrangler pages dev` this file already documented
+as broken against D1 on this `compatibility_date`. Worth trying fresh
+against the new adapter; verify against CI and the deployed site if it
+still doesn't work.
 
 ### ⚠️ `scripts/check-sql-columns.mjs` and `check-routes.mjs` — keep both green
 
@@ -1487,9 +1564,10 @@ These are settled. Read this section before proposing alternatives.
 
 ### One vendor: Cloudflare
 
-Pages (hosting), R2 (the recordings), D1 (the log), Workers, Workflows,
-Queues, Workers AI (Whisper, and the vision check on an uploaded image),
-Access (auth), Containers (FFmpeg).
+Workers with static assets (hosting, via the OpenNext Cloudflare adapter —
+not Pages, since the 19 Sep migration), R2 (the recordings), D1 (the log),
+Workflows, Queues, Workers AI (Whisper, and the vision check on an uploaded
+image), Access (auth), Containers (FFmpeg).
 
 Anthropic is available as a paid opt-in and **nothing currently calls it**.
 
@@ -1565,10 +1643,6 @@ Each post-upload step (transcode, thumbnail, recorded_at, transcribe, and readin
 - Keeps the existing `step.do` retry behaviour intact (each step still gets 2-3 retries before giving up).
 
 The `extraction_outcomes` column is the source of truth for "what worked, what failed" — read it from D1 instead of scrolling the Cloudflare dashboard.
-
-## ⚠️ DO NOT CHANGE — Pages project bindings
-
-The `@cloudflare/next-on-pages` adapter does **not** read `[[services]]` / `[[d1_databases]]` / `[[r2_buckets]]` from the root `wrangler.toml`. Pages projects under that adapter take their bindings from the project's `deployment_configs`, which the bootstrap workflow sets via the Cloudflare REST API (`.github/workflows/bootstrap-cloudflare.yml` → step "Wire Pages project bindings"). Without that step, `env.PROCESS_UPLOAD` and `env.FFMPEG` are undefined on the deployed app and the post-upload workflow never dispatches.
 
 ---
 
@@ -1724,9 +1798,9 @@ preserves a bookmark to a product that no longer exists.
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14.2.5, App Router |
-| Runtime | Cloudflare Workers / Pages Functions |
-| Hosting | Cloudflare Pages |
+| Framework | Next.js 15.5.24, App Router |
+| Runtime | Cloudflare Workers (Node.js runtime) |
+| Hosting | Cloudflare Workers with static assets, via the `@opennextjs/cloudflare` adapter — not Cloudflare Pages |
 | Package manager | **pnpm** — Cloudflare build uses `pnpm install --frozen-lockfile` |
 | Database | Cloudflare D1 (SQLite) |
 | Video storage | Cloudflare R2 (bucket: `neolog-videos`) |
@@ -2288,7 +2362,7 @@ The bootstrap workflow:
 - Auto-triggers on every push to `main`
 - Can be manually re-run from the GitHub Actions tab (https://github.com/crystalford/neolog/actions → "Bootstrap Cloudflare" → "Run workflow")
 - Reads credentials from GitHub repo secrets (already configured — see `docs/CREDENTIALS.md`)
-- Provisions D1, R2, Workers, Workflows, Container, Access, Pages bindings, and deploys — idempotent, safe to re-run
+- Provisions D1, R2, Workers, Workflows, Container, Access, the app Worker's bindings, and deploys — idempotent, safe to re-run
 
 The operator's role after a push: wait for the Actions run to finish (or manually re-trigger if I didn't push a code change), then sign in via Cloudflare Access. That's it. Never tell them to run anything locally.
 

@@ -18,10 +18,10 @@
  *          and best-effort deletes the R2 objects (original + transcoded).
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
 import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -42,7 +42,7 @@ interface Env extends R2Env {
 // ─── POST: register a vlog after the upload completes ───────────────────────
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {
@@ -244,7 +244,7 @@ async function dispatchPipeline(
 // ─── GET: list vlogs ────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {
@@ -350,7 +350,7 @@ export async function GET(req: NextRequest) {
 // ─── DELETE: remove a vlog ──────────────────────────────────────────────────
 
 export async function DELETE(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {

@@ -30,8 +30,6 @@
  * and the record is what home is for now.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'

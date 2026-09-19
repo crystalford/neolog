@@ -12,8 +12,6 @@
  * is the disclosure, and it is why the essay's claim means anything.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

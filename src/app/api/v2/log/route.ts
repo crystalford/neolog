@@ -20,10 +20,10 @@
  * which is what `buried` in the response is for.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { buildFold, OPEN_DAYS } from '@/lib/fold'
@@ -90,7 +90,7 @@ async function presignAll(env: Env, keys: (string | null)[]): Promise<(string | 
 const NEEDS_URL = new WeakMap<LogEntry, { key: string; slot: 'url' | 'poster_url' }>()
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
@@ -475,7 +475,7 @@ export async function GET(req: NextRequest) {
   // A picture the check already refused is not re-asked; its `held_reason`
   // says what the log saw, and asking again would eventually release
   // something it held on purpose.
-  getRequestContext().ctx.waitUntil(
+  getCloudflareContext().ctx.waitUntil(
     lookAtHeldBacklog(env as never, db, operator.id, 6)
       .catch(err => console.warn('[log] hold-back backlog:', err?.message || err)),
   )

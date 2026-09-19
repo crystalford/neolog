@@ -13,9 +13,9 @@
  * will not write one — "the log will not draft a sentence about a person."
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import Link from 'next/link'
 import { getDb, findOne } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
@@ -34,7 +34,7 @@ import { StartAgain } from './StartAgain'
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 export default async function SettingsPage() {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const h = await headers()
   const req = new Request('https://neolog.ai/settings', {
     headers: { cookie: h.get('cookie') || '', 'cf-access-jwt-assertion': h.get('cf-access-jwt-assertion') || '' },

@@ -34,10 +34,10 @@
  * confirmation token in the body, and it reports what it removed.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, run, findOne } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -74,7 +74,7 @@ const VLOG_DERIVED = [
 const OPERATOR_DERIVED = ['profile_digest', 'profile_refreshed_at', 'spark_seeds_json', 'spark_seeds_refreshed_at']
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

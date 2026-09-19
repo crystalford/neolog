@@ -37,8 +37,6 @@
  * The words underneath are his: what was replaced, and what replaced it.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

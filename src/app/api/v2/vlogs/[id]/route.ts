@@ -17,10 +17,10 @@
  * believed.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, findMany } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
@@ -39,7 +39,7 @@ const DATE_SOURCE: Record<string, string> = {
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
@@ -162,7 +162,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
  */
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

@@ -17,10 +17,10 @@
  * Idempotent: if a thumbnail (either thumbnail_url or thumbnail_r2_key) is
  * already set, returns immediately with the existing URL.
  */
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
@@ -37,7 +37,7 @@ const MIN_JPEG_BYTES = 1024  // <1KB → known DJI HEVC rotation bug, force asyn
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 // is broken or unavailable.
 export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {

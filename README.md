@@ -32,8 +32,9 @@ reached from the page it belongs to.
 
 ## Running on
 
-Cloudflare, entirely. Pages, R2 (the recordings), D1 (the log), Workers,
-Workers AI (Whisper), Access, and FFmpeg in a Container Worker. One bill.
+Cloudflare, entirely. Workers (with static assets), R2 (the recordings),
+D1 (the log), Workflows, Workers AI (Whisper), Access, and FFmpeg in a
+Container Worker. One bill.
 
 ## History
 

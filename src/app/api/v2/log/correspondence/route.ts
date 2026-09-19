@@ -19,10 +19,10 @@
  * refused with the speakers it found so the caller can ask him.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, run, batch as d1Batch } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -43,7 +43,7 @@ async function operatorOr401(req: NextRequest, env: Env) {
 }
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
   const db = await readyDb(getDb(env), 'correspondence')
@@ -112,7 +112,7 @@ function placeMessages(parsed: ParsedMessage[], startedAt: string | null): {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
   const db = await readyDb(getDb(env), 'correspondence')

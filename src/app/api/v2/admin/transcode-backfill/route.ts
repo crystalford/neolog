@@ -17,13 +17,13 @@
  * Idempotent: the transcode step skips vlogs that already have the artifact.
  */
 
+export const dynamic = 'force-dynamic'
+
 import { type NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
-
-export const runtime = 'edge'
 
 interface Env {
   DB: D1Database
@@ -33,7 +33,7 @@ interface Env {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try { operator = await requireOperator(req, env) }

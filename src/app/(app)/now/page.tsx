@@ -13,8 +13,6 @@
  * settles, says one word, and clears itself for the next thing.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useIntake } from '@/components/useIntake'

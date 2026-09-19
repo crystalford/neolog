@@ -31,10 +31,10 @@
  * their own surface for that (`entry_revisions` via `PATCH /api/v2/log/[id]`).
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, findMany, run } from '@/lib/d1'
 import { ulid } from '@/lib/ulid'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -48,7 +48,7 @@ const WORDS_LIMIT = 20000
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

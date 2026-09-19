@@ -32,8 +32,6 @@
  * already live.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

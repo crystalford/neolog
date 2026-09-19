@@ -14,8 +14,6 @@
  * things and opened onto an empty list would be worse than no door.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

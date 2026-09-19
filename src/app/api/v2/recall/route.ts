@@ -10,10 +10,10 @@
  * interrupted by it.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -24,7 +24,7 @@ import type { D1Database } from '@cloudflare/workers-types'
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
 export async function GET(req: NextRequest) {
-  const { env: rawEnv, ctx } = getRequestContext()
+  const { env: rawEnv, ctx } = getCloudflareContext()
   const env = rawEnv as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
