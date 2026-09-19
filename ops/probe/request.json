@@ -1,5 +1,4 @@
 {
-  "method": "POST",
-  "path": "/api/v2/dev/replay/01KRMN2EW5STACT7XP07VBM35Q",
-  "body": {"from": "audio_extract", "force": true}
+  "method": "GET",
+  "path": "/api/v2/admin/pipeline-state?nonce=absolute-final-1758246200"
 }
