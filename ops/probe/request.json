@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/log/read?nonce=afterdiskfix-entries-1758243200"
+  "path": "/api/v2/vlogs?status=failed&limit=15&nonce=final10-1758243400"
 }
