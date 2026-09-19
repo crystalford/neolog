@@ -1,11 +1,37 @@
 {
-  "requested_at": "2026-09-19T19:19:30Z",
+  "requested_at": "2026-09-19T19:36:58Z",
   "method": "GET",
-  "path": "/api/v2/log?limit=1&nonce=workers-dev-verify-2",
-  "http_status": 401,
-  "access_headers": "cf-ray: a3daf13f5da5b506-IAD\r|",
-  "body": "{\"error\":\"Unauthenticated\"}",
+  "path": "/api/debug/whoami?nonce=post-restore-check-1",
+  "http_status": 200,
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3db0ad59eabc6f1-ORD\r|",
+  "body": "{\"access_email_header\":false,\"you\":null,\"access_cookie\":true,\"headers_seen\":[\"accept\",\"accept-encoding\",\"cf-access-jwt-assertion\",\"cf-connecting-ip\",\"cf-connecting-o2o\",\"cf-ipcountry\",\"cf-ray\",\"cf-visitor\",\"connection\",\"cookie\",\"host\",\"user-agent\",\"x-forwarded-for\",\"x-forwarded-proto\",\"x-real-ip\",\"x-vercel-ip-city\",\"x-vercel-ip-country\",\"x-vercel-ip-country-region\",\"x-vercel-ip-latitude\",\"x-vercel-ip-longitude\",\"x-vercel-sc-host\"],\"note\":\"Booleans and header names only. If access_email_header is false, the Access application is not in front of this path.\"}",
   "body_json": {
-    "error": "Unauthenticated"
+    "access_email_header": false,
+    "you": null,
+    "access_cookie": true,
+    "headers_seen": [
+      "accept",
+      "accept-encoding",
+      "cf-access-jwt-assertion",
+      "cf-connecting-ip",
+      "cf-connecting-o2o",
+      "cf-ipcountry",
+      "cf-ray",
+      "cf-visitor",
+      "connection",
+      "cookie",
+      "host",
+      "user-agent",
+      "x-forwarded-for",
+      "x-forwarded-proto",
+      "x-real-ip",
+      "x-vercel-ip-city",
+      "x-vercel-ip-country",
+      "x-vercel-ip-country-region",
+      "x-vercel-ip-latitude",
+      "x-vercel-ip-longitude",
+      "x-vercel-sc-host"
+    ],
+    "note": "Booleans and header names only. If access_email_header is false, the Access application is not in front of this path."
   }
 }
