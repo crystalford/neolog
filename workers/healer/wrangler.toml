@@ -23,17 +23,15 @@ compatibility_flags = ["nodejs_compat"]
 account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 
 [triggers]
-# Cron ON, 17 Sep 2026 — the operator's call, for the duration of the
-# 420-recording corpus run. It was off (`crons = []`) because a five-minute
-# sweep is 8,640 invocations/month of ambient cost on a quiet log where a
-# stuck row is rare. It is not rare during this run: a real bug in the
-# pipeline's own step-to-step alarm chaining (see STEP_CHAIN_DELAY_MS in
-# workers/pipeline/src/index.ts) is silently orphaning DOs mid-chain under
-# bulk load, and this sweep is what finds and re-arms them.
-#
-# Turn back off (`crons = []`) once the corpus is read, the same way it was
-# reasoned about before turning it on.
-crons = ["*/5 * * * *"]
+# Cron OFF again, 19 Sep 2026 — the operator's call. It was ON from 17 Sep
+# for the duration of the 420-recording corpus run: a real bug in the
+# pipeline's own step-to-step alarm chaining was silently orphaning DOs
+# mid-chain under bulk load, and this sweep is what found and re-armed them.
+# The run finished at 341 of 420 recordings read (2,279 entries), the operator
+# confirmed the run is done, and a five-minute sweep is 8,640 invocations/month
+# of ambient cost on a quiet log where a stuck row is rare again. If another
+# bulk run is ever needed, turn it back on the same way, for the same reason.
+crons = []
 
 [[d1_databases]]
 binding = "DB"
