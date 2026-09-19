@@ -49,7 +49,10 @@ ok('and there are seven of them', KINDS.length === 7)
     /ENTRY_KINDS\.includes\(body\.kind/.test(route))
   ok('and records what it used to be filed as', /note\('kind'/.test(route))
 
-  const page = strip(readFileSync('src/app/(app)/entry/[id]/page.tsx', 'utf8'))
+  // Next 15 made page `params` a Promise; React 18 (pinned here) has no
+  // `use()` to unwrap one in a Client Component, so this markup moved to a
+  // sibling EntryPageClient.tsx behind a thin async server page.tsx.
+  const page = strip(readFileSync('src/app/(app)/entry/[id]/EntryPageClient.tsx', 'utf8'))
   ok('the entry rail offers every other kind',
     /ENTRY_KINDS\.filter\(k => k !== e\.kind\)/.test(page))
   ok('and patches with it', /patch\(\{ kind: k \}\)/.test(page))
@@ -63,7 +66,7 @@ ok('and there are seven of them', KINDS.length === 7)
 // everywhere it is named, and none has been left out of the words the log
 // uses for it.
 {
-  const page = readFileSync('src/app/(app)/entry/[id]/page.tsx', 'utf8')
+  const page = readFileSync('src/app/(app)/entry/[id]/EntryPageClient.tsx', 'utf8')
   const words = /const KIND_WORD[^=]*=\s*\{([\s\S]*?)\n\}/.exec(page)?.[1] ?? ''
   for (const k of KINDS) {
     ok(`\`${k}\` has a word the log says for it`, new RegExp(`\\b${k}\\s*:`).test(words))

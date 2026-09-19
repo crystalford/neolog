@@ -34,7 +34,8 @@ interface Env {
   NEOLOG_DEV_OPERATOR_EMAIL?: string
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
 
   try {

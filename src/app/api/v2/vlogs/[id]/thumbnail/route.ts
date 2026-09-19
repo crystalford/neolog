@@ -35,7 +35,8 @@ interface Env extends R2Env {
 
 const MIN_JPEG_BYTES = 1024  // <1KB → known DJI HEVC rotation bug, force async
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
 
   let operator
@@ -197,7 +198,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 // Routes around the FFmpeg container entirely — used by the client-side
 // "Fix thumbnails in browser" path on /uploads when the server-side cascade
 // is broken or unavailable.
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
 
   let operator

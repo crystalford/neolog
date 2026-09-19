@@ -41,7 +41,8 @@ async function operatorOr401(req: NextRequest, env: Env) {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error
@@ -71,7 +72,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ ...r, came_from: came }, { headers: { 'Cache-Control': 'no-store' } })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await operatorOr401(req, env)
   if (error) return error

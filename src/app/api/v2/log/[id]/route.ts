@@ -47,7 +47,8 @@ const VISIBILITIES = new Set<Visibility>(['public', 'private', 'held'])
  * gesture — so this returns everything the row didn't show: the transcript,
  * the file behind it, both dates, and who wrote each line.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -255,7 +256,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   )
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }

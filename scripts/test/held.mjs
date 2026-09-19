@@ -52,8 +52,12 @@ const strip = src => src
 }
 
 // ── The entry page renders no URL for a held entry ───────────────────────
+// Next 15 made page `params` a Promise; React 18 (pinned here) has no
+// `use()` to unwrap one in a Client Component, so the markup this checks
+// moved to a sibling EntryPageClient.tsx behind a thin async server
+// page.tsx that just awaits params. Same markup, same classes.
 {
-  const code = strip(readFileSync('src/app/(app)/entry/[id]/page.tsx', 'utf8'))
+  const code = strip(readFileSync('src/app/(app)/entry/[id]/EntryPageClient.tsx', 'utf8'))
 
   ok('a held entry renders the design’s placeholder',
     /className="still"/.test(code) && /not shown/.test(code))
