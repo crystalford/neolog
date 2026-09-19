@@ -1,5 +1,4 @@
 {
-  "method": "POST",
-  "path": "/api/v2/dev/replay/01KRMW8JT8JRR6VXABRRGCPQ5Q",
-  "body": {"from": "audio_extract", "force": true}
+  "method": "GET",
+  "path": "/api/v2/vlogs/01KRMW8JT8JRR6VXABRRGCPQ5Q?nonce=check-force-1758243900"
 }
