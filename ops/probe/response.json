@@ -1,50 +1,163 @@
 {
-  "requested_at": "2026-09-19T19:44:49Z",
+  "requested_at": "2026-09-19T19:46:08Z",
   "method": "GET",
-  "path": "/api/debug/whoami?nonce=post-cutover-check-1",
+  "path": "/api/v2/log?limit=2&nonce=post-cutover-check-2",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3db16504b0c8c16-LAX\r|",
-  "body": "{\"access_email_header\":false,\"you\":null,\"access_cookie\":true,\"headers_seen\":[\"accept\",\"accept-encoding\",\"cf-access-jwt-assertion\",\"cf-connecting-ip\",\"cf-ipcountry\",\"cf-ray\",\"cf-visitor\",\"connection\",\"cookie\",\"host\",\"permissions-policy\",\"referrer-policy\",\"strict-transport-security\",\"user-agent\",\"x-content-type-options\",\"x-forwarded-host\",\"x-forwarded-port\",\"x-forwarded-proto\",\"x-frame-options\",\"x-open-next-city\",\"x-open-next-country\",\"x-open-next-latitude\",\"x-open-next-longitude\",\"x-open-next-region\",\"x-opennext-initial-url\",\"x-opennext-request-id\",\"x-opennext-resolved-routes\",\"x-opennext-rewrite-status-code\",\"x-real-ip\",\"x-vercel-ip-city\",\"x-vercel-ip-country\",\"x-vercel-ip-country-region\",\"x-vercel-ip-latitude\",\"x-vercel-ip-longitude\"],\"note\":\"Booleans and header names only. If access_email_header is false, the Access application is not in front of this path.\"}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3db183a1d2aa68b-ORD\r|",
+  "body": "{\"items\":[{\"id\":\"01M2SGGVN1WPQEZPK9C1FYAJW5\",\"source\":\"entry\",\"kind\":\"said\",\"sentence\":\"Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.\",\"detail\":null,\"happened_at\":\"2026-07-02T09:54:05.000Z\",\"logged_at\":\"2026-09-18T05:41:09.409Z\",\"date_precision\":\"exact\",\"visibility\":\"public\",\"held_reason\":null,\"author\":\"operator\",\"href\":\"/entry/01M2SGGVN1WPQEZPK9C1FYAJW5\",\"media\":[],\"duration_seconds\":null,\"batch_id\":null,\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source_ref\":\"said:01KXZQMFBG90X6H9HTNCWREB4V:0\",\"on_route\":false,\"searchable\":\"thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you.\"},{\"id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source\":\"vlog\",\"kind\":\"made\",\"sentence\":\"Recorded a video.\",\"detail\":null,\"happened_at\":\"2026-07-02T09:54:05.000Z\",\"logged_at\":\"2026-07-20 12:22:25\",\"date_precision\":\"exact\",\"visibility\":\"private\",\"held_reason\":null,\"author\":\"log\",\"href\":\"/vlog/01KXZQMFBG90X6H9HTNCWREB4V\",\"media\":[{\"kind\":\"video\",\"url\":null,\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZQMFBG90X6H9HTNCWREB4V.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T194608Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=158310e837f7a4b0aed052b1a67f3b54499329eca55ee03a420c28f3a34b5c01\",\"duration_seconds\":null,\"label\":\"DJI_20260702095405_0062_D.MP4\"}],\"duration_seconds\":null,\"batch_id\":null,\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source_ref\":null,\"searchable\":\"dji_20260702095405_0062_d.mp4 thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you.\"}],\"total\":4,\"order\":\"happened\",\"filter\":\"all\",\"buried\":0,\"buried_by_day\":{},\"coverage\":{\"2025\":93,\"2026\":2694},\"fold\":[{\"grain\":\"week\",\"from\":\"2026-06-27\",\"to\":\"2026-07-03\",\"label\":\"27 Jun – 3 Jul\",\"count\":36,\"spans\":1,\"line\":\"And that's also what I'm now finally, and it sounds crazy because it's like, I'm finally actually figuring out how this is happening. Like what's actually going on under the hood…\",\"line_entry_id\":\"01M2SGJM5XDSX8ZTGJZRB4EGP8\"},{\"grain\":\"week\",\"from\":\"2026-06-20\",\"to\":\"2026-06-26\",\"label\":\"20 – 26 Jun\",\"count\":1,\"spans\":1,\"line\":\"We managed to get this thing out of Italy where the state would have claimed it. No one knows it exists. No one knows it ever existed. One cannot steal what's ever been missing. …\",\"line_entry_id\":\"01M2RDFTJJ05V13FKY568Q1WFQ\"},{\"grain\":\"month\",\"from\":\"2026-06-01\",\"to\":\"2026-06-19\",\"label\":\"Jun 2026\",\"count\":330,\"spans\":1,\"line\":\"This is a genuinely deep question about how knowledge accretes, and you've found a real design problem, not a confusion, an actual architectural fork. Here's the problem you've s…\",\"line_entry_id\":\"01M2SGK565V8C8E9DESCVZJKMH\"},{\"grain\":\"month\",\"from\":\"2026-05-01\",\"to\":\"2026-05-31\",\"label\":\"May 2026\",\"count\":573,\"spans\":1,\"line\":\"said differently most of what's out there on knowledge representation comes from a gutenberg era assumption knowledge is propositional atomic claims true false linked by typed pr…\",\"line_entry_id\":\"01M2RDHSR24V752R19Z418Y5XP\"},{\"grain\":\"month\",\"from\":\"2026-04-01\",\"to\":\"2026-04-30\",\"label\":\"Apr 2026\",\"count\":280,\"spans\":1,\"line\":\"with AI. And it's like, I see none of it. It doesn't exist yet. But, it's gonna be crazy. Trust me, bro. It's true. Like, I believe that. I know it's gonna be fucking insane and …\",\"line_entry_id\":\"01M2RD6G9FP3ZT96F93518ZYS2\"},{\"grain\":\"month\",\"from\":\"2026-03-01\",\"to\":\"2026-03-31\",\"label\":\"Mar 2026\",\"count\":468,\"spans\":1,\"line\":\"So, I just passed OATC Hamilton Clinic, and you can spot these people right away. Firstly, they're lined up right in the morning, right? Secondly, they're all fucking sketched ou…\",\"line_entry_id\":\"01M2RD24CJQT38KA0H9S5VARHR\"},{\"grain\":\"month\",\"from\":\"2026-02-01\",\"to\":\"2026-02-28\",\"label\":\"Feb 2026\",\"count\":524,\"spans\":1,\"line\":\"Okay. That's actually not true. Prince of Shadows, that's a misconception because Prince of Shadows says, To be fair, deleting your streams when they're done heavily tanks irrele…\",\"line_entry_id\":\"01M2RCZ4FWGFM171Z1SB3V2SNK\"},{\"grain\":\"month\",\"from\":\"2026-01-01\",\"to\":\"2026-01-31\",\"label\":\"Jan 2026\",\"count\":75,\"spans\":1,\"line\":\"and i'm just thinking about the ai you know and the youtube and the algorithms and all that stuff like at this point just saying that i have had two weeks off of youtube there sh…\",\"line_entry_id\":\"01M2SG1CAEX1HMPK9RE2NX76SX\"},{\"grain\":\"year\",\"from\":\"2025-01-01\",\"to\":\"2025-12-31\",\"label\":\"2025\",\"count\":80,\"spans\":1,\"line\":\"and this is what i was but the attention economy and that whole whole aspect in the algorithm because at a certain point like if you get into that threshold and of like super vol…\",\"line_entry_id\":\"01M2RD595CJVNTFZ8PMWSJ11T5\"}],\"open_days\":14}",
   "body_json": {
-    "access_email_header": false,
-    "you": null,
-    "access_cookie": true,
-    "headers_seen": [
-      "accept",
-      "accept-encoding",
-      "cf-access-jwt-assertion",
-      "cf-connecting-ip",
-      "cf-ipcountry",
-      "cf-ray",
-      "cf-visitor",
-      "connection",
-      "cookie",
-      "host",
-      "permissions-policy",
-      "referrer-policy",
-      "strict-transport-security",
-      "user-agent",
-      "x-content-type-options",
-      "x-forwarded-host",
-      "x-forwarded-port",
-      "x-forwarded-proto",
-      "x-frame-options",
-      "x-open-next-city",
-      "x-open-next-country",
-      "x-open-next-latitude",
-      "x-open-next-longitude",
-      "x-open-next-region",
-      "x-opennext-initial-url",
-      "x-opennext-request-id",
-      "x-opennext-resolved-routes",
-      "x-opennext-rewrite-status-code",
-      "x-real-ip",
-      "x-vercel-ip-city",
-      "x-vercel-ip-country",
-      "x-vercel-ip-country-region",
-      "x-vercel-ip-latitude",
-      "x-vercel-ip-longitude"
+    "items": [
+      {
+        "id": "01M2SGGVN1WPQEZPK9C1FYAJW5",
+        "source": "entry",
+        "kind": "said",
+        "sentence": "Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.",
+        "detail": null,
+        "happened_at": "2026-07-02T09:54:05.000Z",
+        "logged_at": "2026-09-18T05:41:09.409Z",
+        "date_precision": "exact",
+        "visibility": "public",
+        "held_reason": null,
+        "author": "operator",
+        "href": "/entry/01M2SGGVN1WPQEZPK9C1FYAJW5",
+        "media": [],
+        "duration_seconds": null,
+        "batch_id": null,
+        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
+        "source_ref": "said:01KXZQMFBG90X6H9HTNCWREB4V:0",
+        "on_route": false,
+        "searchable": "thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you."
+      },
+      {
+        "id": "01KXZQMFBG90X6H9HTNCWREB4V",
+        "source": "vlog",
+        "kind": "made",
+        "sentence": "Recorded a video.",
+        "detail": null,
+        "happened_at": "2026-07-02T09:54:05.000Z",
+        "logged_at": "2026-07-20 12:22:25",
+        "date_precision": "exact",
+        "visibility": "private",
+        "held_reason": null,
+        "author": "log",
+        "href": "/vlog/01KXZQMFBG90X6H9HTNCWREB4V",
+        "media": [
+          {
+            "kind": "video",
+            "url": null,
+            "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZQMFBG90X6H9HTNCWREB4V.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T194608Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=158310e837f7a4b0aed052b1a67f3b54499329eca55ee03a420c28f3a34b5c01",
+            "duration_seconds": null,
+            "label": "DJI_20260702095405_0062_D.MP4"
+          }
+        ],
+        "duration_seconds": null,
+        "batch_id": null,
+        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
+        "source_ref": null,
+        "searchable": "dji_20260702095405_0062_d.mp4 thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you."
+      }
     ],
-    "note": "Booleans and header names only. If access_email_header is false, the Access application is not in front of this path."
+    "total": 4,
+    "order": "happened",
+    "filter": "all",
+    "buried": 0,
+    "buried_by_day": {},
+    "coverage": {
+      "2025": 93,
+      "2026": 2694
+    },
+    "fold": [
+      {
+        "grain": "week",
+        "from": "2026-06-27",
+        "to": "2026-07-03",
+        "label": "27 Jun – 3 Jul",
+        "count": 36,
+        "spans": 1,
+        "line": "And that's also what I'm now finally, and it sounds crazy because it's like, I'm finally actually figuring out how this is happening. Like what's actually going on under the hood…",
+        "line_entry_id": "01M2SGJM5XDSX8ZTGJZRB4EGP8"
+      },
+      {
+        "grain": "week",
+        "from": "2026-06-20",
+        "to": "2026-06-26",
+        "label": "20 – 26 Jun",
+        "count": 1,
+        "spans": 1,
+        "line": "We managed to get this thing out of Italy where the state would have claimed it. No one knows it exists. No one knows it ever existed. One cannot steal what's ever been missing. …",
+        "line_entry_id": "01M2RDFTJJ05V13FKY568Q1WFQ"
+      },
+      {
+        "grain": "month",
+        "from": "2026-06-01",
+        "to": "2026-06-19",
+        "label": "Jun 2026",
+        "count": 330,
+        "spans": 1,
+        "line": "This is a genuinely deep question about how knowledge accretes, and you've found a real design problem, not a confusion, an actual architectural fork. Here's the problem you've s…",
+        "line_entry_id": "01M2SGK565V8C8E9DESCVZJKMH"
+      },
+      {
+        "grain": "month",
+        "from": "2026-05-01",
+        "to": "2026-05-31",
+        "label": "May 2026",
+        "count": 573,
+        "spans": 1,
+        "line": "said differently most of what's out there on knowledge representation comes from a gutenberg era assumption knowledge is propositional atomic claims true false linked by typed pr…",
+        "line_entry_id": "01M2RDHSR24V752R19Z418Y5XP"
+      },
+      {
+        "grain": "month",
+        "from": "2026-04-01",
+        "to": "2026-04-30",
+        "label": "Apr 2026",
+        "count": 280,
+        "spans": 1,
+        "line": "with AI. And it's like, I see none of it. It doesn't exist yet. But, it's gonna be crazy. Trust me, bro. It's true. Like, I believe that. I know it's gonna be fucking insane and …",
+        "line_entry_id": "01M2RD6G9FP3ZT96F93518ZYS2"
+      },
+      {
+        "grain": "month",
+        "from": "2026-03-01",
+        "to": "2026-03-31",
+        "label": "Mar 2026",
+        "count": 468,
+        "spans": 1,
+        "line": "So, I just passed OATC Hamilton Clinic, and you can spot these people right away. Firstly, they're lined up right in the morning, right? Secondly, they're all fucking sketched ou…",
+        "line_entry_id": "01M2RD24CJQT38KA0H9S5VARHR"
+      },
+      {
+        "grain": "month",
+        "from": "2026-02-01",
+        "to": "2026-02-28",
+        "label": "Feb 2026",
+        "count": 524,
+        "spans": 1,
+        "line": "Okay. That's actually not true. Prince of Shadows, that's a misconception because Prince of Shadows says, To be fair, deleting your streams when they're done heavily tanks irrele…",
+        "line_entry_id": "01M2RCZ4FWGFM171Z1SB3V2SNK"
+      },
+      {
+        "grain": "month",
+        "from": "2026-01-01",
+        "to": "2026-01-31",
+        "label": "Jan 2026",
+        "count": 75,
+        "spans": 1,
+        "line": "and i'm just thinking about the ai you know and the youtube and the algorithms and all that stuff like at this point just saying that i have had two weeks off of youtube there sh…",
+        "line_entry_id": "01M2SG1CAEX1HMPK9RE2NX76SX"
+      },
+      {
+        "grain": "year",
+        "from": "2025-01-01",
+        "to": "2025-12-31",
+        "label": "2025",
+        "count": 80,
+        "spans": 1,
+        "line": "and this is what i was but the attention economy and that whole whole aspect in the algorithm because at a certain point like if you get into that threshold and of like super vol…",
+        "line_entry_id": "01M2RD595CJVNTFZ8PMWSJ11T5"
+      }
+    ],
+    "open_days": 14
   }
 }
