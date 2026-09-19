@@ -18,13 +18,14 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "diagnose (read-only) or cutover (makes the change)"
+        description: "diagnose (read-only), cutover (makes the change), or restore-pages (emergency rollback: re-add the domain to the Pages project)"
         required: true
         default: 'diagnose'
         type: choice
         options:
           - diagnose
           - cutover
+          - restore-pages
 
 permissions:
   contents: read
@@ -108,3 +109,22 @@ jobs:
             exit 1
           fi
           echo "✅ $DOMAIN is now a Workers Custom Domain pointed at '$WORKER_NAME'."
+
+      - name: Restore Pages custom domain (emergency rollback)
+        if: ${{ inputs.action == 'restore-pages' }}
+        run: |
+          set -e
+          echo "Re-adding $DOMAIN to Pages project '$PAGES_PROJECT'..."
+          restore_resp=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/domains" \
+            -d '{"name":"'"$DOMAIN"'"}')
+          restore_status=$(echo "$restore_resp" | tail -n1)
+          restore_body=$(echo "$restore_resp" | sed '$d')
+          echo "$restore_body" | jq . || echo "$restore_body"
+          if [ "$restore_status" != "200" ] && [ "$restore_status" != "201" ]; then
+            echo "❌ Failed to restore Pages domain (HTTP $restore_status)."
+            exit 1
+          fi
+          echo "✅ $DOMAIN restored to Pages project '$PAGES_PROJECT'."
