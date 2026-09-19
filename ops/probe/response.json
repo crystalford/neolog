@@ -1,40 +1,14 @@
 {
-  "requested_at": "2026-09-19T12:49:05Z",
+  "requested_at": "2026-09-19T12:49:42Z",
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=absolute-final-1758246200",
+  "path": "/api/v2/log/read?nonce=absolute-final-entries-1758246500",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3d8b556c919b1ab-LAX\r|",
-  "body": "{\"total\":420,\"by_status\":{\"read\":368,\"transcribed_only\":38,\"words_missing\":0,\"untranscribed\":4,\"stuck_in_flight\":2,\"in_flight_recent\":7,\"archived\":0,\"failed\":1},\"failure_breakdown\":{\"other\":3},\"stuck_examples\":[{\"id\":\"01KRCXXJ054HXDSFFXFQBD9Q3X\",\"status\":\"transcoding\",\"stuck_minutes\":6},{\"id\":\"01KRMNWSQRGP60YVTP4CJPZMFS\",\"status\":\"transcoding\",\"stuck_minutes\":5}],\"counts_for_run\":{\"needs_transcribing\":7,\"ready_to_read\":38}}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3d8b638782de8ef-LAX\r|",
+  "body": "{\"recordings\":420,\"transcribed\":410,\"read\":372,\"entries\":2367}",
   "body_json": {
-    "total": 420,
-    "by_status": {
-      "read": 368,
-      "transcribed_only": 38,
-      "words_missing": 0,
-      "untranscribed": 4,
-      "stuck_in_flight": 2,
-      "in_flight_recent": 7,
-      "archived": 0,
-      "failed": 1
-    },
-    "failure_breakdown": {
-      "other": 3
-    },
-    "stuck_examples": [
-      {
-        "id": "01KRCXXJ054HXDSFFXFQBD9Q3X",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      },
-      {
-        "id": "01KRMNWSQRGP60YVTP4CJPZMFS",
-        "status": "transcoding",
-        "stuck_minutes": 5
-      }
-    ],
-    "counts_for_run": {
-      "needs_transcribing": 7,
-      "ready_to_read": 38
-    }
+    "recordings": 420,
+    "transcribed": 410,
+    "read": 372,
+    "entries": 2367
   }
 }
