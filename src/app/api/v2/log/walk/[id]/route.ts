@@ -19,7 +19,8 @@ import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }

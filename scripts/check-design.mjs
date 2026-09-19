@@ -53,7 +53,12 @@ const PAGES = [
   // with no way to say it. The design's third button is "Talk it out",
   // which is the offer and stays below the fence.
   ['log',        'src/app/(app)/page.tsx',              0],
-  ['entry',      'src/app/(app)/entry/[id]/page.tsx',   0],
+  // Next 15 made page `params` a Promise; React 18 (pinned here) has no
+  // `use()` to unwrap one in a Client Component, so the markup moved to a
+  // sibling `EntryPageClient.tsx` behind a thin async server `page.tsx`
+  // that just awaits params and passes the id down. Same markup, same
+  // classes — only the path changed.
+  ['entry',      'src/app/(app)/entry/[id]/EntryPageClient.tsx',   0],
   ['headings',   'src/app/(app)/pages/page.tsx',         0],
   // 12 → 10 on 9 Sep. `person.html` puts the page's own open question at the
   // top of its rail in a warm-bordered card (`.rc warm` + `.a`), and it is
@@ -66,7 +71,8 @@ const PAGES = [
   // page explaining its own mechanic, and `.d .how .auto .first .sh .pl` are
   // that page's own mention-row shape — this page renders the feed's rows,
   // because SPEC §3 says nothing is designed twice.
-  ['person',     'src/app/(app)/page/[id]/page.tsx',    10],
+  // Same split as 'entry' above — markup lives in PageViewClient.tsx now.
+  ['person',     'src/app/(app)/page/[id]/PageViewClient.tsx',    10],
   // 7 → 1 on 9 Sep. The hit was `.pt` wrapping the meta — the design's shape
   // inverted, so the date, the provenance and the passage number all took
   // quoted-text styling. `.d fz` is the one that mattered: a date the log had
@@ -91,7 +97,8 @@ const PAGES = [
   // `.a` — "Talk it out later", a button under the month's paragraph
   // suggesting he record something about the month — is the offer, and the
   // offer is below the fence. §0 rule 2: the log is quiet.
-  ['month',      'src/app/(app)/month/[ym]/page.tsx',   6],
+  // Same split as 'entry' above — markup lives in MonthPageClient.tsx now.
+  ['month',      'src/app/(app)/month/[ym]/MonthPageClient.tsx',   6],
   // 4 → 1 on 9 Sep. ⚠️ The year headings were `.idxband`, which is /pages'
   // index band — a page taking another page's furniture. onthisday.html has
   // its own: `.yr` is the block and `.y` the year, and `.yr` is a two-column

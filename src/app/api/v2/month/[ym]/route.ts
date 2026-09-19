@@ -34,7 +34,8 @@ async function op(req: NextRequest, env: Env) {
   }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { ym: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error
@@ -45,7 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: { ym: string }
   )
 }
 
-export async function POST(req: NextRequest, { params }: { params: { ym: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error
@@ -56,7 +58,8 @@ export async function POST(req: NextRequest, { params }: { params: { ym: string 
   )
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { ym: string } }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error

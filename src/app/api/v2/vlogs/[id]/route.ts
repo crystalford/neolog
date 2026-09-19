@@ -37,7 +37,8 @@ const DATE_SOURCE: Record<string, string> = {
   upload_time_default: 'the time it uploaded — the file carried no clock',
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -159,7 +160,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  * buried with it — they are its words, and leaving them on the feed pointing
  * at a recording that is gone from it would be a worse state than either.
  */
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }

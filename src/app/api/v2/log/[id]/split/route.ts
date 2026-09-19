@@ -62,7 +62,8 @@ interface Row {
   grounded: number | null; led_from: string | null; relation: string | null
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }

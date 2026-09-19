@@ -30,7 +30,7 @@ function check(name, got, want) {
 }
 function ok(name, cond) { check(name, !!cond, true) }
 
-/** The cut, copied from `src/app/(app)/month/[ym]/page.tsx`. */
+/** The cut, copied from `src/app/(app)/month/[ym]/MonthPageClient.tsx`. */
 function weeksOf(yy, mm, daysInMonth) {
   const out = []
   let end = daysInMonth

@@ -46,7 +46,8 @@ interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
 // just guards against a pathological outlier, not normal vlog length.
 const WORDS_LIMIT = 20000
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
@@ -113,7 +114,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
  *
  * Body: { word_index: number, word: string }
  */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const params = await ctx.params
   const env = getRequestContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
