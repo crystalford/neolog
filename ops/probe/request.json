@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/debug/whoami?nonce=post-cutover-check-1"
+  "path": "/api/v2/log?limit=2&nonce=post-cutover-check-2"
 }
