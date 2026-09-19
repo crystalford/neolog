@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=afterdiskfix-1758243000"
+  "path": "/api/v2/log/read?nonce=afterdiskfix-entries-1758243200"
 }
