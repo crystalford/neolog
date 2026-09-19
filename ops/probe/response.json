@@ -1,56 +1,14 @@
 {
-  "requested_at": "2026-09-19T11:59:19Z",
+  "requested_at": "2026-09-19T11:59:54Z",
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=afterdiskfix-1758243000",
+  "path": "/api/v2/log/read?nonce=afterdiskfix-entries-1758243200",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3d86c6e8daea2ba-YUL\r|",
-  "body": "{\"total\":420,\"by_status\":{\"read\":366,\"transcribed_only\":38,\"words_missing\":0,\"untranscribed\":0,\"stuck_in_flight\":5,\"in_flight_recent\":1,\"archived\":0,\"failed\":10},\"failure_breakdown\":{\"other\":23,\"ffmpeg_503\":1},\"stuck_examples\":[{\"id\":\"01KRCXXGSMZ06VAPF8WS36Z8VX\",\"status\":\"transcoding\",\"stuck_minutes\":6},{\"id\":\"01KRCXXJAF1YRQ44G2N0TN488H\",\"status\":\"transcoding\",\"stuck_minutes\":6},{\"id\":\"01KRCXXFSEFZCT8642DY77E9PX\",\"status\":\"transcoding\",\"stuck_minutes\":6},{\"id\":\"01KRCXXGGQTP704GYRYMS1JJT5\",\"status\":\"transcoding\",\"stuck_minutes\":6},{\"id\":\"01KRCXXGF1DQJXQ1VAKEDWTQQW\",\"status\":\"transcoding\",\"stuck_minutes\":6}],\"counts_for_run\":{\"needs_transcribing\":15,\"ready_to_read\":38}}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3d86d47c9ade26e-ORD\r|",
+  "body": "{\"recordings\":420,\"transcribed\":410,\"read\":372,\"entries\":2367}",
   "body_json": {
-    "total": 420,
-    "by_status": {
-      "read": 366,
-      "transcribed_only": 38,
-      "words_missing": 0,
-      "untranscribed": 0,
-      "stuck_in_flight": 5,
-      "in_flight_recent": 1,
-      "archived": 0,
-      "failed": 10
-    },
-    "failure_breakdown": {
-      "other": 23,
-      "ffmpeg_503": 1
-    },
-    "stuck_examples": [
-      {
-        "id": "01KRCXXGSMZ06VAPF8WS36Z8VX",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      },
-      {
-        "id": "01KRCXXJAF1YRQ44G2N0TN488H",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      },
-      {
-        "id": "01KRCXXFSEFZCT8642DY77E9PX",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      },
-      {
-        "id": "01KRCXXGGQTP704GYRYMS1JJT5",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      },
-      {
-        "id": "01KRCXXGF1DQJXQ1VAKEDWTQQW",
-        "status": "transcoding",
-        "stuck_minutes": 6
-      }
-    ],
-    "counts_for_run": {
-      "needs_transcribing": 15,
-      "ready_to_read": 38
-    }
+    "recordings": 420,
+    "transcribed": 410,
+    "read": 372,
+    "entries": 2367
   }
 }
