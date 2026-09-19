@@ -1,15 +1,45 @@
 {
-  "requested_at": "2026-09-19T12:34:22Z",
-  "method": "POST",
-  "path": "/api/v2/dev/replay/01KRMW8JT8JRR6VXABRRGCPQ5Q",
+  "requested_at": "2026-09-19T12:36:43Z",
+  "method": "GET",
+  "path": "/api/v2/vlogs/01KRMW8JT8JRR6VXABRRGCPQ5Q?nonce=verify-fix-1758245200",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3d89fc64c7d81ab-IAD\r|",
-  "body": "{\"ok\":true,\"from\":\"audio_extract\",\"force\":true,\"target_state\":\"queued\",\"dispatched\":true}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3d8a3364f34f7a8-IAD\r|",
+  "body": "{\"vlog\":{\"id\":\"01KRMW8JT8JRR6VXABRRGCPQ5Q\",\"visibility\":\"private\",\"original_filename\":\"DJI_20260510090157_0066_D.MP4\",\"r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KRMW7VCMHG9BKGF63HQQSZ71/DJI_20260510090157_0066_D.MP4\",\"transcoded_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMW8JT8JRR6VXABRRGCPQ5Q.mp4\",\"thumbnail_r2_key\":\"01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMW8JT8JRR6VXABRRGCPQ5Q.jpg\",\"thumbnail_url\":null,\"duration_seconds\":null,\"file_size_bytes\":175367014,\"mime_type\":\"video/mp4\",\"recorded_at\":\"2026-05-10T09:01:57.000Z\",\"recorded_at_source\":\"pre_extracted\",\"created_at\":\"2026-05-15 03:53:10\",\"transcript_text\":\"\",\"transcript_provider\":null,\"transcript_completed_at\":null,\"pipeline_status\":\"complete\",\"extraction_outcomes\":null,\"read_at\":null,\"vision_description\":null,\"frame_note\":null,\"usable\":null,\"play_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMW8JT8JRR6VXABRRGCPQ5Q.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T123643Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=bf6585223552f73f2d2fc1d757f29493b6013f05b765727b5f0867f7bc32fbcf\",\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMW8JT8JRR6VXABRRGCPQ5Q.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T123643Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=4f6bf7964d8223000bf1315bace9a4f9653852f2c72f55f46cba86e33216bda3\",\"date_from\":\"read out of the filename before it uploaded\",\"transcribed_by\":null,\"word_count\":0},\"words\":[],\"entries\":[],\"navigation\":{\"prev_id\":\"01KRMW7V19YAQCV9R5FADF7CTT\",\"next_id\":\"01KRMWEV2QE2MWW4YTJ5KHYHZN\"}}",
   "body_json": {
-    "ok": true,
-    "from": "audio_extract",
-    "force": true,
-    "target_state": "queued",
-    "dispatched": true
+    "vlog": {
+      "id": "01KRMW8JT8JRR6VXABRRGCPQ5Q",
+      "visibility": "private",
+      "original_filename": "DJI_20260510090157_0066_D.MP4",
+      "r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/uploads/01KRMW7VCMHG9BKGF63HQQSZ71/DJI_20260510090157_0066_D.MP4",
+      "transcoded_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMW8JT8JRR6VXABRRGCPQ5Q.mp4",
+      "thumbnail_r2_key": "01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMW8JT8JRR6VXABRRGCPQ5Q.jpg",
+      "thumbnail_url": null,
+      "duration_seconds": null,
+      "file_size_bytes": 175367014,
+      "mime_type": "video/mp4",
+      "recorded_at": "2026-05-10T09:01:57.000Z",
+      "recorded_at_source": "pre_extracted",
+      "created_at": "2026-05-15 03:53:10",
+      "transcript_text": "",
+      "transcript_provider": null,
+      "transcript_completed_at": null,
+      "pipeline_status": "complete",
+      "extraction_outcomes": null,
+      "read_at": null,
+      "vision_description": null,
+      "frame_note": null,
+      "usable": null,
+      "play_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/transcoded/01KRMW8JT8JRR6VXABRRGCPQ5Q.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T123643Z&X-Amz-Expires=21600&X-Amz-SignedHeaders=host&X-Amz-Signature=bf6585223552f73f2d2fc1d757f29493b6013f05b765727b5f0867f7bc32fbcf",
+      "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KRMW8JT8JRR6VXABRRGCPQ5Q.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T123643Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=4f6bf7964d8223000bf1315bace9a4f9653852f2c72f55f46cba86e33216bda3",
+      "date_from": "read out of the filename before it uploaded",
+      "transcribed_by": null,
+      "word_count": 0
+    },
+    "words": [],
+    "entries": [],
+    "navigation": {
+      "prev_id": "01KRMW7V19YAQCV9R5FADF7CTT",
+      "next_id": "01KRMWEV2QE2MWW4YTJ5KHYHZN"
+    }
   }
 }
