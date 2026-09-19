@@ -1,191 +1,52 @@
 {
-  "requested_at": "2026-09-19T18:43:52Z",
+  "requested_at": "2026-09-19T18:46:14Z",
   "method": "GET",
-  "path": "/api/v2/log?limit=3&nonce=next15-pass1-verify-2",
+  "path": "/api/v2/log/01M2SGGVN1WPQEZPK9C1FYAJW5?nonce=next15-pass1-verify-3",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3dabcfc98a32e05-IAD\r|",
-  "body": "{\"items\":[{\"id\":\"01M2SGGVN1WPQEZPK9C1FYAJW5\",\"source\":\"entry\",\"kind\":\"said\",\"sentence\":\"Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.\",\"detail\":null,\"happened_at\":\"2026-07-02T09:54:05.000Z\",\"logged_at\":\"2026-09-18T05:41:09.409Z\",\"date_precision\":\"exact\",\"visibility\":\"public\",\"held_reason\":null,\"author\":\"operator\",\"href\":\"/entry/01M2SGGVN1WPQEZPK9C1FYAJW5\",\"media\":[],\"duration_seconds\":null,\"batch_id\":null,\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source_ref\":\"said:01KXZQMFBG90X6H9HTNCWREB4V:0\",\"on_route\":false,\"searchable\":\"thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you.\"},{\"id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source\":\"vlog\",\"kind\":\"made\",\"sentence\":\"Recorded a video.\",\"detail\":null,\"happened_at\":\"2026-07-02T09:54:05.000Z\",\"logged_at\":\"2026-07-20 12:22:25\",\"date_precision\":\"exact\",\"visibility\":\"private\",\"held_reason\":null,\"author\":\"log\",\"href\":\"/vlog/01KXZQMFBG90X6H9HTNCWREB4V\",\"media\":[{\"kind\":\"video\",\"url\":null,\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZQMFBG90X6H9HTNCWREB4V.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T184351Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=00f4053c03bd08879eca08347facf806dc29e2837be11ad7feae2c4fae13a5b3\",\"duration_seconds\":null,\"label\":\"DJI_20260702095405_0062_D.MP4\"}],\"duration_seconds\":null,\"batch_id\":null,\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source_ref\":null,\"searchable\":\"dji_20260702095405_0062_d.mp4 thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you.\"},{\"id\":\"01KXZMVJCYBNN93NPDH6F6PN6F\",\"source\":\"vlog\",\"kind\":\"made\",\"sentence\":\"Recorded a video.\",\"detail\":null,\"happened_at\":\"2026-07-02T09:52:11.000Z\",\"logged_at\":\"2026-07-20 11:33:52\",\"date_precision\":\"exact\",\"visibility\":\"private\",\"held_reason\":null,\"author\":\"log\",\"href\":\"/vlog/01KXZMVJCYBNN93NPDH6F6PN6F\",\"media\":[{\"kind\":\"video\",\"url\":null,\"poster_url\":\"https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMVJCYBNN93NPDH6F6PN6F.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T184351Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=39103ce53047fa4f2b5cbcea31a05fd5e9562c48b66f434053d74644588aae48\",\"duration_seconds\":null,\"label\":\"DJI_20260702095211_0061_D.MP4\"}],\"duration_seconds\":null,\"batch_id\":null,\"vlog_id\":\"01KXZMVJCYBNN93NPDH6F6PN6F\",\"source_ref\":null,\"searchable\":\"dji_20260702095211_0061_d.mp4 oh oh oh oh oh\"}],\"total\":6,\"order\":\"happened\",\"filter\":\"all\",\"buried\":0,\"buried_by_day\":{},\"coverage\":{\"2025\":93,\"2026\":2694},\"fold\":[{\"grain\":\"week\",\"from\":\"2026-06-27\",\"to\":\"2026-07-03\",\"label\":\"27 Jun – 3 Jul\",\"count\":36,\"spans\":1,\"line\":\"And that's also what I'm now finally, and it sounds crazy because it's like, I'm finally actually figuring out how this is happening. Like what's actually going on under the hood…\",\"line_entry_id\":\"01M2SGJM5XDSX8ZTGJZRB4EGP8\"},{\"grain\":\"week\",\"from\":\"2026-06-20\",\"to\":\"2026-06-26\",\"label\":\"20 – 26 Jun\",\"count\":1,\"spans\":1,\"line\":\"We managed to get this thing out of Italy where the state would have claimed it. No one knows it exists. No one knows it ever existed. One cannot steal what's ever been missing. …\",\"line_entry_id\":\"01M2RDFTJJ05V13FKY568Q1WFQ\"},{\"grain\":\"month\",\"from\":\"2026-06-01\",\"to\":\"2026-06-19\",\"label\":\"Jun 2026\",\"count\":330,\"spans\":1,\"line\":\"This is a genuinely deep question about how knowledge accretes, and you've found a real design problem, not a confusion, an actual architectural fork. Here's the problem you've s…\",\"line_entry_id\":\"01M2SGK565V8C8E9DESCVZJKMH\"},{\"grain\":\"month\",\"from\":\"2026-05-01\",\"to\":\"2026-05-31\",\"label\":\"May 2026\",\"count\":573,\"spans\":1,\"line\":\"said differently most of what's out there on knowledge representation comes from a gutenberg era assumption knowledge is propositional atomic claims true false linked by typed pr…\",\"line_entry_id\":\"01M2RDHSR24V752R19Z418Y5XP\"},{\"grain\":\"month\",\"from\":\"2026-04-01\",\"to\":\"2026-04-30\",\"label\":\"Apr 2026\",\"count\":280,\"spans\":1,\"line\":\"with AI. And it's like, I see none of it. It doesn't exist yet. But, it's gonna be crazy. Trust me, bro. It's true. Like, I believe that. I know it's gonna be fucking insane and …\",\"line_entry_id\":\"01M2RD6G9FP3ZT96F93518ZYS2\"},{\"grain\":\"month\",\"from\":\"2026-03-01\",\"to\":\"2026-03-31\",\"label\":\"Mar 2026\",\"count\":468,\"spans\":1,\"line\":\"So, I just passed OATC Hamilton Clinic, and you can spot these people right away. Firstly, they're lined up right in the morning, right? Secondly, they're all fucking sketched ou…\",\"line_entry_id\":\"01M2RD24CJQT38KA0H9S5VARHR\"},{\"grain\":\"month\",\"from\":\"2026-02-01\",\"to\":\"2026-02-28\",\"label\":\"Feb 2026\",\"count\":524,\"spans\":1,\"line\":\"Okay. That's actually not true. Prince of Shadows, that's a misconception because Prince of Shadows says, To be fair, deleting your streams when they're done heavily tanks irrele…\",\"line_entry_id\":\"01M2RCZ4FWGFM171Z1SB3V2SNK\"},{\"grain\":\"month\",\"from\":\"2026-01-01\",\"to\":\"2026-01-31\",\"label\":\"Jan 2026\",\"count\":75,\"spans\":1,\"line\":\"and i'm just thinking about the ai you know and the youtube and the algorithms and all that stuff like at this point just saying that i have had two weeks off of youtube there sh…\",\"line_entry_id\":\"01M2SG1CAEX1HMPK9RE2NX76SX\"},{\"grain\":\"year\",\"from\":\"2025-01-01\",\"to\":\"2025-12-31\",\"label\":\"2025\",\"count\":80,\"spans\":1,\"line\":\"and this is what i was but the attention economy and that whole whole aspect in the algorithm because at a certain point like if you get into that threshold and of like super vol…\",\"line_entry_id\":\"01M2RD595CJVNTFZ8PMWSJ11T5\"}],\"open_days\":14}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3dac078cd3fc96d-SEA\r|",
+  "body": "{\"id\":\"01M2SGGVN1WPQEZPK9C1FYAJW5\",\"text\":\"Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.\",\"detail\":null,\"occurred_at\":\"2026-07-02T09:54:05.000Z\",\"created_at\":\"2026-09-18 05:41:09\",\"updated_at\":\"2026-09-18 05:41:09\",\"happened_at\":\"2026-07-02T09:54:05.000Z\",\"logged_at\":\"2026-09-18T05:41:09.409Z\",\"date_precision\":\"exact\",\"kind\":\"said\",\"visibility\":\"public\",\"held_reason\":null,\"author\":\"operator\",\"source_kind\":\"vlog\",\"batch_id\":null,\"buried_at\":null,\"r2_key\":null,\"mime\":null,\"bytes\":null,\"duration_seconds\":null,\"transcript\":null,\"link_url\":null,\"original_filename\":null,\"vlog_id\":\"01KXZQMFBG90X6H9HTNCWREB4V\",\"source_ref\":\"said:01KXZQMFBG90X6H9HTNCWREB4V:0\",\"span_start\":0,\"span_end\":757.46,\"grounded\":1,\"led_from\":null,\"transcript_segments\":null,\"media_url\":null,\"revisions\":[],\"came_from\":null,\"led_to\":[],\"earlier\":{\"id\":\"01M2RDG4Z10A0ATVFNBH6YDG1A\",\"text\":\"Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.\"},\"later\":null,\"on_pages\":[],\"copies\":[],\"batch\":null}",
   "body_json": {
-    "items": [
-      {
-        "id": "01M2SGGVN1WPQEZPK9C1FYAJW5",
-        "source": "entry",
-        "kind": "said",
-        "sentence": "Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.",
-        "detail": null,
-        "happened_at": "2026-07-02T09:54:05.000Z",
-        "logged_at": "2026-09-18T05:41:09.409Z",
-        "date_precision": "exact",
-        "visibility": "public",
-        "held_reason": null,
-        "author": "operator",
-        "href": "/entry/01M2SGGVN1WPQEZPK9C1FYAJW5",
-        "media": [],
-        "duration_seconds": null,
-        "batch_id": null,
-        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
-        "source_ref": "said:01KXZQMFBG90X6H9HTNCWREB4V:0",
-        "on_route": false,
-        "searchable": "thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you."
-      },
-      {
-        "id": "01KXZQMFBG90X6H9HTNCWREB4V",
-        "source": "vlog",
-        "kind": "made",
-        "sentence": "Recorded a video.",
-        "detail": null,
-        "happened_at": "2026-07-02T09:54:05.000Z",
-        "logged_at": "2026-07-20 12:22:25",
-        "date_precision": "exact",
-        "visibility": "private",
-        "held_reason": null,
-        "author": "log",
-        "href": "/vlog/01KXZQMFBG90X6H9HTNCWREB4V",
-        "media": [
-          {
-            "kind": "video",
-            "url": null,
-            "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZQMFBG90X6H9HTNCWREB4V.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T184351Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=00f4053c03bd08879eca08347facf806dc29e2837be11ad7feae2c4fae13a5b3",
-            "duration_seconds": null,
-            "label": "DJI_20260702095405_0062_D.MP4"
-          }
-        ],
-        "duration_seconds": null,
-        "batch_id": null,
-        "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
-        "source_ref": null,
-        "searchable": "dji_20260702095405_0062_d.mp4 thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you. thank you."
-      },
-      {
-        "id": "01KXZMVJCYBNN93NPDH6F6PN6F",
-        "source": "vlog",
-        "kind": "made",
-        "sentence": "Recorded a video.",
-        "detail": null,
-        "happened_at": "2026-07-02T09:52:11.000Z",
-        "logged_at": "2026-07-20 11:33:52",
-        "date_precision": "exact",
-        "visibility": "private",
-        "held_reason": null,
-        "author": "log",
-        "href": "/vlog/01KXZMVJCYBNN93NPDH6F6PN6F",
-        "media": [
-          {
-            "kind": "video",
-            "url": null,
-            "poster_url": "https://eda2e9bbd9acc42699027cfdcb50f998.r2.cloudflarestorage.com/neolog-videos/01KRCXWYTRN0BYTR3452ZTSXXJ/thumbs/01KXZMVJCYBNN93NPDH6F6PN6F.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=b57d17d836a9466fd06cd03c18eaad1e%2F20260919%2Fauto%2Fs3%2Faws4_request&X-Amz-Date=20260919T184351Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host&X-Amz-Signature=39103ce53047fa4f2b5cbcea31a05fd5e9562c48b66f434053d74644588aae48",
-            "duration_seconds": null,
-            "label": "DJI_20260702095211_0061_D.MP4"
-          }
-        ],
-        "duration_seconds": null,
-        "batch_id": null,
-        "vlog_id": "01KXZMVJCYBNN93NPDH6F6PN6F",
-        "source_ref": null,
-        "searchable": "dji_20260702095211_0061_d.mp4 oh oh oh oh oh"
-      }
-    ],
-    "total": 6,
-    "order": "happened",
-    "filter": "all",
-    "buried": 0,
-    "buried_by_day": {},
-    "coverage": {
-      "2025": 93,
-      "2026": 2694
+    "id": "01M2SGGVN1WPQEZPK9C1FYAJW5",
+    "text": "Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you.",
+    "detail": null,
+    "occurred_at": "2026-07-02T09:54:05.000Z",
+    "created_at": "2026-09-18 05:41:09",
+    "updated_at": "2026-09-18 05:41:09",
+    "happened_at": "2026-07-02T09:54:05.000Z",
+    "logged_at": "2026-09-18T05:41:09.409Z",
+    "date_precision": "exact",
+    "kind": "said",
+    "visibility": "public",
+    "held_reason": null,
+    "author": "operator",
+    "source_kind": "vlog",
+    "batch_id": null,
+    "buried_at": null,
+    "r2_key": null,
+    "mime": null,
+    "bytes": null,
+    "duration_seconds": null,
+    "transcript": null,
+    "link_url": null,
+    "original_filename": null,
+    "vlog_id": "01KXZQMFBG90X6H9HTNCWREB4V",
+    "source_ref": "said:01KXZQMFBG90X6H9HTNCWREB4V:0",
+    "span_start": 0,
+    "span_end": 757.46,
+    "grounded": 1,
+    "led_from": null,
+    "transcript_segments": null,
+    "media_url": null,
+    "revisions": [],
+    "came_from": null,
+    "led_to": [],
+    "earlier": {
+      "id": "01M2RDG4Z10A0ATVFNBH6YDG1A",
+      "text": "Thank you. Thank you. Thank you. Thank you. Thank you. Thank you. Thank you."
     },
-    "fold": [
-      {
-        "grain": "week",
-        "from": "2026-06-27",
-        "to": "2026-07-03",
-        "label": "27 Jun – 3 Jul",
-        "count": 36,
-        "spans": 1,
-        "line": "And that's also what I'm now finally, and it sounds crazy because it's like, I'm finally actually figuring out how this is happening. Like what's actually going on under the hood…",
-        "line_entry_id": "01M2SGJM5XDSX8ZTGJZRB4EGP8"
-      },
-      {
-        "grain": "week",
-        "from": "2026-06-20",
-        "to": "2026-06-26",
-        "label": "20 – 26 Jun",
-        "count": 1,
-        "spans": 1,
-        "line": "We managed to get this thing out of Italy where the state would have claimed it. No one knows it exists. No one knows it ever existed. One cannot steal what's ever been missing. …",
-        "line_entry_id": "01M2RDFTJJ05V13FKY568Q1WFQ"
-      },
-      {
-        "grain": "month",
-        "from": "2026-06-01",
-        "to": "2026-06-19",
-        "label": "Jun 2026",
-        "count": 330,
-        "spans": 1,
-        "line": "This is a genuinely deep question about how knowledge accretes, and you've found a real design problem, not a confusion, an actual architectural fork. Here's the problem you've s…",
-        "line_entry_id": "01M2SGK565V8C8E9DESCVZJKMH"
-      },
-      {
-        "grain": "month",
-        "from": "2026-05-01",
-        "to": "2026-05-31",
-        "label": "May 2026",
-        "count": 573,
-        "spans": 1,
-        "line": "said differently most of what's out there on knowledge representation comes from a gutenberg era assumption knowledge is propositional atomic claims true false linked by typed pr…",
-        "line_entry_id": "01M2RDHSR24V752R19Z418Y5XP"
-      },
-      {
-        "grain": "month",
-        "from": "2026-04-01",
-        "to": "2026-04-30",
-        "label": "Apr 2026",
-        "count": 280,
-        "spans": 1,
-        "line": "with AI. And it's like, I see none of it. It doesn't exist yet. But, it's gonna be crazy. Trust me, bro. It's true. Like, I believe that. I know it's gonna be fucking insane and …",
-        "line_entry_id": "01M2RD6G9FP3ZT96F93518ZYS2"
-      },
-      {
-        "grain": "month",
-        "from": "2026-03-01",
-        "to": "2026-03-31",
-        "label": "Mar 2026",
-        "count": 468,
-        "spans": 1,
-        "line": "So, I just passed OATC Hamilton Clinic, and you can spot these people right away. Firstly, they're lined up right in the morning, right? Secondly, they're all fucking sketched ou…",
-        "line_entry_id": "01M2RD24CJQT38KA0H9S5VARHR"
-      },
-      {
-        "grain": "month",
-        "from": "2026-02-01",
-        "to": "2026-02-28",
-        "label": "Feb 2026",
-        "count": 524,
-        "spans": 1,
-        "line": "Okay. That's actually not true. Prince of Shadows, that's a misconception because Prince of Shadows says, To be fair, deleting your streams when they're done heavily tanks irrele…",
-        "line_entry_id": "01M2RCZ4FWGFM171Z1SB3V2SNK"
-      },
-      {
-        "grain": "month",
-        "from": "2026-01-01",
-        "to": "2026-01-31",
-        "label": "Jan 2026",
-        "count": 75,
-        "spans": 1,
-        "line": "and i'm just thinking about the ai you know and the youtube and the algorithms and all that stuff like at this point just saying that i have had two weeks off of youtube there sh…",
-        "line_entry_id": "01M2SG1CAEX1HMPK9RE2NX76SX"
-      },
-      {
-        "grain": "year",
-        "from": "2025-01-01",
-        "to": "2025-12-31",
-        "label": "2025",
-        "count": 80,
-        "spans": 1,
-        "line": "and this is what i was but the attention economy and that whole whole aspect in the algorithm because at a certain point like if you get into that threshold and of like super vol…",
-        "line_entry_id": "01M2RD595CJVNTFZ8PMWSJ11T5"
-      }
-    ],
-    "open_days": 14
+    "later": null,
+    "on_pages": [],
+    "copies": [],
+    "batch": null
   }
 }
