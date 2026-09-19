@@ -1,4 +1,5 @@
 {
-  "method": "GET",
-  "path": "/api/v2/vlogs?status=failed&limit=15&nonce=final10-1758243400"
+  "method": "POST",
+  "path": "/api/v2/dev/replay/01KRMW8JT8JRR6VXABRRGCPQ5Q",
+  "body": {"from": "audio_extract", "force": true}
 }
