@@ -1,14 +1,37 @@
 {
-  "requested_at": "2026-09-19T12:49:42Z",
+  "requested_at": "2026-09-19T18:41:28Z",
   "method": "GET",
-  "path": "/api/v2/log/read?nonce=absolute-final-entries-1758246500",
+  "path": "/api/debug/whoami?nonce=next15-pass1-verify-1",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3d8b638782de8ef-LAX\r|",
-  "body": "{\"recordings\":420,\"transcribed\":410,\"read\":372,\"entries\":2367}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3dab9888d1906e1-IAD\r|",
+  "body": "{\"access_email_header\":false,\"you\":null,\"access_cookie\":true,\"headers_seen\":[\"accept\",\"accept-encoding\",\"cf-access-jwt-assertion\",\"cf-connecting-ip\",\"cf-connecting-o2o\",\"cf-ipcountry\",\"cf-ray\",\"cf-visitor\",\"connection\",\"cookie\",\"host\",\"user-agent\",\"x-forwarded-for\",\"x-forwarded-proto\",\"x-real-ip\",\"x-vercel-ip-city\",\"x-vercel-ip-country\",\"x-vercel-ip-country-region\",\"x-vercel-ip-latitude\",\"x-vercel-ip-longitude\",\"x-vercel-sc-host\"],\"note\":\"Booleans and header names only. If access_email_header is false, the Access application is not in front of this path.\"}",
   "body_json": {
-    "recordings": 420,
-    "transcribed": 410,
-    "read": 372,
-    "entries": 2367
+    "access_email_header": false,
+    "you": null,
+    "access_cookie": true,
+    "headers_seen": [
+      "accept",
+      "accept-encoding",
+      "cf-access-jwt-assertion",
+      "cf-connecting-ip",
+      "cf-connecting-o2o",
+      "cf-ipcountry",
+      "cf-ray",
+      "cf-visitor",
+      "connection",
+      "cookie",
+      "host",
+      "user-agent",
+      "x-forwarded-for",
+      "x-forwarded-proto",
+      "x-real-ip",
+      "x-vercel-ip-city",
+      "x-vercel-ip-country",
+      "x-vercel-ip-country-region",
+      "x-vercel-ip-latitude",
+      "x-vercel-ip-longitude",
+      "x-vercel-sc-host"
+    ],
+    "note": "Booleans and header names only. If access_email_header is false, the Access application is not in front of this path."
   }
 }
