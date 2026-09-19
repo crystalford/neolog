@@ -131,19 +131,6 @@ async function downloadToTmp(url, label, opts = {}) {
   }
 }
 
-// One-shot sweep on container start: drop any neolog-ffmpeg-* dirs left over
-// from a prior crash / OOM. Without this, restart inherits the leak.
-function sweepStaleTmpDirs() {
-  try {
-    for (const name of readdirSync(tmpdir())) {
-      if (name.startsWith('neolog-ffmpeg-')) {
-        try { rmSync(join(tmpdir(), name), { recursive: true, force: true }) } catch {}
-      }
-    }
-  } catch {}
-}
-sweepStaleTmpDirs()
-
 /**
  * A hard ceiling on every ffmpeg run, and the reason it exists.
  *
@@ -165,6 +152,46 @@ sweepStaleTmpDirs()
  */
 const FFMPEG_TIMEOUT_MS = 20 * 60 * 1000
 const FFPROBE_TIMEOUT_MS = 60 * 1000
+
+// ⚠️ 19 Sep — sweepStaleTmpDirs() below used to run ONCE, at container boot.
+// A container stays warm across every request while nothing has been idle
+// for `sleepAfter` (5m — see CLAUDE.md), so a job that dies WITHOUT reaching
+// its own cleanup path — the process getting killed out from under it, the
+// connection dropping before `res.on('close', ...)` fires, anything that
+// skips the catch block downloadToTmp and the strategy loop both rely on —
+// leaks a temp dir for the rest of that container's lifetime. Across a
+// 400-recording bulk run against one warm container that is enough small
+// leaks to exhaust local disk: found via a vlog stuck retrying audio_extract
+// for two straight days, one of whose buried errors was `ENOSPC: no space
+// left on device, write`.
+//
+// Sweeping unconditionally on a timer would be unsafe — FFmpegGate allows up
+// to 3 concurrent /extract-audio calls sharing this same container, so a
+// blind sweep could delete another request's still-in-progress temp dir out
+// from under it. The fix is age, not a timer alone: only a dir OLDER than
+// every real job could still be is genuinely stale. FFMPEG_TIMEOUT_MS is the
+// longest any single ffmpeg invocation is allowed to run before this
+// server's own kill switch ends it, so a margin past that can only mean the
+// dir's owner already died some other way.
+const STALE_TMP_AGE_MS = FFMPEG_TIMEOUT_MS + 10 * 60 * 1000
+
+function sweepStaleTmpDirs() {
+  try {
+    const now = Date.now()
+    for (const name of readdirSync(tmpdir())) {
+      if (!name.startsWith('neolog-ffmpeg-')) continue
+      const full = join(tmpdir(), name)
+      try {
+        const age = now - statSync(full).mtimeMs
+        if (age > STALE_TMP_AGE_MS) rmSync(full, { recursive: true, force: true })
+      } catch {}
+    }
+  } catch {}
+}
+sweepStaleTmpDirs()
+// Age-gated, so this can run continuously without risk to an in-flight job —
+// every ten minutes, whether or not this instance is between requests.
+setInterval(sweepStaleTmpDirs, 10 * 60 * 1000).unref?.()
 
 function armKill(proc, timeoutMs, reject, label) {
   const killer = { timedOut: false, clear: () => {} }
