@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/log?limit=2&nonce=post-cutover-check-2"
+  "path": "/api/debug/whoami?nonce=idle-mailbox-reset"
 }
