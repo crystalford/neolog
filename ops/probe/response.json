@@ -1,9 +1,9 @@
 {
-  "requested_at": "2026-09-19T21:01:47Z",
+  "requested_at": "2026-09-19T21:02:52Z",
   "method": "DELETE",
-  "path": "/api/v2/log/intake?entry=01M2RDD82QMJY94Y6JATXFDJVR&nonce=hallucination-cleanup-4",
+  "path": "/api/v2/log/intake?entry=01M2SGAT5RH1SXFAWM2YSAR4SD&nonce=hallucination-cleanup-5",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3db870d2a4b98e4-IAD\r|",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3db88a36ce53512-SEA\r|",
   "body": "{\"ok\":true}",
   "body_json": {
     "ok": true
