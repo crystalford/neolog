@@ -1,4 +1,4 @@
 {
-  "method": "GET",
-  "path": "/api/debug/whoami?nonce=idle-mailbox-reset"
+  "method": "DELETE",
+  "path": "/api/v2/log/intake?entry=01M2RD3AWSZZHGMZW5P1696K4E&nonce=hallucination-cleanup-1"
 }
