@@ -1437,11 +1437,60 @@ put` — that repush exists because of a real prior incident (secrets
 drifting out of sync caused 503s on bulk dispatch), and a deploy-target
 change is exactly the moment to keep that safety net, not drop it.
 
-**The custom domain (`neolog.ai`) is not touched by either workflow.**
-Both build/deploy the Worker under its Cloudflare-assigned name; wiring
-the domain to it, alongside Access, is the one deliberately manual,
-explicitly-confirmed step — a Worker deploy target change is exactly the
-kind of thing that can take the operator's daily tool offline if rushed.
+**The custom domain (`neolog.ai`) is not touched by either workflow** —
+wiring it up was a one-time, manual, explicitly-confirmed step, done and
+recorded below rather than automated, because a Worker deploy target
+change is exactly the kind of thing that can take the operator's daily
+tool offline if rushed.
+
+### ⚠️ 19 Sep — the domain cutover found a DNS record neither API told the truth about
+
+`neolog.ai` was a Cloudflare **Pages** custom domain, verified working
+throughout Pass 1 and the early part of Pass 2. Cutting it to the new
+Worker is two DIFFERENT Cloudflare features with two different APIs —
+Pages custom domains (`pages/projects/{p}/domains`) and Workers Custom
+Domains (`workers/domains`) — and detaching from one does not imply
+anything about the other.
+
+The sequence that actually worked, found by hitting the real error rather
+than reading docs: detach from Pages (`DELETE .../domains/neolog.ai`) →
+attempt the Workers Custom Domain attach (`PUT workers/domains`) → **it
+refused with HTTP 409, `"Hostname 'neolog.ai' already has externally
+managed DNS records (A, CNAME, etc). Delete them first."`** The API
+token had no DNS read/edit scope for the zone, so this was invisible from
+here — the operator checked the dashboard directly and found a `neolog.ai
+CNAME neolog.pages.dev` record, proxied, sitting in the zone independently
+of whichever custom-domain feature currently claims the hostname.
+
+**That left the domain attached to NEITHER target for under two minutes**
+— caught immediately (the attach failure is loud and unambiguous) and
+rolled back by re-adding the Pages domain (`POST .../domains` with
+`{name: "neolog.ai"}`), verified live again before touching anything
+else. Once the operator deleted the blocking CNAME from the dashboard,
+the same detach-then-attach sequence succeeded outright: `enabled: true`,
+a fresh cert issued, `neolog.ai` immediately serving the new Worker
+end-to-end (verified via a real D1-backed route, not just a 200).
+
+**The mechanism, now that it is understood:** a Pages custom domain and a
+Workers Custom Domain each want to own the hostname's DNS themselves, and
+Cloudflare's safety check for the Workers side refuses to silently
+overwrite ANY existing record at that name — including one a different
+Cloudflare feature put there. Deleting the Pages *custom domain object*
+via its own API does not delete this DNS record; they are governed
+separately. A future domain move on this repo should expect the same:
+check the zone's DNS records for the target hostname first, not just the
+custom-domain object.
+
+**One more record found the same way and left alone**: `www.neolog.ai
+CNAME 1b7064cbc9b22c81.vercel-dns-...`, DNS-only (not proxied) — a leftover
+from a pre-Cloudflare Vercel deployment of an earlier version of this app.
+Nothing here serves `www.neolog.ai`; inert, not blocking, worth deleting
+in a later pass but not chased down during this one.
+
+The one-off `domain-cutover.yml` workflow (`workflow_dispatch` only,
+`diagnose` / `cutover` / `restore-pages` actions) that did this stays in
+the repo — it is the exact tool the next domain move needs, and deleting
+it would mean re-deriving this same sequence from scratch.
 
 ⚠️ **Local preview never got to be re-tried on the old toolchain, and
 does not need to be**: OpenNext's own `preview` command wraps plain
