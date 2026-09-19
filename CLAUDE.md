@@ -1060,6 +1060,41 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 19 Sep — a silent recording's "already done" was silently undone
+
+After the disk fix below, 8 of the corpus's last 10 failures turned out to
+be one thing: a recording with **no audio track at all** — real DJI
+drone footage, not a leftover bug from anywhere upstream. `stepAudioExtract`
+already handles this correctly: it probes the input, finds no audio
+stream, records `no_audio_input`, and writes `pipeline_status='complete'`
+straight to D1 with a comment reading *"the alarm loop will see
+pipeline_status='complete' on the next tick and exit cleanly."*
+
+That comment was wrong, and forcing a fresh run on one of the ten proved
+it: `audio_extract` correctly finished in under four seconds
+(`no_audio_input`, `ok`) — and `transcribe` started anyway thirty seconds
+later, tried to load a `mp3.full` that correctly was never written, threw
+"audio missing from R2", and the row was marked `failed` after
+`MAX_RESTARTS` — **overwriting the `complete` the no-audio branch had
+already set.**
+
+**The D1 row and the DO's own `pointer` are two different pieces of
+state.** `alarm()` doesn't re-read D1 after a step — it just advances the
+in-Durable-Object-storage pointer to the next step and reschedules,
+unconditionally, whenever a step function returns without throwing. A
+step marking the row done in D1 was never enough to stop that; only
+`advance()` reaching the last step, or an actual exception, could. The
+no-audio path did neither — it returned normally from the *first* step,
+so the pointer dutifully moved on to `transcribe` regardless of what D1
+now said.
+
+`stepAudioExtract` returns `true` now when it took the no-audio
+short-circuit, and `alarm()` checks that return value before calling
+`advance()`: `true` means delete the DO's pointer and stop, the same
+terminal state `advance()` reaches on its own past the last step, without
+touching the D1 row a second time (already correct). Every other step
+still returns `void` and advances normally.
+
 ### ⚠️ 19 Sep — the FFmpeg container's temp-file sweep only ran once, ever
 
 After the routing, Whisper, and healer fixes above, the corpus run finished

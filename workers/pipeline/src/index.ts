@@ -597,8 +597,9 @@ export class VlogPipelineDO {
       await this.setVlogState(vlog_id, stateForStep(pointer), null)
 
       const t0 = Date.now()
+      let pipelineAlreadyFinished = false
       switch (pointer) {
-        case 'audio_extract': await this.stepAudioExtract(vlog); break
+        case 'audio_extract': pipelineAlreadyFinished = (await this.stepAudioExtract(vlog)) === true; break
         case 'transcribe': await this.stepTranscribe(vlog); break
         // The step keeps its key so in-flight rows and recorded events
         // still resolve; what it does is read, not extract.
@@ -609,6 +610,13 @@ export class VlogPipelineDO {
       await this.recordEvent(vlog_id, pointer, 'ok', null, { duration_ms: ms })
       await this.state.storage.delete(`attempts:${pointer}`)
       await this.state.storage.delete(`force_${pointer}`)
+      if (pipelineAlreadyFinished) {
+        // The step already wrote its own terminal D1 state (e.g. the
+        // no-audio short circuit) — advancing to the next step would run
+        // it against artifacts that were never produced on purpose.
+        await this.state.storage.delete('pointer')
+        return
+      }
       await this.advance(pointer)
       await this.state.storage.setAlarm(Date.now() + STEP_CHAIN_DELAY_MS)
     } catch (e: any) {
@@ -657,7 +665,10 @@ export class VlogPipelineDO {
    *       sees per-second ffmpeg progress on /timeline/[id]. Write the
    *       resulting MP3 to R2 at {operator}/audio/{vlog_id}/mp3.full.
    */
-  private async stepAudioExtract(vlog: VlogRow): Promise<void> {
+  // Returns `true` when the step already finished the whole pipeline itself
+  // (the no-audio short circuit below) — alarm() must not advance past a
+  // step that says so.
+  private async stepAudioExtract(vlog: VlogRow): Promise<boolean | void> {
     if (!vlog.mime_type.startsWith('video/')) {
       // Audio-only source — nothing to extract; transcribe step reads R2 directly.
       await this.recordEvent(vlog.id, 'audio_extract', 'skipped', 'audio_source',
@@ -761,9 +772,19 @@ export class VlogPipelineDO {
           // old UI read "complete with 0 items" rather than "no run at all" —
           // has no table and no reader. A recording with no audio simply has
           // nothing on the log from it, which its own page says.
-          // Short-circuit — the alarm loop will see pipeline_status='complete'
-          // on the next tick and exit cleanly.
-          return
+          //
+          // ⚠️ 19 Sep — a bare `return` here does NOT stop the alarm loop.
+          // The DO's own `pointer` in Durable Object storage is separate
+          // from the D1 row this just updated, and alarm() unconditionally
+          // calls advance()+reschedule after any step that didn't throw —
+          // it has no way to know this step already finished the whole
+          // pipeline. The result: pointer advances to 'transcribe' anyway,
+          // which then throws "audio missing from R2" (no mp3.full was ever
+          // written, correctly, since there's no audio) and the vlog gets
+          // marked failed after MAX_RESTARTS — overwriting the correct
+          // 'complete' this branch just set. Returning `true` tells alarm()
+          // to stop here instead of advancing.
+          return true
         }
       }
 
