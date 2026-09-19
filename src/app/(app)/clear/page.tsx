@@ -21,8 +21,6 @@
  * the one feature that exists to be trusted.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

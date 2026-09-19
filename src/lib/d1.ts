@@ -7,9 +7,9 @@
  * Usage (from a Route Handler / API route running on the Workers runtime):
  *
  *   import { getDb, findOne, findMany, run } from '@/lib/d1'
- *   import { getRequestContext } from '@cloudflare/next-on-pages'
+ *   import { getCloudflareContext } from '@opennextjs/cloudflare'
  *
- *   const db = getDb(getRequestContext().env)
+ *   const db = getDb(getCloudflareContext().env)
  *   const vlog = await findOne<Vlog>(
  *     db,
  *     'SELECT * FROM vlogs WHERE id = ? AND operator_id = ?',

@@ -11,6 +11,10 @@ node_modules/
 /out/
 next-env.d.ts
 
+# OpenNext Cloudflare adapter build output + local wrangler cache
+/.open-next/
+/.wrangler/
+
 # Production
 /build
 /dist

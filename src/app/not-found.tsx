@@ -16,8 +16,6 @@
 import Link from 'next/link'
 import { LogoMark } from '@/components/Shell'
 
-export const runtime = 'edge'
-
 export default function NotFound() {
   return (
     <div style={{

@@ -37,10 +37,10 @@
  * in its span, which would silently put the two halves back together.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, findMany, batch as d1Batch } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { ulid } from '@/lib/ulid'
@@ -64,7 +64,7 @@ interface Row {
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

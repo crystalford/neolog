@@ -8,8 +8,6 @@
  * actual work.
  */
 
-export const runtime = 'edge'
-
 import { EntryPageClient } from './EntryPageClient'
 
 export default async function EntryPage({ params }: { params: Promise<{ id: string }> }) {

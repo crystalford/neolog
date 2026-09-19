@@ -18,8 +18,6 @@
  *     and misses what was said in others
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

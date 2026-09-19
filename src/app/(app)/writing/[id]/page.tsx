@@ -12,8 +12,6 @@
  * facts it actually knows: when, and who made it.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'

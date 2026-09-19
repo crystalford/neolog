@@ -15,10 +15,10 @@
  *   4. Browser POSTs vlog metadata to /api/v2/vlogs to register the row in D1
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import {
   createMultipartUpload,
   presignMultipartPartUrl,
@@ -47,7 +47,7 @@ function safeFilename(name: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {

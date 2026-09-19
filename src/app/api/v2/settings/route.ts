@@ -10,10 +10,10 @@
  * Whitelist of known keys lives in src/lib/operator-settings.ts. Unknown keys
  * are rejected so a typo in the client doesn't silently write garbage.
  */
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -28,7 +28,7 @@ interface Env {
 const KNOWN_KEYS = new Set<string>(Object.values(SETTING_KEYS))
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
 /** His one sentence. Typed by him or absent — the log does not draft it. */
 export async function PATCH(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

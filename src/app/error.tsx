@@ -7,8 +7,6 @@
  * `reset()` to retry the render) + a way back to the log.
  */
 
-export const runtime = 'edge'
-
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { LogoMark } from '@/components/Shell'

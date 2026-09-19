@@ -11,7 +11,8 @@
 - Account → Workers Scripts → Edit
 - Account → Workers R2 Storage → Edit
 - Account → Cloudflare D1 → Edit
-- Account → Cloudflare Pages → Edit
+- Account → Cloudflare Pages → Edit (kept for the old Pages project, retained as a rollback path — see `CLAUDE.md`'s 19 Sep framework-debt entry)
+- Account → Cloudflare Workers → Edit (the deploy target since the OpenNext Cloudflare migration)
 - Account → Access: Apps and Policies → Edit
 - Account → Workers AI → Edit
 - Account → Cloudflare Containers → Edit
@@ -26,25 +27,29 @@ If this token gets modified or rolled, the bootstrap workflow fails. Restore the
 
 **Permissions:** Object Read & Write on bucket `neolog-videos` (or all buckets).
 **Stored as:**
-- `R2_ACCESS_KEY_ID` GitHub repo secret + Pages Variables/Secrets
-- `R2_SECRET_ACCESS_KEY` GitHub repo secret + Pages Variables/Secrets
+- `R2_ACCESS_KEY_ID` GitHub repo secret + a Worker secret (`wrangler secret put`)
+- `R2_SECRET_ACCESS_KEY` GitHub repo secret + a Worker secret (`wrangler secret put`)
 
-Bootstrap workflow propagates these from GitHub to Pages on each run.
+Both `deploy.yml` and `bootstrap-cloudflare.yml` propagate these from GitHub
+to the Worker on every run. ⚠️ Before the OpenNext Cloudflare migration
+(19 Sep) this was GitHub + **Pages** Variables/Secrets — a dual store that
+caused a real propagation bug (see #4 below). A Worker has one secret
+store, so that class of drift retires with the migration.
 
 The current Access Key ID begins with `b57d17d836a9466fd06cd03c18eaad1e` (visible in browser DevTools network panel during upload, harmless to share — the secret is what matters).
 
 ## 3. Anthropic API Key
 
 **Where:** https://console.anthropic.com/settings/keys
-**Stored as:** `ANTHROPIC_API_KEY` in GitHub repo secrets + Pages Variables/Secrets.
-**Used by:** the extraction passes (threads, clips, creative, entities) when the operator picks Premium or Max tier.
+**Stored as:** `ANTHROPIC_API_KEY` in GitHub repo secrets + a Worker secret. ⚠️ **Nothing currently calls it** — `src/lib/anthropic.ts` has no caller (see CLAUDE.md). It is a paid opt-in the operator has not taken.
+**Used by:** nothing at present. Historical note, kept for whoever wires it up: the old extraction passes (threads, clips, creative, entities) used it at Premium/Max tier, before that engine was deleted 8 Sep.
 
 ## 4. Cloudflare Account ID
 
 **Value:** `eda2e9bbd9acc42699027cfdcb50f998`
-**Stored as:** `CLOUDFLARE_ACCOUNT_ID` GitHub secret AND Pages Variables/Secrets.
+**Stored as:** `CLOUDFLARE_ACCOUNT_ID` GitHub secret AND a Worker secret.
 
-The Pages copy was originally missed by the bootstrap; commit `2b9ccd6` added a propagation step. Both places must have it for R2 presigning to work.
+Under the old Pages deploy target this was GitHub + Pages Variables/Secrets — two places, and the Pages copy was originally missed by the bootstrap (commit `2b9ccd6` added a propagation step to fix it). Since the 19 Sep OpenNext Cloudflare migration there is one deploy target (a Worker) and one secret store; this specific class of drift can't recur.
 
 ## 5. Operator email
 
@@ -53,13 +58,15 @@ The Pages copy was originally missed by the bootstrap; commit `2b9ccd6` added a 
 
 ## 6. Cloudflare Access cookie identity
 
-**Auto-handled.** Cloudflare Access drops a `CF_Authorization` JWT cookie on every authenticated request to `neolog.ai`. The Pages worker reads the email from the JWT payload (see `src/lib/access.ts:readEmail`). No manual configuration needed beyond the Access app the bootstrap creates.
+**Auto-handled.** Cloudflare Access drops a `CF_Authorization` JWT cookie on every authenticated request to `neolog.ai`. The Worker reads the email from the JWT payload (see `src/lib/access.ts:readEmail`). No manual configuration needed beyond the Access app the bootstrap creates.
 
 ## Things that are NOT credentials and don't need to be re-asked
 
 - The R2 bucket itself (`neolog-videos`) already exists with 11.67 GB of vlogs preserved across rebuilds.
 - The D1 database (`neolog`, id `d9db2aeb-c47b-4611-a2ba-96720939205b`) is provisioned.
-- The Pages project (`neolog`) is provisioned with the custom domain `neolog.ai` attached.
+- `neolog.ai` is a **Workers Custom Domain** pointed at the Worker `neolog`, since the 19 Sep domain cutover (see `CLAUDE.md`'s 19 Sep entries) — not a Cloudflare Pages custom domain any more. The old Pages project (`neolog`) still exists, deliberately kept as an instant rollback, but no longer has the domain attached and receives no new deploys.
+- Cutting the domain over required deleting a `neolog.ai CNAME neolog.pages.dev` record at the DNS level — a Pages custom domain and a Workers Custom Domain each want to own the hostname's DNS, and Cloudflare refuses to let the Workers side silently take over an existing record. The `neolog-bootstrap` API token has no DNS read/edit scope for the zone, so that record was invisible to any API call from here; the operator found it in the dashboard. If the domain is ever moved again, check the zone's DNS records for the target hostname first — don't assume detaching from one custom-domain feature clears the DNS layer too.
+- `.github/workflows/domain-cutover.yml` (manual-only, `diagnose` / `cutover` / `restore-pages`) is the tool this used and stays in the repo for the next time.
 - The Workflow worker (`neolog-process-upload`) is deployed.
 - The FFmpeg Container worker (`neolog-ffmpeg`) is deployed.
 - The Access app for `neolog.ai` is configured.

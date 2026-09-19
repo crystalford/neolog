@@ -19,8 +19,6 @@
  * imply otherwise.
  */
 
-export const runtime = 'edge'
-
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

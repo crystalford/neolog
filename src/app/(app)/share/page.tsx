@@ -17,8 +17,6 @@
  * thing arrives in the composer, and one press puts it in.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

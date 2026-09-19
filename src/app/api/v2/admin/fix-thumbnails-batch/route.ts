@@ -26,10 +26,10 @@
  * so concurrent batches (operator double-tabbed) can't corrupt rows — at worst
  * they waste an FFmpeg call.
  */
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function handle(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
 
   let operator
   try {

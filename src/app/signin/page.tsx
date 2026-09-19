@@ -14,8 +14,6 @@
 
 import { LogoMark } from '@/components/Shell'
 
-export const runtime = 'edge'
-
 export default function SignInPage() {
   return (
     <div style={{

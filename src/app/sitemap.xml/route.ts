@@ -11,10 +11,10 @@
  * and the two-times model means we have both without guessing.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { loadPublicFeed, soleOperator, xmlEscape } from '@/lib/machine-layer'
@@ -28,7 +28,7 @@ const day = (iso: string): string => {
 }
 
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const db = await readyDb(getDb(env), 'sitemap')
   const origin = new URL(req.url).origin
 

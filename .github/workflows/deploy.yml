@@ -1,7 +1,7 @@
-name: Fast deploy to Pages
+name: Fast deploy to Worker
 
-# Fast path: just build the Next.js app with next-on-pages + push to Cloudflare
-# Pages. Skips D1 schema apply, container worker rebuild, Pages binding patch,
+# Fast path: build the Next.js app with the OpenNext Cloudflare adapter +
+# deploy the Worker. Skips D1 schema apply, container worker rebuild,
 # Access app config — all of which are handled by `bootstrap-cloudflare.yml`
 # (workflow_dispatch only) when infra actually changes.
 #
@@ -18,6 +18,12 @@ name: Fast deploy to Pages
 # Required secrets (already configured for bootstrap-cloudflare.yml — same set):
 #   CLOUDFLARE_API_TOKEN
 #   CLOUDFLARE_ACCOUNT_ID
+#
+# ⚠️ Deploy target changed from a Cloudflare Pages project to a Cloudflare
+# Worker with static assets (the OpenNext Cloudflare adapter's model, not
+# the deprecated @cloudflare/next-on-pages one). `wrangler.toml`'s bindings
+# are read natively by `wrangler deploy` now — no more Pages-projects REST
+# patch step, and no more Pages-preview R2 CORS entry.
 
 on:
   push:
@@ -35,7 +41,7 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
       R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      PAGES_PROJECT: neolog
+      WORKER_NAME: neolog
     steps:
       - uses: actions/checkout@v4
 
@@ -53,44 +59,41 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Install wrangler
-        run: pnpm add -g wrangler@4
+      - name: Build with the OpenNext Cloudflare adapter
+        run: npx opennextjs-cloudflare build
 
-      - name: Build with next-on-pages
-        run: npx @cloudflare/next-on-pages
+      - name: Deploy the Worker
+        run: npx wrangler deploy
 
-      - name: Deploy to Cloudflare Pages
-        run: wrangler pages deploy .vercel/output/static --project-name "$PAGES_PROJECT" --branch main
-
-      - name: Push Pages secrets (idempotent)
-        # These were originally set by bootstrap-cloudflare.yml, but that
-        # workflow is workflow_dispatch only. Pushing them here on every
-        # deploy ensures the Pages runtime always has the secrets it
-        # needs — bulk dispatch (HEARTBEAT_TOKEN) + zombie termination
-        # (CLOUDFLARE_API_TOKEN). The binding-check endpoint surfaced
-        # these as missing when bulk Run returned 503 on every chunk.
-        # `wrangler pages secret put` is idempotent — overwrites silently.
+      - name: Push Worker secrets (idempotent)
+        # A real prior incident, from the Pages era: bulk dispatch
+        # (HEARTBEAT_TOKEN) and zombie termination (CLOUDFLARE_API_TOKEN)
+        # secrets went missing between GitHub's copy and the deploy
+        # target's, and the binding-check endpoint caught it as 503 on
+        # every bulk-dispatch chunk. Re-asserting on every deploy is the
+        # fix. `wrangler secret put` is idempotent — overwrites silently —
+        # and reads the Worker name from wrangler.toml.
         run: |
           set -e
           if [ -n "$HEARTBEAT_TOKEN" ]; then
-            echo "$HEARTBEAT_TOKEN" | wrangler pages secret put HEARTBEAT_TOKEN --project-name "$PAGES_PROJECT"
+            echo "$HEARTBEAT_TOKEN" | npx wrangler secret put HEARTBEAT_TOKEN
           else
             echo "::warning::HEARTBEAT_TOKEN secret missing from GitHub repo — bulk dispatch will 503"
           fi
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "$CLOUDFLARE_API_TOKEN" | wrangler pages secret put CLOUDFLARE_API_TOKEN --project-name "$PAGES_PROJECT"
+            echo "$CLOUDFLARE_API_TOKEN" | npx wrangler secret put CLOUDFLARE_API_TOKEN
           else
             echo "::warning::CLOUDFLARE_API_TOKEN missing — Workflow termination won't work"
           fi
           if [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "$ANTHROPIC_API_KEY" | wrangler pages secret put ANTHROPIC_API_KEY --project-name "$PAGES_PROJECT"
+            echo "$ANTHROPIC_API_KEY" | npx wrangler secret put ANTHROPIC_API_KEY
           fi
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ]; then
-            echo "$R2_ACCESS_KEY_ID" | wrangler pages secret put R2_ACCESS_KEY_ID --project-name "$PAGES_PROJECT"
-            echo "$R2_SECRET_ACCESS_KEY" | wrangler pages secret put R2_SECRET_ACCESS_KEY --project-name "$PAGES_PROJECT"
+            echo "$R2_ACCESS_KEY_ID" | npx wrangler secret put R2_ACCESS_KEY_ID
+            echo "$R2_SECRET_ACCESS_KEY" | npx wrangler secret put R2_SECRET_ACCESS_KEY
           fi
           if [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "$CLOUDFLARE_ACCOUNT_ID" | wrangler pages secret put CLOUDFLARE_ACCOUNT_ID --project-name "$PAGES_PROJECT"
+            echo "$CLOUDFLARE_ACCOUNT_ID" | npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
           fi
 
       - name: Summary
@@ -99,9 +102,9 @@ jobs:
           {
             echo "## Fast deploy"
             echo ""
-            echo "Project: \`$PAGES_PROJECT\`"
+            echo "Worker: \`$WORKER_NAME\`"
             echo "Result: ${{ job.status }}"
             echo ""
-            echo "For infra changes (D1 schema, container worker, Pages bindings, Access policy):"
+            echo "For infra changes (D1 schema, container worker, custom domain, Access policy):"
             echo "run the **Bootstrap Cloudflare** workflow manually from the Actions tab."
           } >> "$GITHUB_STEP_SUMMARY"

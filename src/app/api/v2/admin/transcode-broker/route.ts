@@ -14,14 +14,14 @@
  * no-op if the field is already set.
  */
 
+export const dynamic = 'force-dynamic'
+
 import { type NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { presignGetUrl, presignPutUrl } from '@/lib/r2'
 import type { D1Database, R2Bucket } from '@cloudflare/workers-types'
-
-export const runtime = 'edge'
 
 interface Env {
   DB: D1Database
@@ -39,7 +39,7 @@ async function auth(req: NextRequest, env: Env) {
 
 // GET ?vlog_id=X -> presigned URLs
 export async function GET(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await auth(req, env) }
   catch (e) {
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
 
 // POST { vlog_id, transcoded_key } -> verify + set transcoded_r2_key
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await auth(req, env) }
   catch (e) {

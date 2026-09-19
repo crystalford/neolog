@@ -17,8 +17,6 @@
  * Keys: → keep as filed · ↓ bury · P make public · typing adds your words.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

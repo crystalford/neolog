@@ -17,8 +17,6 @@
  * prompt to do anything about it. The year, and what was written under it.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

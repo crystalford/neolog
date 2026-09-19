@@ -8,10 +8,10 @@
  * month is ever shown to the model.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -36,7 +36,7 @@ async function op(req: NextRequest, env: Env) {
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error
   if (!isValidYm(params.ym)) return NextResponse.json({ error: 'ym must be YYYY-MM' }, { status: 400 })
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ ym: string 
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error
   if (!isValidYm(params.ym)) return NextResponse.json({ error: 'ym must be YYYY-MM' }, { status: 400 })
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ ym: string
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ ym: string }> }) {
   const params = await ctx.params
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   const { operator, error } = await op(req, env)
   if (error) return error
   if (!isValidYm(params.ym)) return NextResponse.json({ error: 'ym must be YYYY-MM' }, { status: 400 })

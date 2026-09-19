@@ -1,6 +1,21 @@
 # Moving deploys off GitHub Actions → Cloudflare native builds
 
-**Status: reference / not yet executed.** This removes GitHub Actions from the
+**Status: OBSOLETE as of 19 Sep 2026.** This whole plan is built on the app
+deploying as a Cloudflare **Pages** project — connecting Git to a Pages
+project, moving `neolog.ai`'s custom domain between two Pages projects,
+Pages Functions bindings. The framework-debt pass documented in `CLAUDE.md`
+(19 Sep) moved the deploy target off Pages entirely, onto a Cloudflare
+Worker with static assets via the `@opennextjs/cloudflare` adapter. There is
+no Pages project to Git-connect once this lands — Cloudflare's
+Git-connected-builds equivalent for a Worker is **Workers Builds**
+(Workers & Pages → the worker → Settings → Builds → Connect to Git), a
+different, unexplored setup. Kept below for its historical reasoning, not as
+a plan to execute — a fresh pass would need to be written against the
+Worker deploy target if this is still wanted.
+
+---
+
+**Original status: reference / not yet executed.** This removes GitHub Actions from the
 deploy path so app deploys run on Cloudflare's own build infrastructure (no
 Actions minutes). Do this deliberately — it touches the live `neolog.ai`
 deploy. Verify the site stays up at each step.

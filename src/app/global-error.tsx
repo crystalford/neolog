@@ -17,8 +17,6 @@
 import './globals.css'
 import { LogoMark } from '@/components/Shell'
 
-export const runtime = 'edge'
-
 export default function GlobalError({
   error, reset,
 }: {

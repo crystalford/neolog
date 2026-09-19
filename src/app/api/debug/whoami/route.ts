@@ -19,8 +19,6 @@
  * signed-in caller and nobody else. A stranger gets `null` and learns
  * nothing about the operator.
  */
-export const runtime = 'edge'
-
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {

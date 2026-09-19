@@ -16,8 +16,6 @@
  * which is the only thing about a recording the log knows and did not guess.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'

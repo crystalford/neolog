@@ -86,6 +86,15 @@ jobs:
       - name: Reading a recording
         run: node scripts/test/read-recording.mjs
 
+      # Whisper hallucinates a short filler phrase ("Thank you.") on
+      # near-silent audio instead of returning nothing, complete with
+      # real-looking per-word timings — found live when a silent DJI clip
+      # became "Thank you." x26 on the log, attributed to the operator.
+      # hasRealTranscript() only checks that word-timing rows exist; it
+      # cannot tell a real transcript from a fabricated one.
+      - name: The hallucination guard
+        run: node scripts/test/hallucination-guard.mjs
+
       # The one kind with someone else in it. A wrong split files another
       # person's sentence as something HE said; a wrong public view
       # publishes words nobody agreed to publish.

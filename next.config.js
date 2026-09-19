@@ -1,3 +1,16 @@
+// ⚠️ Gated on NODE_ENV, not called unconditionally.
+// Next's own build process exposes `globalThis.AsyncLocalStorage` (it uses
+// AsyncLocalStorage internally for request context), which is exactly the
+// signal the adapter's own dev/build differentiator relies on — so an
+// unconditional call here also fires during `next build`, tries to open a
+// remote wrangler proxy session, and fails outside an interactive shell
+// with no CLOUDFLARE_API_TOKEN set. `next build`/`next start` never hit
+// this branch at all.
+if (process.env.NODE_ENV === 'development') {
+  const { initOpenNextCloudflareForDev } = require('@opennextjs/cloudflare')
+  initOpenNextCloudflareForDev()
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },

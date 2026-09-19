@@ -8,8 +8,6 @@
  * actual work.
  */
 
-export const runtime = 'edge'
-
 import { PageViewClient } from './PageViewClient'
 
 export default async function PageView({ params }: { params: Promise<{ id: string }> }) {

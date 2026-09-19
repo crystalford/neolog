@@ -13,10 +13,10 @@
  * vlogs prefixes, so ownership checks read the same way everywhere.
  */
 
-export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getRequestContext } from '@cloudflare/next-on-pages'
+import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { presignPutUrl, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
@@ -40,7 +40,7 @@ function extFor(filename: string | undefined, contentType: string | undefined): 
 }
 
 export async function POST(req: NextRequest) {
-  const env = getRequestContext().env as unknown as Env
+  const env = getCloudflareContext().env as unknown as Env
   let operator
   try { operator = await requireOperator(req, env) }
   catch (e) {

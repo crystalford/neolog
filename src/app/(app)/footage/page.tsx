@@ -20,8 +20,6 @@
  * filmmaker looking for a shot needs to know which one he got.
  */
 
-export const runtime = 'edge'
-
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
