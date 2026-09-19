@@ -1,0 +1,89 @@
+name: Scan for hallucinated transcripts
+
+# Read-only. Finds vlogs whose transcript_words look like the Whisper
+# hallucination pattern fixed in workers/pipeline/src/index.ts
+# (looksLikeHallucinatedLoop) — a single word dominating the transcript,
+# the classic shape of "Thank you." x26 on a silent clip. This is a SQL
+# approximation of that function (a single dominant word, not the full
+# 1-4-word n-gram check), so it is a candidate list for human review, not
+# an authoritative verdict — some results may be legitimate repetition,
+# and the n-gram cases this doesn't catch (a repeated 2-4 word phrase
+# where no single word dominates) won't show up here.
+#
+# Nothing here writes to D1. Manual only.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  D1_NAME: neolog
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install wrangler
+        run: npm install -g wrangler@4
+
+      - name: Candidate vlogs — one dominant word across their transcript
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            WITH normed AS (
+              SELECT vlog_id,
+                     LOWER(TRIM(REPLACE(REPLACE(REPLACE(REPLACE(word,'.',''),',',''),'!',''),'?',''))) AS w
+              FROM transcript_words
+            ),
+            counts AS (
+              SELECT vlog_id, w, COUNT(*) AS c FROM normed WHERE w != '' GROUP BY vlog_id, w
+            ),
+            totals AS (
+              SELECT vlog_id, COUNT(*) AS total FROM normed WHERE w != '' GROUP BY vlog_id
+            ),
+            ranked AS (
+              SELECT c.vlog_id, c.w, c.c, t.total,
+                     ROW_NUMBER() OVER (PARTITION BY c.vlog_id ORDER BY c.c DESC) AS rn
+              FROM counts c JOIN totals t ON c.vlog_id = t.vlog_id
+            )
+            SELECT r.vlog_id, r.w AS top_word, r.c AS top_word_count, r.total AS word_count,
+                   ROUND(1.0 * r.c / r.total, 2) AS top_word_fraction,
+                   v.original_filename, v.recorded_at, v.duration_seconds, v.transcript_text
+              FROM ranked r JOIN vlogs v ON v.id = r.vlog_id
+             WHERE r.rn = 1 AND r.total >= 8 AND r.c >= 5 AND (1.0 * r.c / r.total) >= 0.35
+             ORDER BY top_word_fraction DESC;
+          " > /tmp/candidates.json
+          cat /tmp/candidates.json
+          echo "candidate_count=$(jq '.[0].results | length' /tmp/candidates.json)" >> "$GITHUB_OUTPUT"
+        id: candidates
+
+      - name: Entries built from those vlogs
+        run: |
+          set -e
+          ids=$(jq -r '.[0].results[].vlog_id' /tmp/candidates.json | tr '\n' ',' | sed 's/,$//')
+          if [ -z "$ids" ]; then
+            echo "No candidates — nothing to check for entries."
+            exit 0
+          fi
+          quoted=$(echo "$ids" | sed "s/\([^,]*\)/'\1'/g")
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT id, vlog_id, text, happened_at, logged_at, buried_at, visibility, source_ref
+              FROM log_entries
+             WHERE vlog_id IN ($quoted) AND deleted_at IS NULL
+             ORDER BY vlog_id, span_start;
+          " | tee /tmp/entries.json
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Hallucination scan"
+            echo ""
+            echo "Candidate vlogs: ${{ steps.candidates.outputs.candidate_count || 0 }}"
+            echo ""
+            echo "See job logs above for the full candidate list and any log_entries built from them."
+          } >> "$GITHUB_STEP_SUMMARY"
