@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=absolute-final-1758246200"
+  "path": "/api/v2/log/read?nonce=absolute-final-entries-1758246500"
 }
