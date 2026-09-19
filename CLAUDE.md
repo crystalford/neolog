@@ -1060,6 +1060,48 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 19 Sep — the FFmpeg container's temp-file sweep only ran once, ever
+
+After the routing, Whisper, and healer fixes above, the corpus run finished
+at 341 of 420 recordings actually read (2,279 entries) — but 47 still
+failed, and one traced end to end never got past `audio_extract` across
+**two straight days** of healer restarts. Buried in its event history,
+one attempt's real error: `ffmpeg /extract-audio 500: ENOSPC: no space
+left on device, write`.
+
+`workers/ffmpeg/server.js`'s `sweepStaleTmpDirs()` — the cleanup for a
+temp dir left behind by a crash — ran exactly once, at container boot
+(`sweepStaleTmpDirs()` at module load, nothing after). A container stays
+warm across every request while nothing has been idle for `sleepAfter`
+(5m), so across a 400-recording bulk run one container serves hundreds of
+jobs without ever restarting. Every job that dies WITHOUT reaching its own
+cleanup path — the process killed out from under it, the connection
+dropping before `res.on('close', ...)` fires, anything bypassing the
+try/catch `downloadToTmp` and the strategy loop both rely on — leaks a
+temp dir for the rest of that container's life. This vlog's own history
+already showed exactly that shape earlier: "Network connection lost",
+"operation was aborted", "Durable Object reset because its code was
+updated" — each one a path that skips the normal cleanup. Enough small
+leaks over enough hours is exactly how a container fills its disk.
+
+**The fix is age-gated, not a bare timer.** `FFmpegGate` allows up to 3
+concurrent `/extract-audio` calls sharing one container, so sweeping
+everything on an interval would delete another request's still-running
+temp dir out from under it. `STALE_TMP_AGE_MS` is `FFMPEG_TIMEOUT_MS` (this
+server's own 20-minute kill switch on a wedged ffmpeg) plus a 10-minute
+margin — a dir older than the longest any real job can still be running
+can only mean its owner already died some other way. The sweep now runs
+on that basis every ten minutes via `setInterval`, not only at boot.
+
+**Not fixed, and not chased further this pass:** the 4 (of the 47) that
+failed with `audio missing from R2` instead — `stepAudioExtract`'s
+`artifactExists()` check saw `VIDEOS.head()` succeed for an mp3 that
+`VIDEOS.get()` then couldn't read moments later in `stepTranscribe`. That
+reads as R2 read-after-write inconsistency under this specific bulk
+load, not a code bug in this repo, and re-dispatching those four (Settings
+→ "transcribe the untranscribed") is the correct next step rather than
+a code change guessing at a platform race.
+
 ### ⚠️ 18 Sep — the healer marked already-read recordings "failed"
 
 Running the fixed pipeline against the corpus overnight moved `read` from
