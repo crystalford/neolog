@@ -1219,13 +1219,17 @@ pinned toolchain, above) — but giving the platform more room between one
 alarm's writes settling and the next alarm coming due is the standard
 defensive move for exactly this failure shape.
 
-**The cron is back on** (`workers/healer/wrangler.toml`, `crons = ["*/5 * * * *"]`)
+**The cron was on** (`workers/healer/wrangler.toml`, `crons = ["*/5 * * * *"]`)
 — the operator's call, made when told what it costs and what it was for,
 the same way this file has said it should be decided since 9 Sep. It is
 what actually recovers a DO an alarm bug orphaned mid-chain: `/heal/:id`
 just re-arms the alarm without touching the stored pointer, so the row
-resumes exactly where it stopped rather than restarting. Turn it back off
-the same way once the corpus is read.
+resumes exactly where it stopped rather than restarting.
+
+**Turned back off 19 Sep** (`crons = []`), the operator's call again, once
+the corpus run finished at 341 of 420 recordings read (2,279 entries) and
+he confirmed it was done. If another bulk run is ever needed, turn it back
+on the same way, for the same reason.
 
 ### The backend pass — what the old engine left behind
 
