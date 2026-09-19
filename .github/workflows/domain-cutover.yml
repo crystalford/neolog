@@ -1,0 +1,106 @@
+name: Domain cutover (neolog.ai)
+
+# One-off, manual-only workflow for moving the neolog.ai custom domain from
+# the old Cloudflare Pages project to the new Worker deployed by the
+# OpenNext Cloudflare migration (see CLAUDE.md, 19 Sep entry).
+#
+# `action: diagnose` is read-only: it prints exactly how neolog.ai is
+# currently attached (Pages project domain list, DNS record, any existing
+# Workers Custom Domain for the zone) so the real cutover step is written
+# against ground truth instead of assumptions — Pages custom domains and
+# Workers Custom Domains are two different Cloudflare features with two
+# different APIs, and getting the sequencing wrong risks the domain
+# resolving nowhere for a window.
+#
+# `action: cutover` performs the actual move. Run `diagnose` first.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "diagnose (read-only) or cutover (makes the change)"
+        required: true
+        default: 'diagnose'
+        type: choice
+        options:
+          - diagnose
+          - cutover
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  DOMAIN: neolog.ai
+  PAGES_PROJECT: neolog
+  WORKER_NAME: neolog
+
+jobs:
+  domain-cutover:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Diagnose current domain attachment
+        run: |
+          set -e
+          echo "== Zone lookup for $DOMAIN =="
+          zone_resp=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/zones?name=$DOMAIN")
+          echo "$zone_resp" | jq '.result[] | {id, name, status}'
+          zone_id=$(echo "$zone_resp" | jq -r '.result[0].id // empty')
+          echo "zone_id=$zone_id" >> "$GITHUB_OUTPUT" 2>/dev/null || true
+          echo "ZONE_ID=$zone_id" >> "$GITHUB_ENV"
+
+          echo ""
+          echo "== Pages project '$PAGES_PROJECT' domains =="
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/domains" \
+            | jq '.result'
+
+          echo ""
+          echo "== DNS records for $DOMAIN (root + any relevant subdomain) =="
+          if [ -n "$zone_id" ]; then
+            curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?name=$DOMAIN" \
+              | jq '.result[] | {id, type, name, content, proxied}'
+          fi
+
+          echo ""
+          echo "== Existing Workers Custom Domains for this account (any hostname) =="
+          curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" \
+            | jq '.result[] | {id, hostname, service, environment, zone_name}'
+
+      - name: Perform cutover (Pages -> Worker Custom Domain)
+        if: ${{ inputs.action == 'cutover' }}
+        run: |
+          set -e
+          echo "Removing $DOMAIN from Pages project '$PAGES_PROJECT'..."
+          del_resp=$(curl -s -w "\n%{http_code}" -X DELETE \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT/domains/$DOMAIN")
+          del_status=$(echo "$del_resp" | tail -n1)
+          del_body=$(echo "$del_resp" | sed '$d')
+          echo "$del_body" | jq . || echo "$del_body"
+          if [ "$del_status" != "200" ] && [ "$del_status" != "404" ]; then
+            echo "❌ Failed to detach domain from Pages project (HTTP $del_status). Stopping before attaching to the Worker."
+            exit 1
+          fi
+          echo "✅ Detached from Pages (or already absent)."
+
+          echo "Attaching $DOMAIN to Worker '$WORKER_NAME' as a Workers Custom Domain..."
+          attach_resp=$(curl -s -w "\n%{http_code}" -X PUT \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" \
+            -d '{"environment":"production","hostname":"'"$DOMAIN"'","service":"'"$WORKER_NAME"'","zone_id":"'"$ZONE_ID"'"}')
+          attach_status=$(echo "$attach_resp" | tail -n1)
+          attach_body=$(echo "$attach_resp" | sed '$d')
+          echo "$attach_body" | jq . || echo "$attach_body"
+          if [ "$attach_status" != "200" ] && [ "$attach_status" != "201" ]; then
+            echo "❌ Failed to attach domain to the Worker (HTTP $attach_status)."
+            echo "⚠️ The domain was already detached from Pages above and is now attached to NEITHER target."
+            echo "⚠️ Re-run this same 'cutover' action to retry the attach (the detach step is a no-op on a 404 the second time)."
+            exit 1
+          fi
+          echo "✅ $DOMAIN is now a Workers Custom Domain pointed at '$WORKER_NAME'."
