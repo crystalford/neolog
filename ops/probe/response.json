@@ -1,29 +1,14 @@
 {
-  "requested_at": "2026-09-19T10:35:58Z",
+  "requested_at": "2026-09-19T10:36:35Z",
   "method": "GET",
-  "path": "/api/v2/admin/pipeline-state?nonce=finalday-1758240000",
+  "path": "/api/v2/log/read?nonce=finalentries-1758240200",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3d7f257aeeb3450-IAD\r|",
-  "body": "{\"total\":420,\"by_status\":{\"read\":341,\"transcribed_only\":32,\"words_missing\":0,\"untranscribed\":0,\"stuck_in_flight\":0,\"in_flight_recent\":0,\"archived\":0,\"failed\":47},\"failure_breakdown\":{\"other\":152},\"stuck_examples\":[],\"counts_for_run\":{\"needs_transcribing\":47,\"ready_to_read\":32}}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3d7f33c6d06ad1d-MSP\r|",
+  "body": "{\"recordings\":420,\"transcribed\":377,\"read\":341,\"entries\":2279}",
   "body_json": {
-    "total": 420,
-    "by_status": {
-      "read": 341,
-      "transcribed_only": 32,
-      "words_missing": 0,
-      "untranscribed": 0,
-      "stuck_in_flight": 0,
-      "in_flight_recent": 0,
-      "archived": 0,
-      "failed": 47
-    },
-    "failure_breakdown": {
-      "other": 152
-    },
-    "stuck_examples": [],
-    "counts_for_run": {
-      "needs_transcribing": 47,
-      "ready_to_read": 32
-    }
+    "recordings": 420,
+    "transcribed": 377,
+    "read": 341,
+    "entries": 2279
   }
 }
