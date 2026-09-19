@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/debug/whoami?nonce=next15-pass1-verify-1"
+  "path": "/api/v2/log?limit=3&nonce=next15-pass1-verify-2"
 }
