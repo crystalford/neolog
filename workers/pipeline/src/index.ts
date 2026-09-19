@@ -170,6 +170,46 @@ function extractWhisperWords(result: any): Array<{ word: string; start: number; 
   return out
 }
 
+/**
+ * ⚠️ 19 Sep — Whisper hallucinates a short filler phrase ("Thank you.",
+ * "Thanks for watching.", "Bye.") on near-silent or non-speech audio,
+ * instead of returning nothing. `stepAudioExtract`'s no-audio check only
+ * catches an input with NO audio stream at all (`ffprobe`'s stream count);
+ * a DJI clip whose mic picked up nothing but wind or near-silence still HAS
+ * an audio stream, so it reaches Whisper, and Whisper invents words —
+ * complete with real-looking per-word timings, because it is still
+ * confidently guessing. `hasRealTranscript()` only checks that word-timing
+ * rows EXIST; it cannot tell a genuine transcript from a fabricated one, so
+ * nothing before this line ever asked whether the words looked real.
+ *
+ * The signature this catches: the SAME short phrase (1-4 words), repeated
+ * back-to-back, covering most of the transcript. Real speech does not do
+ * this — a genuine recording essentially never repeats an identical short
+ * phrase five-plus times running. `read-recording.ts` would otherwise quote
+ * this verbatim as things he said, which is exactly the lie this product
+ * exists to never tell (`§0.2` — CLAUDE.md: "the log is wrong about the
+ * boundary sometimes and never wrong about the words").
+ */
+function looksLikeHallucinatedLoop(words: Array<{ word: string }>): boolean {
+  const tokens = words
+    .map(w => w.word.toLowerCase().replace(/[^a-z']/g, ''))
+    .filter(Boolean)
+  if (tokens.length < 8) return false
+
+  for (let n = 1; n <= 4; n++) {
+    const chunkCount = Math.floor(tokens.length / n)
+    if (chunkCount < 5) continue
+    const counts = new Map<string, number>()
+    for (let i = 0; i < chunkCount; i++) {
+      const key = tokens.slice(i * n, i * n + n).join(' ')
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+    const maxCount = Math.max(...counts.values())
+    if (maxCount >= 5 && (maxCount * n) / tokens.length >= 0.6) return true
+  }
+  return false
+}
+
 // ─── Host worker ────────────────────────────────────────────────────────────
 
 export default {
@@ -958,6 +998,26 @@ export class VlogPipelineDO {
 
     if (!stitched) throw new Error('Whisper returned empty transcript')
 
+    // ⚠️ Whisper hallucinating a short filler phrase on near-silent audio
+    // ("Thank you." x26 was the case that found this) looks exactly like a
+    // real transcript to hasRealTranscript() — real per-word timings, a
+    // non-empty transcript_text. transcript_text is still recorded below
+    // (never silently — it is the audit trail proving what Whisper actually
+    // said and why it was not trusted), but transcript_words is not: that
+    // is the only table read-recording.ts and the vlog page's transcript
+    // panel ever read, so refusing to write it there is enough to stop a
+    // fabricated word from ever reaching an entry or a screen.
+    const hallucinated = looksLikeHallucinatedLoop(allWords)
+    if (hallucinated) {
+      await this.recordEvent(vlog.id, 'transcribe', 'ok', 'hallucination_guard',
+        {
+          state: 'likely_hallucination',
+          reason: 'repeated_short_phrase',
+          transcript_preview: stitched.slice(0, 200),
+          word_count: allWords.length,
+        })
+    }
+
     await this.env.DB.prepare(
       `UPDATE vlogs SET transcript_text = ?, transcript_provider = 'workers_ai_whisper',
                         transcript_completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
@@ -979,7 +1039,7 @@ export class VlogPipelineDO {
       }
     }
 
-    if (allWords.length > 0) {
+    if (allWords.length > 0 && !hallucinated) {
       const stmts = allWords.map((w, idx) =>
         this.env.DB.prepare(
           `INSERT INTO transcript_words (vlog_id, operator_id, word, start_time, end_time, word_index)

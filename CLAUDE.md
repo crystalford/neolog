@@ -1061,6 +1061,66 @@ skip an interpolated list first — `IN ('${IN_FLIGHT_STATUSES.join("','")}')`
 read as a literal value, so the shared constant reported as an illegal one,
 which is the opposite of the point.
 
+### ⚠️ 19 Sep — Whisper hallucinated "Thank you." onto a silent recording, and the log said he said it
+
+Reported live: a silent, slow-motion DJI clip (`DJI_20260702095405_0062_D.MP4`
+— running footage, no speech, no audience) came back from Whisper with
+**52 words of "Thank you." repeated 26 times**, real per-word timings
+attached, presented on `/vlog/[id]` as *"the transcript, as it was heard ·
+click a word to fix it"* — and at least one "said" entry on the log,
+attributed to the operator, was built from it. This is the exact lie
+`SPEC §0.2` and this file's own opening promise exist to prevent: **"it never
+writes a word of your recordings."**
+
+**Whisper hallucinating a short filler phrase on near-silent audio is a
+known failure mode, not a one-off.** Quiet or wordless clips push it toward
+phrases its training data associates with quiet audio — "Thank you.",
+"Thanks for watching.", "Bye." — and it returns them with the same
+confident, real-looking per-word timings as genuine speech. Nothing in this
+pipeline had ever asked whether a transcript looked real.
+
+**`stepAudioExtract`'s no-audio short-circuit (the fix directly above) does
+not catch this.** It probes for an audio STREAM and short-circuits only
+when there is none at all. A DJI clip whose mic picked up nothing but wind
+or near-silence still has a stream — ffprobe reports it present — so the
+clip proceeds through extraction and reaches Whisper, which is exactly
+where it invents words. And `hasRealTranscript()` (the fix two entries
+above this one) only ever checked that `transcript_words` rows EXIST — real
+timings on fabricated words pass that check identically to real timings on
+real words. Two separate, previously-correct fixes, and the gap between
+them was never closed.
+
+**`looksLikeHallucinatedLoop()` in `workers/pipeline/src/index.ts`** closes
+it directly: the SAME short phrase (1-4 words) repeated back-to-back,
+covering most of the transcript. Real speech does not do this — a genuine
+recording essentially never repeats an identical short phrase five-plus
+times running, so this is a high-precision signal about the SHAPE of the
+output, not a guess about what he meant. `stepTranscribe` still writes
+`transcript_text` when this fires (never silently — it is the audit trail
+proving what Whisper actually said and why it was not trusted), but skips
+the `transcript_words` INSERT entirely. That one table is the only thing
+`read-recording.ts` and the vlog page's transcript panel ever read (the
+panel is gated on `words.length > 0`, confirmed by reading the route), so
+refusing to write it there is enough to stop a fabricated word from ever
+reaching an entry or a screen — no other change needed on the read side.
+
+`scripts/test/hallucination-guard.mjs` — 15 assertions, in CI. Re-implements
+the pure function (the real one reaches Cloudflare Worker types this script
+can't load) and asserts the real source still matches its shape, the way
+`split-note.mjs` already does for `findAnchor`. Covers the real incident
+(26x "Thank you."), single-word loops at and below the repetition floor, a
+genuine varied sentence, counting with no repeats, a short clip below the
+8-word minimum, and a phrase said a normal handful of times inside real
+speech — the case that must NOT be flagged, or a real thank-you tangent
+would be discarded along with the fabricated one.
+
+**Not yet done, on purpose, pending the operator's decision:** the corpus
+already has entries built from vlogs transcribed before this fix landed.
+Finding and deciding what to do with them — bury, or the stronger removal
+this file reserves for "something that should never have gone in at all" —
+is a separate pass, because it touches existing entries on a live log and
+that is not a call to make unilaterally.
+
 ### ⚠️ 19 Sep — a silent recording's "already done" was silently undone
 
 After the disk fix below, 8 of the corpus's last 10 failures turned out to
