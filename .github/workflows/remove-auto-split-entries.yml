@@ -22,6 +22,13 @@ name: Remove auto-split entries
 #      the split code wrote nowhere else: "Split into N things you said in
 #      it. The whole take is kept."
 #
+#      ⚠️ D1 rejects a LIKE pattern nested inside an IN (SELECT ... WHERE
+#      x LIKE ...) subquery with "LIKE or GLOB pattern too complex" — found
+#      running this workflow's first version. Worked around the same way
+#      scan-hallucinated-transcripts.yml already does it: resolve the
+#      parent ids in one plain query, then splice the literal id list into
+#      the child query as a quoted IN (...) — no LIKE inside a subquery.
+#
 # The parent entries themselves are NOT deleted — they are the vlog/voice
 # note's own one entry, which stays. Their `detail` (the stale "Split into
 # N things..." line) is cleared back to NULL so nothing claims a split that
@@ -70,19 +77,35 @@ jobs:
              ORDER BY happened_at DESC LIMIT 5;
           "
 
-      - name: Count + sample — population B (composer voice-note split)
+      - name: Resolve parent ids carrying the split marker
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT id FROM log_entries
+             WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.';
+          " > /tmp/parents.json
+          cat /tmp/parents.json
+          jq -r '.[0].results | length' /tmp/parents.json
+          ids=$(jq -r '.[0].results[].id' /tmp/parents.json | tr '\n' ',' | sed 's/,$//')
+          echo "$ids" > /tmp/parent_ids.txt
+          echo "parent ids: $ids"
+
+      - name: Count + sample — population B (composer voice-note split children)
         run: |
           set -e
           echo "## Population B — composer voice-note split children" | tee -a "$GITHUB_STEP_SUMMARY"
+          ids=$(cat /tmp/parent_ids.txt)
+          if [ -z "$ids" ]; then
+            echo "No marked parents — nothing in population B."
+            exit 0
+          fi
+          quoted=$(echo "$ids" | sed "s/\([^,]*\)/'\1'/g")
           wrangler d1 execute "$D1_NAME" --remote --json --command "
             SELECT COUNT(*) AS n FROM log_entries
              WHERE deleted_at IS NULL
                AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
                AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
-               AND led_from IN (
-                 SELECT id FROM log_entries
-                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
-               );
+               AND led_from IN ($quoted);
           " | tee /tmp/count_b.json
           jq -r '.[0].results[0].n' /tmp/count_b.json
           echo "sample:"
@@ -91,20 +114,8 @@ jobs:
              WHERE deleted_at IS NULL
                AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
                AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
-               AND led_from IN (
-                 SELECT id FROM log_entries
-                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
-               )
+               AND led_from IN ($quoted)
              ORDER BY happened_at DESC LIMIT 5;
-          "
-
-      - name: Count — parents whose stale detail marker will be cleared
-        run: |
-          set -e
-          wrangler d1 execute "$D1_NAME" --remote --json --command "
-            SELECT COUNT(*) AS n FROM log_entries
-             WHERE deleted_at IS NULL
-               AND detail LIKE 'Split into % things you said in it. The whole take is kept.';
           "
 
       - name: DELETE (soft) — population A
@@ -120,25 +131,33 @@ jobs:
         if: ${{ inputs.execute }}
         run: |
           set -e
+          ids=$(cat /tmp/parent_ids.txt)
+          if [ -z "$ids" ]; then
+            echo "No marked parents — nothing in population B to delete."
+            exit 0
+          fi
+          quoted=$(echo "$ids" | sed "s/\([^,]*\)/'\1'/g")
           wrangler d1 execute "$D1_NAME" --remote --command "
             UPDATE log_entries SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
              WHERE deleted_at IS NULL
                AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
                AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
-               AND led_from IN (
-                 SELECT id FROM log_entries
-                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
-               );
+               AND led_from IN ($quoted);
           "
 
       - name: Clear the stale split marker on the parents (they are not deleted)
         if: ${{ inputs.execute }}
         run: |
           set -e
+          ids=$(cat /tmp/parent_ids.txt)
+          if [ -z "$ids" ]; then
+            echo "No marked parents to clear."
+            exit 0
+          fi
+          quoted=$(echo "$ids" | sed "s/\([^,]*\)/'\1'/g")
           wrangler d1 execute "$D1_NAME" --remote --command "
             UPDATE log_entries SET detail = NULL, updated_at = CURRENT_TIMESTAMP
-             WHERE deleted_at IS NULL
-               AND detail LIKE 'Split into % things you said in it. The whole take is kept.';
+             WHERE deleted_at IS NULL AND id IN ($quoted);
           "
 
       - name: Verify — zero remain
@@ -146,6 +165,11 @@ jobs:
         run: |
           set -e
           echo "## After cleanup" | tee -a "$GITHUB_STEP_SUMMARY"
+          ids=$(cat /tmp/parent_ids.txt)
+          quoted="''"
+          if [ -n "$ids" ]; then
+            quoted=$(echo "$ids" | sed "s/\([^,]*\)/'\1'/g")
+          fi
           wrangler d1 execute "$D1_NAME" --remote --json --command "
             SELECT
               (SELECT COUNT(*) FROM log_entries WHERE deleted_at IS NULL AND source_ref LIKE 'said:%') AS pop_a_remaining,
@@ -153,10 +177,7 @@ jobs:
                 WHERE deleted_at IS NULL
                   AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
                   AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
-                  AND led_from IN (
-                    SELECT id FROM log_entries
-                     WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
-                  )) AS pop_b_remaining;
+                  AND led_from IN ($quoted)) AS pop_b_remaining;
           " | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Summary
