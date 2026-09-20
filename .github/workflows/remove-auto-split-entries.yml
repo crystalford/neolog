@@ -79,12 +79,10 @@ jobs:
 
       - name: Resolve parent ids carrying the split marker
         run: |
-          set -e
           wrangler d1 execute "$D1_NAME" --remote --json --command "
             SELECT id FROM log_entries
              WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.';
-          " > /tmp/parents.json
-          cat /tmp/parents.json
+          " | tee /tmp/parents.json
           jq -r '.[0].results | length' /tmp/parents.json
           ids=$(jq -r '.[0].results[].id' /tmp/parents.json | tr '\n' ',' | sed 's/,$//')
           echo "$ids" > /tmp/parent_ids.txt
