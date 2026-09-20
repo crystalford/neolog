@@ -52,7 +52,10 @@ const PAGES = [
   // top — "don't remember" is a complete answer and the rest were listed
   // with no way to say it. The design's third button is "Talk it out",
   // which is the offer and stays below the fence.
-  ['log',        'src/app/(app)/page.tsx',              0],
+  // 20 Sep: the markup moved to the client sibling when `/` was split into
+  // a Server Component that reads the feed and a client half that renders
+  // it. Same move the Next 15 migration made for entry/page/month.
+  ['log',        'src/app/(app)/LogHomeClient.tsx',     0],
   // Next 15 made page `params` a Promise; React 18 (pinned here) has no
   // `use()` to unwrap one in a Client Component, so the markup moved to a
   // sibling `EntryPageClient.tsx` behind a thin async server `page.tsx`

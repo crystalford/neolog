@@ -54,7 +54,14 @@ export async function GET(req: NextRequest) {
     db,
     `SELECT id, text, detail,
             COALESCE(happened_at, occurred_at, created_at) AS happened_at,
-            date_precision, author, visibility, source_kind, r, mime
+            -- 20 Sep: this read a column named r, which does not exist, so
+            -- every request threw "no such column: r". The rail card caught
+            -- it and hid itself, and On This Day had silently never worked.
+            -- The column is r2_key, aliased back to r because the rows are
+            -- read below as r.r. check-sql-columns.mjs could not see it: it
+            -- validates alias-qualified references, and this query has no
+            -- table alias, so every bare name in it was skipped.
+            date_precision, author, visibility, source_kind, r2_key AS r, mime
        FROM log_entries
       WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         AND substr(COALESCE(happened_at, occurred_at, created_at), 6, 5) = ?

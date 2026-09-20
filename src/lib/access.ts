@@ -182,6 +182,23 @@ export async function requireOperator(
   return op
 }
 
+/**
+ * The same gate, for a Server Component.
+ *
+ * A route handler has a `Request`; a page render has `headers()` from
+ * `next/headers` and nothing else. Both `readEmail` and
+ * `readServiceTokenName` only ever touch `request.headers`, so rather than
+ * grow a second copy of the identity logic — which is exactly how one of
+ * them would come to disagree with the other about who is signed in — this
+ * wraps the headers in a Request and calls the one gate.
+ */
+export async function requireOperatorFromHeaders(
+  headers: Headers,
+  env: { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string },
+): Promise<Operator> {
+  return requireOperator(new Request('https://neolog.internal/', { headers }), env)
+}
+
 export class UnauthenticatedError extends Error {
   constructor() {
     super('No Cloudflare Access identity on request')
