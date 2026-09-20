@@ -1,11 +1,21 @@
 'use client'
 
 /**
- * Transcribe the recordings again, then read them onto the log.
+ * Transcribe the recordings again.
  *
  * After **Start again** the recordings have no transcript, so nothing can
- * be read from them — a recording with no word timings is deliberately
- * skipped rather than dated by guess. This is what refills them.
+ * be read from them on the vlog's own page — a recording with no word
+ * timings is deliberately left alone rather than dated by guess. This is
+ * what refills them.
+ *
+ * ⚠️ 20 Sep — this panel used to also have a "Read them onto the log"
+ * action, walking every transcribed recording and cutting it into several
+ * standalone "said" entries automatically. That was removed: the operator
+ * never asked the log to carve his own speech into separate posts on his
+ * behalf (SPEC §0 rule 3, rule 7). Recording a vlog is one logged act, and
+ * it already produced its one entry at intake. Transcribing is still
+ * useful on its own — it's what populates the word-by-word transcript on
+ * the vlog's own page for him to read, scrub and fix.
  *
  * It dispatches in small batches and reports the running count, because 400
  * recordings will not fit in one request and a bar that says nothing for
@@ -14,30 +24,14 @@
  * far the log has got.
  */
 
-import { useCallback, useEffect, useState, useRef } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-interface Status { recordings: number; transcribed: number; read: number; entries: number }
+interface Status { recordings: number; transcribed: number }
 
 export function Retranscribe() {
   const [s, setS] = useState<Status | null>(null)
-  const [busy, setBusy] = useState<'transcribe' | 'read' | null>(null)
+  const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
-  const [stop, setStop] = useState(false)
-  /**
-   * ⚠️ A REF as well as state, and the loop reads the ref.
-   *
-   * `read` walks four hundred recordings a page at a time, and it checked
-   * `stop` from the closure it STARTED with — which is `false` for the whole
-   * run, because `useCallback` making a new function does not reach into the
-   * one already looping. Pressing Stop set the state, re-rendered the button,
-   * and changed nothing. On the one job long enough to want stopping, the
-   * stop did nothing.
-   *
-   * The state is what the button renders from — it says "stopping after this
-   * page…" so the press is visibly heard — and the ref is what the loop
-   * reads. They are set together.
-   */
-  const stopRef = useRef(false)
 
   const load = useCallback(async () => {
     try {
@@ -48,7 +42,7 @@ export function Retranscribe() {
   useEffect(() => { void load() }, [load])
 
   const transcribe = useCallback(async () => {
-    setBusy('transcribe'); setNote(null)
+    setBusy(true); setNote(null)
     try {
       // Two steps, because that is the endpoint's shape: resolve the list
       // with a dry run, then dispatch it in chunks so 400 recordings do not
@@ -77,68 +71,22 @@ export function Retranscribe() {
       setNote(`${sent} sent to the pipeline. It runs in the background — come back for the count.`)
       await load()
     } catch { setNote('that did not go through') }
-    finally { setBusy(null) }
-  }, [load])
-
-  const read = useCallback(async () => {
-    setBusy('read'); setNote(null); setStop(false); stopRef.current = false
-    let cursor: string | null = null
-    let written = 0
-    let skipped = 0
-    try {
-      for (;;) {
-        if (stopRef.current) break
-        const res: Response = await fetch('/api/v2/log/read', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cursor, limit: 5 }),
-        })
-        if (!res.ok) break
-        const r = await res.json() as {
-          entries_written: number; untranscribed: number; next_cursor: string | null
-        }
-        written += r.entries_written
-        skipped += r.untranscribed
-        setNote(`${written} on the log so far…`)
-        cursor = r.next_cursor
-        if (!cursor) break
-      }
-      setNote(
-        `${written} entries on the log.`
-        + (skipped ? ` ${skipped} recordings had no word timings, so nothing was placed from them.` : ''),
-      )
-      await load()
-    } catch { setNote('that stopped early — press again, it picks up where it left off') }
-    finally { setBusy(null) }
+    finally { setBusy(false) }
   }, [load])
 
   return (
     <div className="paste">
       {s && (
         <p className="none" style={{ padding: '0 0 12px' }}>
-          {s.recordings} recordings · {s.transcribed} transcribed ·{' '}
-          {s.read} read · {s.entries.toLocaleString('en-GB')} entries on the log from them.
+          {s.recordings} recordings · {s.transcribed} transcribed.
         </p>
       )}
       <div className="bar">
-        <button onClick={() => void transcribe()} disabled={busy !== null}>
-          {busy === 'transcribe' ? 'Sending' : 'Transcribe the untranscribed'}
+        <button className="p" onClick={() => void transcribe()} disabled={busy}>
+          {busy ? 'Sending' : 'Transcribe the untranscribed'}
         </button>
-        <button className="p" onClick={() => void read()} disabled={busy !== null}>
-          {busy === 'read' ? 'Reading' : 'Read them onto the log'}
-        </button>
-        {busy === 'read' && (
-          <button
-            onClick={() => { stopRef.current = true; setStop(true) }}
-            disabled={stop}
-          >{stop ? 'stopping after this page…' : 'Stop'}</button>
-        )}
         {note && <span className="say">{note}</span>}
       </div>
-      <p className="none" style={{ padding: '10px 0 0', fontSize: 13 }}>
-        Reading is idempotent — running it twice writes nothing the second
-        time, so stopping halfway and starting again loses nothing.
-      </p>
     </div>
   )
 }

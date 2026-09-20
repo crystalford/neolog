@@ -10,12 +10,15 @@
  *
  * This is the rule that makes a document a different thing from a paste.
  *
- * `src/lib/split-note.ts` splits a recollection INTO dated entries, because
- * that is what a recollection is for — the document stays and the entries
- * point back into it. A finished piece of writing is the opposite: it was
- * made to be read whole, and cutting it into lines destroys the thing. So
- * nothing in this file calls the splitter, and a document shows on the feed
- * as ONE entry saying it was made.
+ * ⚠️ 20 Sep — the codebase used to also auto-split a recollection (a vlog,
+ * a voice note) INTO several dated entries via `src/lib/split-note.ts`. That
+ * was removed — the operator never asked the log to carve his own speech
+ * into separate posts on his behalf (SPEC §0 rule 3, rule 7); recording
+ * something is one logged act. This rule for documents was never that
+ * mechanism anyway and needs no change: a finished piece of writing was made
+ * to be read whole, and cutting it into lines destroys the thing. So nothing
+ * in this file calls a splitter, and a document shows on the feed as ONE
+ * entry saying it was made.
  *
  * ── Above the fence ──────────────────────────────────────────────────────
  *

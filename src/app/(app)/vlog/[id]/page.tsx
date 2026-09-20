@@ -68,8 +68,6 @@ export default function Recording() {
   const router = useRouter()
   const [r, setR] = useState<Result | null>(null)
   const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
   const [at, setAt] = useState(0)
   // `fix.html`: click the word, type the right one. One word is open at a
   // time — `editing` is its index, `draft` is what he has typed so far.
@@ -85,22 +83,6 @@ export default function Recording() {
     finally { setLoading(false) }
   }, [params.id])
   useEffect(() => { void load() }, [load])
-
-  const read = useCallback(async () => {
-    setBusy(true); setMsg(null)
-    try {
-      const res = await fetch('/api/v2/log/read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vlog_id: params.id }),
-      })
-      const j = await res.json() as { entries_written: number; passages: number; no_words: boolean }
-      if (j.no_words) setMsg('No word timings on this one yet, so nothing was placed. Nothing is dated by guess.')
-      else setMsg(`${j.entries_written} of ${j.passages} on the log. Each is a run of the words below, at the second you said it.`)
-      await load()
-    } catch { setMsg('that did not run') }
-    finally { setBusy(false) }
-  }, [params.id, load])
 
   /**
    * Correct one word Whisper misheard.
@@ -269,35 +251,6 @@ export default function Recording() {
                 </div>
               </div>
             </div>
-
-            <div className="sh">
-              <span>what the log read out of it</span>
-              <b>{r.entries.length}</b>
-            </div>
-            <div className="paste" style={{ marginTop: 14 }}>
-              <div className="bar">
-                <button className="p" onClick={() => void read()} disabled={busy || v.word_count === 0}>
-                  {busy ? 'Reading it' : r.entries.length ? 'Read it again' : 'Read it onto the log'}
-                </button>
-                {msg && <span className="say">{msg}</span>}
-                {!msg && (
-                  <span className="say">
-                    Your sentences, cut where you paused, at the second you
-                    said them. No model touches this.
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {r.entries.map(e => (
-              <div className="item" key={e.id}>
-                <div className="x"><Link href={`/entry/${e.id}`}>{e.text}</Link></div>
-                <div className="m">
-                  {e.span_start != null && <time>{clock(e.span_start)}</time>}
-                  <span>on the log</span>
-                </div>
-              </div>
-            ))}
 
             {r.words.length > 0 && (
               <>

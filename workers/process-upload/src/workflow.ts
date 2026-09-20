@@ -695,25 +695,19 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // judgement about his thoughts. Every entry is a contiguous run of the
     // transcript at the second he said it.
     //
-    // It is softStep-wrapped like everything else: a recording whose reader
-    // fails still keeps its file, its thumbnail, its date and its transcript,
-    // and can be read again from its own page.
+    // ⚠️ 20 Sep — this step used to call `readRecording`, cutting a
+    // recording's transcript into several standalone "said" entries
+    // automatically. The operator never asked for that: recording a vlog is
+    // one logged act, and the log deciding to carve his speech into several
+    // posts is the log authoring content (SPEC §0 rule 3, rule 7). Now a
+    // no-op — a vlog produces exactly the one entry the upload itself
+    // already wrote, and the full transcript stays on the vlog's own page.
+    // `src/lib/read-recording.ts` is deleted; nothing else called it.
     await step.do('mark-reading', async () => reportStatus('reading'))
-
     await softStep(
       'read-onto-log',
       { retries: { limit: 2, delay: '10 seconds' }, timeout: '5 minutes' },
-      async () => {
-        const { readRecording } = await import('../../../src/lib/read-recording')
-        const r = await readRecording(this.env.DB as any, operator_id, vlog_id, this.env)
-        // Named in the outcome rather than swallowed: a recording with no
-        // word timings is skipped, never dated by guess.
-        return {
-          passages: r.passages,
-          entries_written: r.entries_written,
-          no_word_timings: r.no_words,
-        }
-      },
+      async () => ({ disabled: true }),
     )
 
 

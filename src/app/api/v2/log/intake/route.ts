@@ -52,7 +52,6 @@ import { transcribeAudio } from '@/lib/transcribe'
 import { checkHoldBack, NOT_LOOKED_AT, placeFile, kindForUpload } from '@/lib/log-intake'
 import { dispatchPipeline } from '@/lib/dispatch-pipeline'
 import { verifyStored, findExistingCopy } from '@/lib/keep'
-import { splitNote } from '@/lib/split-note'
 import {
   looksLikeConversation, splitTurns, operatorTurns, conversationSentence,
   looksLikeDocument, documentSentence,
@@ -514,6 +513,13 @@ async function runFollowUps(
         const segments = (result.segments || [])
           .filter(sg => sg && typeof sg.start === 'number' && (sg.text || '').trim())
           .map(sg => ({ s: Math.round(sg.start * 10) / 10, t: sg.text.trim() }))
+        // ⚠️ 20 Sep — this used to call splitNote() and cut the transcript
+        // into several standalone entries automatically ("Split into N
+        // things you said in it"). The operator never asked for that:
+        // recording a voice note is one logged act, and the log deciding to
+        // carve his speech into several posts is the log authoring content
+        // (SPEC §0 rule 3, rule 7). The whole take is one entry, in full,
+        // below — nothing further happens to it.
         await run(
           db,
           `UPDATE log_entries
@@ -526,51 +532,6 @@ async function runFollowUps(
           segments.length ? JSON.stringify(segments) : null,
           result.duration_seconds ?? null, item.id,
         )
-
-        // One take usually carries several things. Split it into the parts
-        // it actually was — each part a verbatim slice of what he said, none
-        // of them written by a model. The recording keeps the whole thing;
-        // the parts point back at it.
-        try {
-          const parts = await splitNote(env, said)
-          if (parts.length >= 2) {
-            const now2 = new Date().toISOString()
-            const stmts = parts.map(part => ({
-              sql: `INSERT INTO log_entries
-                      (id, operator_id, text, occurred_at, happened_at, logged_at,
-                       date_precision, kind, visibility, author, source_kind,
-                       led_from, relation, vlog_id)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-              binds: [
-                ulid(), operatorId, part.text,
-                // Each part sits at the moment of the recording it came out
-                // of. A finer time would be invented, not known.
-                happenedAt, happenedAt, now2,
-                precision, 'said', 'public', 'operator', 'voice',
-                // A part of one take is a turn out of it, not a later
-                // thought about it — he said them in the same breath.
-                item.id, RELATION_DEFAULT, null,
-              ],
-            }))
-            for (let i = 0; i < stmts.length; i += 40) {
-              await d1Batch(db, stmts.slice(i, i + 40))
-            }
-            // The take says what it turned into, so the parts are not a
-            // surprise and the wrong-split correction has somewhere to start.
-            await run(
-              db,
-              `UPDATE log_entries
-                  SET detail = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?`,
-              `Split into ${parts.length} things you said in it. The whole take is kept.`,
-              item.id,
-            )
-          }
-        } catch (err: any) {
-          console.warn('[intake] split failed:', err?.message || err)
-          // The note stays whole. A failed split is a missing convenience,
-          // never a lost entry.
-        }
         return
       }
 

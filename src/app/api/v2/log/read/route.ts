@@ -1,99 +1,50 @@
 /**
- * GET  /api/v2/log/read — how much of the corpus the log has read.
- * POST /api/v2/log/read — read a page of recordings onto the log.
+ * GET /api/v2/log/read — how much of the corpus is transcribed.
  *
- * The replacement for relog. Relog turned the extraction model's `threads`
- * into entries; this reads the transcript directly, cutting at his own
- * pauses. No model is involved at any point — see `src/lib/read-recording.ts`
- * for why that is the whole design rather than an optimisation.
+ * ⚠️ 20 Sep — this route used to also POST a page of recordings through
+ * `readRecording()`, cutting each transcript into several standalone "said"
+ * entries automatically. That was removed: the operator never asked the log
+ * to carve his own speech into separate posts on his behalf (SPEC §0 rule 3,
+ * rule 7) — recording a vlog is one logged act, and it already produced its
+ * one entry at intake ("Recorded a video."). The full transcript still lives
+ * on the vlog's own page for him to read and scrub; nothing from it becomes
+ * a separate post unless he deliberately writes one.
  *
- * Paged, because four hundred recordings will not fit in one Function
- * invocation, and idempotent at the row level, so a retry after a timeout is
- * always safe.
+ * What's left is read-only: two honest counts for the Settings "transcribe
+ * the untranscribed" panel, which is unrelated and stays — populating
+ * `transcript_words` for on-page reading and fixing is still useful; turning
+ * it into entries the operator didn't write is what went.
  */
 
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getDb, findMany } from '@/lib/d1'
+import { getDb, findOne } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import { readRecording, readStatus } from '@/lib/read-recording'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
   DB: D1Database
-  /** The splitter's model. Absent means reading falls back to his pauses. */
-  AI?: { run: (m: any, a: any) => Promise<any> }
   NEOLOG_DEV_OPERATOR_EMAIL?: string
-}
-
-async function operatorOr401(req: NextRequest, env: Env) {
-  try { return { operator: await requireOperator(req, env), error: null as null } }
-  catch (e) {
-    if (e instanceof UnauthenticatedError) {
-      return { operator: null, error: NextResponse.json({ error: 'Unauthenticated' }, { status: 401 }) }
-    }
-    throw e
-  }
 }
 
 export async function GET(req: NextRequest) {
   const env = getCloudflareContext().env as unknown as Env
-  const { operator, error } = await operatorOr401(req, env)
-  if (error) return error
-  const status = await readStatus(await readyDb(getDb(env), 'read'), operator!.id)
-  return NextResponse.json(status, { headers: { 'Cache-Control': 'no-store' } })
-}
-
-export async function POST(req: NextRequest) {
-  const env = getCloudflareContext().env as unknown as Env
-  const { operator, error } = await operatorOr401(req, env)
-  if (error) return error
+  let operator
+  try { operator = await requireOperator(req, env) }
+  catch (e) {
+    if (e instanceof UnauthenticatedError) return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
+    throw e
+  }
   const db = await readyDb(getDb(env), 'read')
-  const body = await req.json().catch(() => ({})) as { cursor?: string; limit?: number; vlog_id?: string }
-
-  // One recording, named — the button on its own page.
-  if (body.vlog_id) {
-    const r = await readRecording(db, operator!.id, body.vlog_id, env)
-    return NextResponse.json({ ...r, next_cursor: null }, { headers: { 'Cache-Control': 'no-store' } })
-  }
-
-  // Or a page of them, oldest first so a partial run fills the log from the
-  // beginning rather than leaving a hole in the middle.
-  const limit = Math.min(20, Math.max(1, body.limit ?? 5))
-  const rows = await findMany<{ id: string }>(
+  const r = await findOne<{ recordings: number; transcribed: number }>(
     db,
-    `SELECT id FROM vlogs
-      WHERE operator_id = ? AND deleted_at IS NULL
-        ${body.cursor ? 'AND id > ?' : ''}
-      ORDER BY id ASC LIMIT ?`,
-    ...(body.cursor ? [operator!.id, body.cursor, limit] : [operator!.id, limit]),
+    `SELECT
+       (SELECT COUNT(*) FROM vlogs WHERE operator_id = ?1 AND deleted_at IS NULL) AS recordings,
+       (SELECT COUNT(DISTINCT vlog_id) FROM transcript_words WHERE operator_id = ?1) AS transcribed`,
+    operator.id,
   )
-
-  let entries = 0, passages = 0, untranscribed = 0, byPauses = 0
-  for (const r of rows) {
-    const res = await readRecording(db, operator!.id, r.id, env)
-    entries += res.entries_written
-    passages += res.passages
-    if (res.no_words) untranscribed++
-    else if (res.cut_by === 'pauses') byPauses++
-  }
-
-  return NextResponse.json(
-    {
-      recordings_seen: rows.length,
-      passages,
-      entries_written: entries,
-      // Named out loud: a recording with no word timings is skipped, not
-      // dated by guess.
-      untranscribed,
-      // And how many fell back to pause-cutting because the splitter had
-      // nothing to say — a coarser entry, still his words.
-      cut_by_pauses: byPauses,
-      next_cursor: rows.length === limit ? rows[rows.length - 1].id : null,
-    },
-    { headers: { 'Cache-Control': 'no-store' } },
-  )
+  return NextResponse.json(r || { recordings: 0, transcribed: 0 }, { headers: { 'Cache-Control': 'no-store' } })
 }

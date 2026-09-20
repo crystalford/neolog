@@ -8,8 +8,9 @@
  *   audio_extract  →  transcribe  →  read
  *
  * The last step keeps the pointer name `extract` for continuity with DO
- * storage written before 8 Sep; what runs there is `stepRead`, which cuts
- * the word timings into entries and calls no model.
+ * storage written before 8 Sep. `stepRead` is a no-op since 20 Sep — it used
+ * to cut a recording's transcript into several standalone entries
+ * automatically, which nobody asked for; see `stepRead`'s own comment.
  *
  * One DO instance per vlog (id derived from vlog_id). DO storage holds the
  * pointer + per-step attempts + force flags. Alarm-driven execution: each
@@ -1171,39 +1172,32 @@ export class VlogPipelineDO {
   }
 
   /**
-   * The last step: read the recording onto the log.
+   * The last step. It used to be `stepExtract` — a gated Llama call
+   * producing threads, clips, creative elements and entities. Roughly 250
+   * lines, and the operator did not trust a word of what it produced.
    *
-   * This was `stepExtract` — a gated Llama call producing threads, clips,
-   * creative elements and entities, a run row in `extraction_runs`, a
-   * cascade-deactivate of the previous run's rows, and an AI-written title
-   * and summary written back onto the recording. Roughly 250 lines, and the
-   * operator did not trust a word of what it produced.
+   * ⚠️ 20 Sep — it then became `readRecording`: no model, but the same
+   * underlying mistake in a different shape. It cut a recording's transcript
+   * into several standalone "said" entries automatically, on the operator's
+   * behalf, at the second he paused — and he never asked for that. Recording
+   * a vlog is one logged act; the log deciding to carve his speech into
+   * several posts is the log authoring content, which is exactly what this
+   * product exists to refuse (SPEC §0 rule 3, rule 7). Found when he pointed
+   * at his own feed and asked why sentences he never "posted" were sitting
+   * on it as entries.
    *
-   * What it is now calls no model, so there is no gate, no tier, no
-   * escalation and no run to deactivate: `readRecording` cuts the word
-   * timestamps at his own pauses and writes one entry per passage,
-   * idempotently. Running it twice writes nothing the second time, which is
-   * why the old cascade is not needed rather than merely absent.
+   * This step is now a no-op. A vlog produces exactly the one entry the
+   * upload itself already wrote ("Recorded a video."). The full transcript
+   * still lives on the vlog's own page (`/vlog/[id]`) for him to read and
+   * scrub — nothing about VIEWING it changed — but nothing from it becomes a
+   * separate post unless he deliberately writes one. `src/lib/read-recording.ts`
+   * and `src/lib/split-note.ts` are deleted; nothing else called either.
    */
   private async stepRead(vlog: VlogRow): Promise<void> {
-    await this.recordEvent(vlog.id, 'extract', 'running', 'read_start', { state: 'starting' })
-    try {
-      const { readRecording } = await import('../../../src/lib/read-recording')
-      const r = await readRecording(this.env.DB as any, vlog.operator_id, vlog.id, this.env)
-      await this.recordEvent(vlog.id, 'extract', r.no_words ? 'failed' : 'ok', 'read_done', {
-        state: r.no_words ? 'error' : 'ok',
-        passages: r.passages,
-        entries_written: r.entries_written,
-        // Named rather than swallowed: without word timings nothing can be
-        // placed, and nothing is dated by guess.
-        no_word_timings: r.no_words,
-      })
-    } catch (err: any) {
-      await this.recordEvent(vlog.id, 'extract', 'failed', 'read_done', {
-        state: 'error', error: err?.message || String(err),
-      })
-      throw err
-    }
+    await this.recordEvent(vlog.id, 'extract', 'ok', 'read_done', {
+      state: 'disabled',
+      reason: 'auto-splitting a recording into entries was removed 20 Sep — the transcript stays on the vlog’s own page',
+    })
   }
 
 

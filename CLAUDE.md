@@ -219,93 +219,109 @@ This does not violate §0.1 ("never author a second feed") — §0.1 forbids two
 *authored* feeds that can disagree, and requires one feed, one entry shape,
 one shell. `/api/v2/log` is that one feed over three tables.
 
-### Reading a recording — the corpus is already the log
+### ⚠️ 20 Sep — auto-splitting a recording into entries was never the design, and it is gone
 
-Four hundred recordings sit in R2. Until they are read, each shows on the
-feed as one line: "Recorded 22 minutes of video." True, and nearly useless.
+Until this date this file carried a section here titled "Reading a
+recording — the corpus is already the log", calling `src/lib/read-recording.ts`
+"the single most important fact about this product, and what the whole
+8 Sep rebuild was for." It described a pipeline step that read a vlog's
+transcript, asked a model only WHERE the seams were (via `splitNote`,
+`src/lib/split-note.ts`), and wrote one `log_entries` row per seam — so a
+single recording became anywhere from a handful to dozens of separate
+"said" posts on the feed, each dated to the second within the recording it
+started at. A second, independently-built copy of the same idea sat on the
+composer's voice-note *talk* button in `src/app/api/v2/log/intake/route.ts`:
+transcribe, call `splitNote()`, insert child entries under the one parent
+via `led_from`, and rewrite the parent's own line to
+*"Split into N things you said in it."*
 
-**`src/lib/read-recording.ts` reads them, and nothing in it writes.** This is
-the single most important fact about this product, and it is what the whole
-8 Sep rebuild was for. The old path had an extraction model write `threads` —
-a topic, a take, some quotes — and relog turned those into entries, so the
-words on the log were a paraphrase of a paraphrase. The operator: *"the
-problem with the old system was i didn't trust its output anyway."*
+**That was wrong, and it was never what the operator designed.** Explaining
+the 19 Sep hallucination fix, this file (and I, in conversation) described
+the product's premise as *"400 hours of vlogs sitting as opaque video files
+aren't useful as a log — they're a pile of footage"* — as if turning a
+recording into several posts were the point. The operator's correction,
+verbatim, is worth keeping in full because it is the actual spec this
+section replaces:
 
-Now the seams come from `splitNote` (`src/lib/split-note.ts`), which
-`LLM-PIPELINE.md` §8 stage 01 specifies and `branch.html` demonstrates. The
-model returns the **first six to ten words of each thread, character for
-character**, and those anchors are located in the transcript by exact match.
-The entries are the slices between them, so **every entry is a substring of
-what he actually said**. An anchor the model invented is not found and that
-seam is dropped — the failure mode is *fewer splits*, never *words he did
-not say*. Each passage becomes one entry at `recorded_at + start`,
-`author='operator'`, `grounded=1`, idempotent via
-`source_ref='said:<vlog>:<first word index>'`.
+> *"the whole point of the log is to log activities. so it isn't to then
+> 'make text entries automatically' because that isn't me making a text
+> entry. that makes no sense. i record a vlog, that is an activity or
+> behavior. i upload that vlog that is another logged behavior. perhaps if
+> I went through the transcript, and isolated something and posted it that
+> would be another log.. the video / vlog page should have all the
+> transcript there, yes, but no none should automatically leak out into
+> other posts i'm not sure where that came from ... that is not it at all.
+> so something has been lost along the way when i worked with claude design
+> and then passed it to you."*
 
-⚠️ **`splitNote` cut the transcript at an index into a different string,
-and it did it on the composer's *talk* button.** `findAnchor` searched a
-FLATTENED copy — lowercased, whitespace runs collapsed — and returned
-`indexOf` on that; `splitNote` then sliced the ORIGINAL with it. Every run of
-two or more whitespace characters makes the flattened copy shorter, so after
-the first paragraph break the cut landed somewhere else: **mid-word, with the
-part before it keeping words the part after it also had.**
+**What this means, going forward:** a vlog produces exactly one log entry —
+"Recorded a video." The full transcript lives on that vlog's own page
+(`/vlog/[id]`) for him to read, scrub and fix a misheard word on. Nothing
+from it becomes a separate post unless he deliberately selects a piece of
+it and posts it himself — a feature this file records as wanted and not yet
+built (*"perhaps if I went through the transcript, and isolated something
+and posted it that would be another log"*), not to be confused with the
+auto-split this section removes. The same rule applies to the composer's
+voice note: it produces one entry, in full, and nothing further happens to
+it.
 
-`read-recording.ts` never saw it, because it joins `transcript_words` with
-single spaces and there is nothing to collapse. The composer hands over a raw
-Whisper transcript, which is full of newlines. The flatten now carries an
-index map, so matching survives a newline the model did not reproduce and the
-cut still lands on the character the anchor starts at.
+**What was actually removed, both instances:**
+- `src/lib/read-recording.ts` and `src/lib/split-note.ts` — deleted.
+- `workers/pipeline/src/index.ts`'s `stepRead` — kept in the state machine
+  (so `pipeline_status`, the healer's `IN_FLIGHT_STATUSES`, `reset-stuck`
+  and the admin-bridge routes that all key off the same step names keep
+  working unchanged) but its body is now a no-op that logs
+  `state: 'disabled'` and does nothing else.
+- `workers/process-upload/src/workflow.ts`'s `read-onto-log` `softStep` —
+  same treatment, returns `{ disabled: true }` without calling anything.
+- The voice-note auto-split block in `log/intake/route.ts` — deleted
+  outright; the transcript is written onto the one entry that already
+  exists and nothing after that runs.
+- `GET`/`POST /api/v2/log/read` — the POST handler (page-at-a-time
+  dispatch of the read) is gone entirely; GET is now a two-number status
+  query (`recordings`, `transcribed`) for the Settings transcribe panel,
+  which is unrelated and stays.
+- The `ReadRecordings` rail card on `/`, the "what the log read out of it"
+  block and its "Read it onto the log" button on `/vlog/[id]`, and the
+  "Read them onto the log" action in `settings/Retranscribe.tsx` — all
+  removed. The vlog page's transcript display — the word-by-word panel
+  with click-to-fix — is unchanged; that is exactly the surface the
+  operator asked to keep.
+- `scripts/test/read-recording.mjs`, `scripts/test/split-note.mjs`, and
+  their CI steps — deleted.
 
-⚠️ **And a sliver was dropped, not merged.** A part under twelve words was
-skipped — and skipped means those words were in NO entry. The whole take
-survives on the recording, so nothing looked broken and no count was wrong. A
-sliver merges into its neighbour now: **the seam is what the log may be wrong
-about; the words are not.**
+**What stays, because it was never the auto-split mechanism:** Whisper
+transcription and `transcript_words` (still needed for the vlog page's
+transcript and its click-to-fix, and for `/search` and `/month`'s keyword
+retrieval); `POST /api/v2/log/[id]/split` (an entry the operator is looking
+at, cut where HE points, on purpose — the opposite of a model deciding
+seams for him); merge; and the `grounded` column's enforcement, which now
+guards a rewritten or split-by-hand entry rather than one this pipeline
+step produced.
 
-`scripts/test/split-note.mjs` — 24 assertions, in CI, up from 7. ⚠️ The old
-version could not have caught either: it inlined the implementation as it
-stood, so it tested the bug faithfully, and its fixture was one line of
-single spaces with nothing to collapse. The new one runs the same note again
-with newlines and tabs in it, asserts **every word in exactly one part, in
-order**, and puts the sliver in the MIDDLE — where dropping it still leaves
-two parts, so the loss does not show up in the count. All three regressions
-were re-introduced and watched to fail.
+**The ~2,300+ entries the old mechanism had already written are being
+removed the same way the 8 Sep hallucinated entries were**: `deleted_at` set
+via the product's own undo, not buried — the operator's explicit call, in
+the same terms as the fabricated-transcript cleanup: *"the same 'should
+never have gone in' treatment... not just hidden, gone."* Every
+`log_entries` row with `source_ref LIKE 'said:%'` (the vlog-pipeline path's
+identifier) and every row identifiable as the composer's voice-note split
+(via its parent's `detail` marker and matching
+`led_from`/`relation`/`source_kind`) is in scope. The vlogs and the words
+they hold are untouched — only the posts the log manufactured from them go.
+This is a data migration against live D1, run separately from the code
+deploy via the same one-off GitHub Actions pattern the hallucination
+cleanup used; if this paragraph is being read before that has run, the feed
+may still show entries this section says are gone.
 
-**`cutIntoPassages` is the fallback**, cutting at his own pauses — a
-2.5-second gap between two words, a sentence end past 90, a ceiling at 140.
-It needs no model and was the default until 8 Sep, when running it against
-`branch.html`'s own example produced ONE entry where the design shows five:
-he said all five of those things without stopping. It still runs when no
-model is available or the split returns nothing, because a coarse entry of
-his words beats no entry at all.
-
-**A recording with no word timings writes nothing at all.** It could split
-`transcript_text` on punctuation, and then every entry would carry a second
-the log invented — the failure this product exists to avoid. It stays one
-line saying he recorded, until it has been transcribed.
-
-The honest limitation, stated because it is the trade: the boundary is
-sometimes wrong. The splitter can miss a seam, and the pause fallback is
-coarser still — he pauses mid-thought and runs two thoughts together without
-breathing. **The log is wrong about the boundary sometimes and never wrong
-about the words** — which is the right way round, and is why merge and split
-both exist on an entry (`POST /api/v2/log/[id]/split`; split landed 9 Sep,
-having been claimed here since 8 Sep and absent from the code). A model allowed to WRITE would be wrong about the words
-too, and that is the line this design does not cross.
-
-**The 4-gram grounding checker is gone too**, and its absence is the same
-point: it existed to catch an extraction model's paraphrase being attributed
-to him, and nothing paraphrases him any more. A line on the log IS the
-transcript, not something checked against it. Do not reintroduce one — if a
-new path needs a grounding check, that path is a generator and should not
-exist.
-
-`scripts/test/read-recording.mjs` — in CI. Every word in exactly one
-passage, the passages joined equal to the transcript, the same recording
-always cut the same way, and — checked against the source with comments
-stripped — no code path to `transcript_text`, the only model use is the
-splitter, and every passage's text is words joined rather than model
-output.
+**The lesson, stated plainly because it cost the operator months:** this
+file described the auto-split as the product's foundational feature for
+weeks, and it was never what he asked Claude Design for. A model reading
+CLAUDE.md and inheriting its framing will confidently rebuild exactly this
+mistake unless the framing itself is corrected — which is what this section
+does. If a future session is tempted to make a recording "more useful"
+by turning it into several posts automatically, that impulse is the bug,
+not a feature to route around it.
 
 
 ### A page is made when he names it
@@ -605,21 +621,24 @@ of a recording.
 
 Merge has been on the entry page since it had a rail — "wrong split → merge,
 thread intact" (`wrong.html`). **Split had not, though this file claimed both
-since 8 Sep**, and split is the one the read path actually needs: the stated
-failure mode is a MISSED seam. `splitNote` can pass over a subject change and
-the pause fallback is coarser still, because he changes subject without
-breathing.
+since 8 Sep.** ⚠️ 20 Sep: the section above removed the pipeline that used
+to auto-split a recording's transcript into several entries, so this is no
+longer a remedy for that pipeline's missed seams — there is no such pipeline
+any more. It stays because a hand-written or transcribed entry can still
+cover two distinct thoughts, and cutting it where HE points is a correction
+he makes, not a seam the log guesses at.
 
 `POST /api/v2/log/[id]/split` takes one number — the index of the word the
 second thought starts on. The gesture is `fix.html`'s, moved from the
 transcript to the line. Two ways to cut and **the response says which ran**,
 the way `/clear` names the check it used:
 
-- **timings** — the entry is still, word for word, what the transcript says
-  for its span, so the cut is made in `transcript_words`. Both halves get a
-  real span and the second is dated to the second he said it. Its
-  `source_ref` is the seam `read-recording` would have written, so re-reading
-  the recording skips it rather than writing a third copy of those words.
+- **timings** — when the entry carries a real span into `transcript_words`,
+  the cut is made there, so the entry stays word for word what the
+  transcript says for its span. Both halves get a real span and the second
+  is dated to the second he said it. Its `source_ref` marks the seam so a
+  future re-read of that span (if one is ever built) would skip it rather
+  than writing a second copy of those words.
 - **text** — everything else. The words are cut where he pointed and the new
   half carries **no span**, because the log does not know what second it was
   said at and will not invent one.
@@ -1855,33 +1874,35 @@ loud when it is showing 500 of more.
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — the recordings themselves, reached from the avatar dropdown.
 - `/vlog/[id]` — one recording, whole: the video played from R2 untouched, the
-  word-timestamped transcript following the playhead, provenance in words
-  (which of the four tiers dated it, who transcribed it), the entries the log
-  read out of it, and one action — **read it onto the log**. Deleting buries;
-  the file always stays.
+  word-timestamped transcript following the playhead (click a word to fix
+  it), and provenance in words (which of the four tiers dated it, who
+  transcribed it). Deleting buries; the file always stays. ⚠️ 20 Sep: this
+  page used to also show "what the log read out of it" and a **read it onto
+  the log** button that cut the transcript into several separate entries.
+  Removed — see the 20 Sep entry above. The transcript itself is unchanged;
+  nothing from it becomes a separate post unless he writes one himself.
 
-⚠️ **A long loop must read a REF, not state.** `read` walks four hundred
-recordings a page at a time and checked `stop` from the closure it STARTED
-with — which stays `false` for the whole run, because `useCallback` making a
-new function does not reach into the one already looping. Pressing Stop set
-the state, re-rendered the button and changed nothing: **on the one job long
-enough to want stopping, the stop did nothing.** The state renders the button
-("stopping after this page…", so the press is visibly heard); the ref is what
-the loop reads. Both are set together.
-
-The two long jobs beside it were already right, and are the pattern to copy:
-**transcribe** resolves the list with a dry run then dispatches in tens, and
-**read** is cursor-paged five at a time and idempotent, so "press again, it
-picks up where it left off" is true rather than hopeful.
+⚠️ **A long loop must read a REF, not state — a lesson from a since-removed
+feature, kept because the pattern still applies.** The old auto-split "read"
+action walked four hundred recordings a page at a time and checked `stop`
+from the closure it STARTED with — which stays `false` for the whole run,
+because `useCallback` making a new function does not reach into the one
+already looping. Pressing Stop set the state, re-rendered the button and
+changed nothing: on the one job long enough to want stopping, the stop did
+nothing. The fix was a ref set alongside the state, and the ref is what the
+loop reads. **transcribe** (still live, in Settings) is the pattern to
+copy: it resolves the list with a dry run then dispatches in tens, so
+there's no long-running client loop that would need a stop button at all.
 
 **Settings** (`/settings`) — his one sentence (which `/facts` shows and will
 not draft), where the files are kept, the recordings panel (**transcribe the
-untranscribed · read them onto the log**, with the running counts), the
-**three** maintenance jobs for a recording the pipeline dropped — *missing a
-still*, *won't play*, and ***wedged half-way*** (the healer's job, as a
-button so the same recovery is one press away whether or not its cron
-happens to be on — see 17 Sep, above, for when and why it was) — and last,
-**Start again**.
+untranscribed**, with the running counts — ⚠️ 20 Sep: the panel's other
+action, *read them onto the log*, is removed along with the auto-split
+mechanism it drove; see above), the **three** maintenance jobs for a
+recording the pipeline dropped — *missing a still*, *won't play*, and
+***wedged half-way*** (the healer's job, as a button so the same recovery is
+one press away whether or not its cron happens to be on — see 17 Sep,
+above, for when and why it was) — and last, **Start again**.
 
 **Start again** is the one irreversible act in the product and it is a button
 because the operator has no terminal — this session is his runtime, so a
@@ -1915,8 +1936,7 @@ preserves a bookmark to a product that no longer exists.
 | Video storage | Cloudflare R2 (bucket: `neolog-videos`) |
 | Uploads | Multipart direct to R2 via presigned URLs |
 | Async jobs | Cloudflare Workflows + Durable Object pipeline |
-| Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) — word-level timestamps, which the reader needs |
-| **Reading a recording** | `src/lib/read-recording.ts` → `split-note.ts`. The model returns verbatim anchors and nothing else; the fallback cuts `transcript_words` at his own pauses. |
+| Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) — word-level timestamps, for the transcript on a vlog's own page and for keyword search |
 | Looking at an uploaded image | Llama 4 Scout via `callChat` — the hold-back check and the words out of a screenshot. It reports what is visibly there and nothing else. |
 | Writing a search answer | `callReasoning()` in `src/lib/models.ts` — the one place a model writes prose, and every sentence's citations are checked in code before it is shown. |
 | Video processing | Cloudflare Container Worker running FFmpeg (`workers/ffmpeg`) — transcode, thumbnail, audio extract |
@@ -2344,10 +2364,9 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 
 | File | Purpose |
 |---|---|
-| `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are four places a model runs and a fifth needs a reason written next to it. |
-| `read-recording.ts` | **How a recording reaches the log.** Reads `transcript_words`, gets the seams from `splitNote`, and falls back to cutting at his own pauses. The model says WHERE only, by quoting. Never let anything here write a word. |
+| `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
-| `transcribe.ts` | Whisper, with word-level timestamps — which `read-recording.ts` needs and without which a recording is not read at all. |
+| `transcribe.ts` | Whisper, with word-level timestamps — for the transcript on a vlog's own page (with click-to-fix) and for keyword search. ⚠️ 20 Sep: `src/lib/read-recording.ts` and `src/lib/split-note.ts`, which used to turn these timings into several auto-generated log entries, are deleted — see the 20 Sep entry above. Nothing here writes an entry. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
 | `d1.ts` | D1 query helpers (`getDb`, `findOne`, `findMany`, `run`, `batch`). |
 | `access.ts` | Cloudflare Access JWT parsing → `requireOperator()`. |
@@ -2355,7 +2374,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 
 ## Cloudflare Workflows / Workers
 
-- **`workers/process-upload`** — post-upload pipeline (transcode → thumb → recorded_at → audio → transcribe → **read**). There is no extraction fan-out; the last step is `readRecording`, which calls no model. Each step `softStep()`-wrapped for resilience; failures recorded in `vlogs.extraction_outcomes`.
+- **`workers/process-upload`** — post-upload pipeline (transcode → thumb → recorded_at → audio → transcribe → **read**). There is no extraction fan-out. ⚠️ 20 Sep: the **read** step used to call `readRecording`, cutting the transcript into several log entries; that step is now a no-op (kept in the chain so the state machine and its consumers are unchanged — see the 20 Sep entry above). Each step `softStep()`-wrapped for resilience; failures recorded in `vlogs.extraction_outcomes`.
 - **`workers/pipeline`** — the Durable Object that runs that pipeline and broadcasts its events over WebSocket to the live vlog detail UI.
 - **`workers/ffmpeg`** — Container Worker. **Five endpoints, and that is all of them**: `/transcode-h264`, `/extract-thumb`, `/extract-thumb-mini-transcode`, `/extract-audio`, `/concat-audio`. ⚠️ Seven more were deployed until 9 Sep with no caller anywhere — `/trim`, `/concat`, `/extract-audio-segment`, `/extract-video-segment`, `/render-video-essay`, `/ken-burns`, `/images-to-video` — the production engine, **520 of that file's 1,240 lines**, running in a container for a product deleted on 8 Sep. `server.js` is plain JS outside every typecheck here, so nothing objected. `check-unreached-routes.mjs` now reads its endpoint map and fails CI on a sixth.
 - **`workers/healer`** — cron worker (disabled by default; manually invocable) that detects stuck rows and re-dispatches.
@@ -2422,25 +2441,29 @@ first — the same distinction the deletion script failed to make.
 **Vendor & infrastructure:**
 - **Cloudflare only.** Refuse to reintroduce Supabase / Inngest / Replicate / ElevenLabs / fal.ai / OpenAI / AssemblyAI / Bing / GitHub-as-a-data-source — say so explicitly if asked. Anthropic remains available as a paid opt-in and nothing currently calls it.
 - **No third-party touchpoint at all now.** Brave Search went with Topics.
-- `export const runtime = 'edge'` on every Next.js route + page.
+- `export const dynamic = 'force-dynamic'` on every route/page that calls `getCloudflareContext()` (Next 15 + OpenNext Cloudflare runs the Node.js runtime, not edge — `runtime = 'edge'` was removed in the 19 Sep migration; see that entry above).
 - Never hardcode API keys; they're Worker secrets.
 - Large files go direct to R2 via presigned URLs — never through API routes.
 
 **Models:**
-- **There are four places a model runs, and that is all of them.** The
+- **There are three places a model runs, and that is all of them.** The
   hold-back check on an uploaded image (what is visibly on it); the words out
-  of a screenshot; the answer on `/search` and `/month`, whose every sentence
-  has its citations checked in code before it is shown; and `splitNote`,
-  which returns verbatim anchors and never prose. A fifth would need a reason
-  written down next to it.
-- **Never let a model WRITE in the read path.** `read-recording.ts` may ask
-  where a seam is; it may never ask for a sentence. The old product asked
-  for sentences, and that is what he stopped trusting.
+  of a screenshot; and the answer on `/search` and `/month`, whose every
+  sentence has its citations checked in code before it is shown. A fourth
+  would need a reason written down next to it. ⚠️ 20 Sep: `splitNote` — the
+  fourth place, which used to ask a model only for verbatim anchors and cut a
+  recording's transcript into several entries at them — is deleted. It was
+  never asked for; see the 20 Sep entry above.
+- **Never let a model decide what becomes a separate post.** A vlog or a
+  voice note produces exactly one entry, in full. If a future feature lets
+  the operator excerpt a piece of his own transcript and post it, the
+  SELECTION is his, made deliberately, on the page — never a model's guess at
+  where his thoughts break.
 
 **Voice preservation:**
 - **Nothing the operator said is ever cleaned up.** Hesitations, profanity,
-  fragments and false starts stay. `read-recording.ts` copies the transcript's
-  own words; anything that would "tidy" them is the bug.
+  fragments and false starts stay in the transcript on a vlog's own page.
+  Anything that would "tidy" them is the bug.
 - A line the log wrote is marked as the log's, always, including the ones that
   read naturally.
 

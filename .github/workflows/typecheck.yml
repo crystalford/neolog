@@ -75,17 +75,6 @@ jobs:
       - name: Conversation splitting
         run: node --experimental-strip-types scripts/test/conversation.mjs
 
-      # A seam the model invented must not become a part — the anchors it
-      # returns are located in the transcript, never trusted as text.
-      - name: Note splitting
-        run: node --experimental-strip-types scripts/test/split-note.mjs
-
-      # Reading a recording onto the log is now the whole path from a file
-      # to his words on a page, with no model in it. A dropped or invented
-      # word here is not recoverable; a boundary in the wrong place is.
-      - name: Reading a recording
-        run: node scripts/test/read-recording.mjs
-
       # Whisper hallucinates a short filler phrase ("Thank you.") on
       # near-silent audio instead of returning nothing, complete with
       # real-looking per-word timings — found live when a silent DJI clip
