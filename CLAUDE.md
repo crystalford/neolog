@@ -408,6 +408,111 @@ waits on the fold covering what the feed covers. The reasoning sits in
 `feed.ts` at the place the window would go, so the next attempt starts from
 it rather than rediscovering it.
 
+### ⚠️ 20 Sep — the bulk uploader was never missing, it was unreachable
+
+The operator: *"where is the upload video like there used to be a bulk
+uploader with progress bars and stuff, i need that too... i have 50 videos
+to upload.. and i don't want to type in everything."*
+
+**`src/components/CapturePanel.tsx` is 865 lines and does all of it** —
+takes as many files as you drop, checks each against D1 for a duplicate,
+uploads MULTIPART through `/api/v2/upload/initiate` + `/complete` with
+per-part progress, shows a bar per file and one overall, and registers each
+through `POST /api/v2/vlogs`. It has been on `/vlogs` the entire time.
+
+It could not be found because of three things, none of them the uploader:
+
+- the button said **"Add a recording"**, which reads as one file
+- `/vlogs` was *"reached from the avatar dropdown, not the nav"* — and the
+  avatar dropdown was deleted on 8 Sep, so it was reachable from nothing
+- nothing on `/`, where he is when he has files, pointed at it
+
+So the label says *"Put recordings in"*, `/vlogs` is in the masthead, and
+the composer offers the uploader once four files are attached. ⚠️ **I was
+most of the way through writing a second uploader before reading
+`CapturePanel`.** `check-unreached-lib.mjs` is what stopped it: the new
+`upload-file.ts` had no importer, which is exactly the state it exists to
+catch, and reading why revealed the multipart path already there and better
+than what I was writing. **Search for the thing before building it; a
+865-line component can hide behind one unfortunate label.**
+
+### The upload queue — banked, and drained without being asked
+
+Asked whether a bulk drop should transcribe on arrival, be archived, or ask
+each time, the operator rejected all three and described the right answer:
+
+> *"i think they should be transcribed later. so i guess recommended. but i
+> don't want to have to manually trigger transcription. that is too much
+> work. they should be maybe queued .. so that we get no failures .. not
+> sure"*
+
+Both halves are load-bearing, and the September corpus run is why.
+Dispatching four hundred recordings at once produced the dropped alarms,
+the container filling its disk and the R2 read-after-write failures
+recorded further down this file — the pipeline is reliable one at a time
+and not in a herd. And *"transcribe the untranscribed"* in Settings already
+exists, so requiring it after every drop is precisely the work he is asking
+not to do.
+
+`src/lib/upload-queue.ts`. A recording registered with `queue: true` lands
+at `pipeline_status = 'uploaded'` with **`dispatched_at IS NULL`**, and
+`drainUploadQueue` sends **three at a time** — the number `FFmpegGate`
+admits concurrently against one container.
+
+Three decisions worth keeping:
+
+- ⚠️ **No new pipeline status.** `uploaded` already reads as *"Just
+  arrived. Nothing read yet."* in `pipelineLine`, which is exactly true of
+  something waiting. A fifth copy of the status taxonomy is the bug this
+  repo keeps finding, and **Start again** writing `pending` once left four
+  hundred recordings rendering with no state line at all. A column that
+  means one thing is safer than a value five files have to agree about.
+- ⚠️ **`archived` is not the queue and is left alone.** It means *"Kept,
+  not read — you asked for it that way"*: an instruction not to process.
+  These are waiting TO be processed. Same absence of dispatch, opposite
+  meaning.
+- ⚠️ **`useStart: true` is passed explicitly.** Without it
+  `dispatchPipeline` sends `/reextract`, which begins at the read step and
+  never calls Whisper — the exact 17 Sep bug where hundreds of recordings
+  reached `complete` having transcribed nothing. Everything in this queue
+  has no transcript at all.
+
+The drain marks each row **before** it dispatches, so calling it from two
+tabs, on a timer, or twice in a second cannot send the same recording
+twice. It runs from the uploader after each file, from a 15-second poll on
+`/vlogs`, and from the home page's `waitUntil`.
+
+⚠️ **It only moves while he is on the site.** Fifty dropped and the browser
+closed drains to the cap and stops. The unattended answer is
+`workers/healer`'s cron, which is off by default and is his call because it
+is his bill — the decision this file has recorded since 9 Sep. Settings →
+*transcribe the untranscribed* also picks up anything left behind.
+
+### ⚠️ 20 Sep — the index left the masthead
+
+`log.html` carries home · search · index on every page of the design
+package, and this followed it. The operator, on `/pages`: *"what is 'the
+index'? why is it here? its blank, useless"* — and, told what it was:
+
+> *"i don't know what that is so i guess remove it.. like .. the design was
+> a starting point, if we have a blank page it doesn't make sense."*
+
+He is right about this log. A page is made only when he names something,
+nothing seeds them — and that absence is deliberate and stays, because a
+page the log invented is the log deciding what is significant in his life
+(deleted 8 Sep). What he puts in is recordings. So the index was a door
+onto a blank room, permanently, in one of three nav slots.
+
+**`/pages` is not deleted** — it works, it is still linked from the log's
+footer, and the moment he names a person or a project it is where they
+live. It is out of the masthead, and `/vlogs` took the slot, being the
+thing he could not find when he needed it.
+
+⚠️ **This is a deliberate deviation from the design package's masthead**,
+which is otherwise binding. Recorded here rather than done quietly, and the
+reason is his sentence above: the package is a starting point, and a nav
+entry that can only ever be empty for this operator is not one.
+
 ### A page is made when he names it
 
 **A page is made when he names it, and only then.** `POST /api/v2/pages`
@@ -2450,6 +2555,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 |---|---|
 | `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
 | `feed.ts` | **The feed.** `loadFeed()` over `log_entries` + `vlogs` + `photos`, called by `GET /api/v2/log` and by the server-rendered home page. One feed, one query, two callers — §0.1 forbids a second authored feed, not a second caller. ⚠️ Read the open-window note in it before touching the row limit. |
+| `upload-queue.ts` | **A bulk drop, drained three at a time.** Registered-but-not-dispatched recordings (`uploaded` + `dispatched_at IS NULL`) handed to the pipeline as there is room, from the uploader, `/vlogs` and the home page's `waitUntil`. ⚠️ Passes `useStart: true` — without it Whisper never runs. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
 | `transcribe.ts` | Whisper, with word-level timestamps — for the transcript on a vlog's own page (with click-to-fix) and for keyword search. ⚠️ 20 Sep: `src/lib/read-recording.ts` and `src/lib/split-note.ts`, which used to turn these timings into several auto-generated log entries, are deleted — see the 20 Sep entry above. Nothing here writes an entry. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
