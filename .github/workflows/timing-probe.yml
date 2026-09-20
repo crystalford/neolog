@@ -1,0 +1,88 @@
+name: Timing probe
+
+# Where does the second go? The home page is a 'use client' shell that fetches
+# six API endpoints on mount, so "the content loads after the site" is expected
+# by construction — but the SIZE of the gap is a fact, not a guess, and the
+# split between a cold isolate (migration runner awaited once) and steady state
+# matters for what's worth fixing.
+#
+# Read-only. Times the HTML document and each API call the home page makes,
+# twice: once cold-ish, once warm. Nothing is written.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+env:
+  CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+  CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+  BASE_URL: https://neolog.ai
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Time the document and every call the home page makes
+        run: |
+          paths=(
+            "/"
+            "/api/v2/log?order=happened&filter=all&limit=200"
+            "/api/v2/away"
+            "/api/v2/triage"
+            "/api/v2/onthisday"
+            "/api/v2/clear"
+            "/api/v2/recall"
+          )
+
+          probe () {
+            local label="$1" path="$2"
+            local out
+            out=$(curl -s -S -o /tmp/body.bin -w \
+              '%{http_code} %{time_starttransfer} %{time_total} %{size_download}' \
+              --max-time 60 \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "$BASE_URL$path" 2>/dev/null || echo "000 0 0 0")
+            set -- $out
+            printf '%-10s %-46s  http=%-4s ttfb=%7.0fms total=%7.0fms  %8s bytes\n' \
+              "$label" "$path" "$1" \
+              "$(echo "$2 * 1000" | bc -l)" \
+              "$(echo "$3 * 1000" | bc -l)" \
+              "$4"
+          }
+
+          echo "=== PASS 1 (sequential, cold-ish) ==="
+          for p in "${paths[@]}"; do probe "pass1" "$p"; done
+
+          echo ""
+          echo "=== PASS 2 (sequential, warm) ==="
+          for p in "${paths[@]}"; do probe "pass2" "$p"; done
+
+          echo ""
+          echo "=== PASS 3 (the six API calls CONCURRENTLY, as the browser does) ==="
+          start=$(date +%s%N)
+          for p in "${paths[@]:1}"; do
+            (
+              curl -s -o /dev/null -w "  $p -> %{time_total}s\n" --max-time 60 \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                "$BASE_URL$p"
+            ) &
+          done
+          wait
+          end=$(date +%s%N)
+          echo "  wall clock for all six in parallel: $(( (end - start) / 1000000 ))ms"
+
+      - name: What the document actually contains
+        # If the shell ships with no entries in it, the HTML is proof: the
+        # content cannot appear until the client fetch resolves.
+        run: |
+          curl -s -S -o /tmp/home.html --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/"
+          echo "document bytes: $(wc -c < /tmp/home.html)"
+          echo "occurrences of the feed row class (.en) in the HTML: $(grep -o 'class="en' /tmp/home.html | wc -l)"
+          echo "occurrences of 'day' dividers: $(grep -o 'class="day' /tmp/home.html | wc -l)"
