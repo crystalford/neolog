@@ -96,6 +96,20 @@ jobs:
           echo "$ids" > /tmp/parent_ids.txt
           echo "parent ids: $ids"
 
+      - name: Diagnostic — any voice-sourced led_from rows at all, marker or not
+        # Population B came back empty on the first real run. Before
+        # concluding the composer voice-split path never actually produced
+        # anything, check the broader shape without requiring the parent's
+        # marker text — in case the marker was later overwritten by some
+        # other edit and the child rows are still there.
+        run: |
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT COUNT(*) AS n FROM log_entries
+             WHERE deleted_at IS NULL
+               AND source_kind = 'voice' AND relation = 'led_from'
+               AND led_from IS NOT NULL AND r2_key IS NULL;
+          "
+
       - name: Count + sample — population B (composer voice-note split children)
         run: |
           set -e
