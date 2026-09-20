@@ -1,0 +1,172 @@
+name: Remove auto-split entries
+
+# One-off cleanup for the 20 Sep reversal (see CLAUDE.md): the pipeline used
+# to cut a vlog's transcript into several standalone "said" entries, and the
+# composer's voice-note button did the same thing independently. Neither was
+# ever the design — a recording produces exactly one entry. The code paths
+# that wrote these are already deleted; this removes what they already wrote.
+#
+# Two populations, identified precisely so nothing else is ever touched:
+#
+#   A. Vlog-pipeline auto-split — `log_entries.source_ref LIKE 'said:%'`.
+#      This exact prefix is already used elsewhere in the codebase
+#      (reset-to-recordings, corrections.ts) as the recognised identifier
+#      for this mechanism's output. Nothing else writes this pattern.
+#
+#   B. Composer voice-note auto-split (children) — an entry with
+#      kind='said', author='operator', source_kind='voice',
+#      relation='led_from', a non-null led_from, and no r2_key (the
+#      generic "dropped an audio file" entry always has author='log' and a
+#      real r2_key, so this combination cannot collide with it) — AND
+#      whose led_from points at a parent carrying the exact marker text
+#      the split code wrote nowhere else: "Split into N things you said in
+#      it. The whole take is kept."
+#
+# The parent entries themselves are NOT deleted — they are the vlog/voice
+# note's own one entry, which stays. Their `detail` (the stale "Split into
+# N things..." line) is cleared back to NULL so nothing claims a split that
+# no longer exists.
+#
+# Uses the product's own undo mechanism: `deleted_at = CURRENT_TIMESTAMP`,
+# not a hard delete and not R2-touching. Runs read-only (counts + samples)
+# unless `execute: true` is passed.
+
+on:
+  workflow_dispatch:
+    inputs:
+      execute:
+        description: 'Actually delete (soft) — leave unchecked for a dry run'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  D1_NAME: neolog
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install wrangler
+        run: npm install -g wrangler@4
+
+      - name: Count + sample — population A (vlog pipeline)
+        run: |
+          set -e
+          echo "## Population A — source_ref LIKE 'said:%'" | tee -a "$GITHUB_STEP_SUMMARY"
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT COUNT(*) AS n FROM log_entries
+             WHERE deleted_at IS NULL AND source_ref LIKE 'said:%';
+          " | tee /tmp/count_a.json
+          jq -r '.[0].results[0].n' /tmp/count_a.json
+          echo "sample:"
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT id, vlog_id, text, happened_at, source_ref FROM log_entries
+             WHERE deleted_at IS NULL AND source_ref LIKE 'said:%'
+             ORDER BY happened_at DESC LIMIT 5;
+          "
+
+      - name: Count + sample — population B (composer voice-note split)
+        run: |
+          set -e
+          echo "## Population B — composer voice-note split children" | tee -a "$GITHUB_STEP_SUMMARY"
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT COUNT(*) AS n FROM log_entries
+             WHERE deleted_at IS NULL
+               AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
+               AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
+               AND led_from IN (
+                 SELECT id FROM log_entries
+                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
+               );
+          " | tee /tmp/count_b.json
+          jq -r '.[0].results[0].n' /tmp/count_b.json
+          echo "sample:"
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT id, led_from, text, happened_at FROM log_entries
+             WHERE deleted_at IS NULL
+               AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
+               AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
+               AND led_from IN (
+                 SELECT id FROM log_entries
+                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
+               )
+             ORDER BY happened_at DESC LIMIT 5;
+          "
+
+      - name: Count — parents whose stale detail marker will be cleared
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT COUNT(*) AS n FROM log_entries
+             WHERE deleted_at IS NULL
+               AND detail LIKE 'Split into % things you said in it. The whole take is kept.';
+          "
+
+      - name: DELETE (soft) — population A
+        if: ${{ inputs.execute }}
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --command "
+            UPDATE log_entries SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE deleted_at IS NULL AND source_ref LIKE 'said:%';
+          "
+
+      - name: DELETE (soft) — population B, children first
+        if: ${{ inputs.execute }}
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --command "
+            UPDATE log_entries SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+             WHERE deleted_at IS NULL
+               AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
+               AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
+               AND led_from IN (
+                 SELECT id FROM log_entries
+                  WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
+               );
+          "
+
+      - name: Clear the stale split marker on the parents (they are not deleted)
+        if: ${{ inputs.execute }}
+        run: |
+          set -e
+          wrangler d1 execute "$D1_NAME" --remote --command "
+            UPDATE log_entries SET detail = NULL, updated_at = CURRENT_TIMESTAMP
+             WHERE deleted_at IS NULL
+               AND detail LIKE 'Split into % things you said in it. The whole take is kept.';
+          "
+
+      - name: Verify — zero remain
+        if: ${{ inputs.execute }}
+        run: |
+          set -e
+          echo "## After cleanup" | tee -a "$GITHUB_STEP_SUMMARY"
+          wrangler d1 execute "$D1_NAME" --remote --json --command "
+            SELECT
+              (SELECT COUNT(*) FROM log_entries WHERE deleted_at IS NULL AND source_ref LIKE 'said:%') AS pop_a_remaining,
+              (SELECT COUNT(*) FROM log_entries
+                WHERE deleted_at IS NULL
+                  AND kind = 'said' AND author = 'operator' AND source_kind = 'voice'
+                  AND relation = 'led_from' AND led_from IS NOT NULL AND r2_key IS NULL
+                  AND led_from IN (
+                    SELECT id FROM log_entries
+                     WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.'
+                  )) AS pop_b_remaining;
+          " | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo ""
+            echo "execute input: ${{ inputs.execute }}"
+            if [ "${{ inputs.execute }}" != "true" ]; then
+              echo ""
+              echo "**Dry run only — nothing was changed.** Re-run with execute checked to delete."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
