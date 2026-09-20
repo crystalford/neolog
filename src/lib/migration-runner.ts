@@ -1658,6 +1658,16 @@ export const MIGRATIONS: Migration[] = [
   // it is one fact about one person and a table for it would be schema
   // before necessity.
   { name: '2026-09-09_operator_same_as', sql: `ALTER TABLE operator ADD COLUMN same_as_json TEXT` },
+
+  // When this recording was actually handed to the pipeline.
+  //
+  // A bulk drop registers its recordings WITHOUT dispatching — fifty at once
+  // is what wedged the corpus in September — so they sit at
+  // `pipeline_status = 'uploaded'`, which the feed already reads as "Just
+  // arrived. Nothing read yet." That is also the status `dispatchPipeline`
+  // writes on reset, so the column is what tells a waiting recording from
+  // one that has already been sent. NULL means still in the queue.
+  { name: '2026-09-20_vlogs_dispatched_at', sql: `ALTER TABLE vlogs ADD COLUMN dispatched_at TEXT` },
 ]
 
 // `no such table` is deliberately NOT here. That is how a table which failed

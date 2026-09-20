@@ -80,6 +80,36 @@ export default function Recordings() {
   // glance rather than after clicking into one.
   const untranscribed = vlogs.filter(v => !v.has_transcript).length
 
+  // ⚠️ The queue, watched while it drains.
+  //
+  // A bulk drop registers its recordings without dispatching them — fifty at
+  // the pipeline together is what wedged the September corpus run — so they
+  // wait and go through a few at a time. That is invisible unless something
+  // says so, and "nothing appears to be happening" is exactly how the last
+  // bulk run looked while it was quietly broken.
+  //
+  // This GET also DRAINS (see the route), so polling it is what keeps the
+  // queue moving while he is on this page.
+  const [queue, setQueue] = useState<{ waiting: number; in_flight: number } | null>(null)
+  useEffect(() => {
+    let live = true
+    const tick = async () => {
+      try {
+        const res = await fetch('/api/v2/vlogs/queue', { cache: 'no-store' })
+        if (res.ok && live) {
+          const q = await res.json() as { waiting: number; in_flight: number }
+          setQueue(q)
+          // The list only changes as recordings finish, so reload it with
+          // the queue rather than on its own timer.
+          if (q.in_flight > 0 || q.waiting > 0) void load()
+        }
+      } catch { /* the line just doesn't show */ }
+    }
+    void tick()
+    const t = setInterval(tick, 15000)
+    return () => { live = false; clearInterval(t) }
+  }, [load])
+
   return (
     <Shell>
       <div className="logpage">
@@ -92,10 +122,29 @@ export default function Recordings() {
           {untranscribed > 0 && <span>{untranscribed} not transcribed yet</span>}
         </div>
 
+        {/* What the queue is doing, in words, and only when it is doing
+            something. A count with no state line is how four hundred
+            recordings sat at "complete" having read nothing. */}
+        {queue && (queue.waiting > 0 || queue.in_flight > 0) && (
+          <div className="say" style={{ padding: '0 0 10px' }}>
+            {queue.in_flight > 0 && (
+              <>{queue.in_flight} being read now. </>
+            )}
+            {queue.waiting > 0 && (
+              <>{queue.waiting} waiting their turn — a few at a time, so none of
+              them fail. They go through on their own while you are here.</>
+            )}
+          </div>
+        )}
+
         <div className="paste">
           <div className="bar">
+            {/* ⚠️ 20 Sep — "Add a recording" read as one file at a time, so
+                the operator went looking for a bulk uploader that had been
+                sitting behind this button all along. It takes as many as you
+                drop, with progress on each. The label says so now. */}
             <button className="p" onClick={() => setOpen(v => !v)}>
-              {open ? 'Not now' : 'Add a recording'}
+              {open ? 'Not now' : 'Put recordings in'}
             </button>
             <input
               value={q}

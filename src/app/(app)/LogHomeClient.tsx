@@ -285,6 +285,25 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
                     ))}
                   </div>
                 )}
+                {/* ⚠️ 20 Sep — the door to the bulk uploader, from where he
+                    actually is when he has a pile of files.
+                    `CapturePanel` on /vlogs has taken many at once, with
+                    multipart upload and per-file progress, the whole time —
+                    it was behind a button on a page reachable only from a
+                    dropdown that was removed, so it may as well not have
+                    existed. The operator: "where is the upload video like
+                    there used to be a bulk uploader with progress bars and
+                    stuff, i need that too... i have 50 videos to upload."
+                    The composer is for a file you are saying something
+                    about; four is where that stops being true. */}
+                {pending.length >= 4 && (
+                  <div className="say" style={{ padding: '2px 0 6px' }}>
+                    A lot at once?{' '}
+                    <Link href="/vlogs">Put them in on the recordings page</Link>{' '}
+                    — progress on each, nothing to write, and they queue for
+                    transcription instead of all going at the pipeline together.
+                  </div>
+                )}
                 {wordCount > 0 && (
                   <span className="cnt">{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
                 )}
@@ -379,9 +398,21 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
                     onClick={() => setWhenOpen(o => !o)}
                   >{when ? whenLabel(when, precision) : 'when'}</button>
                   <Link className="focus" href="/now">full screen</Link>
+                  {/* ⚠️ 20 Sep — why the arrow is greyed out, said out loud.
+                      You never have to type anything to put a file in: a
+                      finished upload is enough on its own. The button is
+                      disabled only while bytes are still going up, and with
+                      nothing saying so it read as "I have to write
+                      something first." The operator: "it seems like i have
+                      to write something and post." */}
+                  {pending.some(p => p.uploading) && (
+                    <span className="say">still going up — the arrow wakes when it lands</span>
+                  )}
                   <button
                     className="send"
-                    title="Put it in · Enter"
+                    title={pending.some(p => p.uploading)
+                      ? 'Waiting for the upload to finish'
+                      : 'Put it in · Enter'}
                     disabled={!canSend}
                     onClick={() => void submit()}
                   ><SendIcon /></button>

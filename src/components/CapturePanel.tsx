@@ -144,6 +144,11 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
         })
         if (!next) break
         await processOne(next, { archive, uploadMode }, updateEntry, () => cancelRef.current, getLatestEntry)
+        // Nudge the queue after each file rather than only at the end, so a
+        // fifty-file drop starts being read while the rest are still going
+        // up. The drain is bounded and marks before it sends, so calling it
+        // this often cannot dispatch anything twice.
+        void fetch('/api/v2/vlogs/queue', { cache: 'no-store' }).catch(() => {})
       }
     } finally {
       setRunning(false)
@@ -743,6 +748,20 @@ async function processOne(
         mime_type: skipVideoUpload ? 'audio/mpeg' : uploadMime,
         recorded_at: recordedAt,
         archive,
+        // ⚠️ 20 Sep — queued, not dispatched on the spot.
+        //
+        // This panel takes fifty files at a time, and registering fifty
+        // recordings used to hand fifty of them to the pipeline at once.
+        // That is precisely the herd that produced the dropped alarms, the
+        // container filling its disk and the R2 read-after-write failures
+        // in the September corpus run. `src/lib/upload-queue.ts` sends them
+        // three at a time instead, on its own.
+        //
+        // Always, not only for a big drop: one file queued is dispatched
+        // immediately anyway, because the drain finds room for it. A flag
+        // that changes behaviour at some size threshold is a second code
+        // path that only runs when things are already going badly.
+        queue: true,
         thumbnail_blob_base64: thumbnailBase64,
         audio_chunks_json: audioChunksManifest,
         slideshow_frames_json: slideshowManifest,

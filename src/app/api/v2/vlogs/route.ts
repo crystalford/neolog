@@ -66,6 +66,12 @@ export async function POST(req: NextRequest) {
         audio_chunks_json?: Array<{ r2_key: string; start_sec: number; end_sec: number; bytes: number }> | null
         slideshow_frames_json?: Array<{ r2_key: string; time_sec: number; bytes: number }> | null
         archive?: boolean
+        // A bulk drop registers with `queue: true`: the row lands at
+        // 'uploaded' like any other recording, and is NOT handed to the
+        // pipeline here. `src/lib/upload-queue.ts` sends it when there is
+        // room. Fifty dispatches at once is what wedged the corpus run in
+        // September; this is the same upload with the herd removed.
+        queue?: boolean
       }
     | null
 
@@ -179,7 +185,12 @@ export async function POST(req: NextRequest) {
   // Trigger the post-upload Workflow when not in archive mode.
   // Archive uploads stay in 'archived' status until the operator hits
   // "Process now" on the vlog detail page (which calls /api/v2/vlogs/[id]/process).
-  if (!body.archive) {
+  //
+  // ⚠️ `queue` is not `archive`. An archived recording is one the operator
+  // said to keep and not read; a queued one is waiting its turn and will go
+  // through on its own. They look the same here — neither dispatches — and
+  // mean opposite things on the page, which is why the status differs.
+  if (!body.archive && !body.queue) {
     // Prefer the new DO orchestrator (neolog-pipeline). It runs the 3-step
     // pipeline (audio_extract → transcribe → extract) with alarm-driven
     // retries, skip-if-exists guards, and live WebSocket progress.
@@ -188,6 +199,16 @@ export async function POST(req: NextRequest) {
     // if the PIPELINE binding isn't present — keeps existing deploys working
     // while the new wiring rolls out.
     const dispatched = await dispatchPipeline(env, id, operator.id)
+    if (dispatched.ok) {
+      // Marked so the queue drain can tell this from a recording still
+      // waiting its turn — both sit at 'uploaded' until the pipeline moves
+      // them, and without this one would be dispatched a second time.
+      await run(
+        db,
+        `UPDATE vlogs SET dispatched_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        id,
+      )
+    }
     if (!dispatched.ok) {
       await run(
         db,

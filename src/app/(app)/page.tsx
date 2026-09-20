@@ -36,6 +36,7 @@ import { readyDb } from '@/lib/ready-db'
 import { loadFeed, type FeedEnv } from '@/lib/feed'
 import { requireOperatorFromHeaders } from '@/lib/access'
 import { lookAtHeldBacklog } from '@/lib/log-intake'
+import { drainUploadQueue } from '@/lib/upload-queue'
 import type { FeedFilter } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 import LogHomeClient, { type InitialFeed } from './LogHomeClient'
@@ -87,6 +88,20 @@ export default async function LogHome({ searchParams }: {
     getCloudflareContext().ctx?.waitUntil?.(
       lookAtHeldBacklog(env as never, db, operator.id, 6)
         .catch(err => console.warn('[log-page] hold-back backlog:', err?.message || err)),
+    )
+
+    // And send the next few queued recordings to the pipeline. A bulk drop
+    // registers without dispatching (fifty at once is what wedged the
+    // September corpus run), so something has to hand them over — and the
+    // operator was explicit it must not be him. The drain is bounded and
+    // marks each row before it sends, so a page visit cannot double-send.
+    //
+    // ⚠️ This means the queue moves while he is using the site. Left alone
+    // with the browser closed it stops at the cap and waits; the unattended
+    // answer is the healer's cron, which is off by default and his call.
+    getCloudflareContext().ctx?.waitUntil?.(
+      drainUploadQueue(env as never, db, operator.id)
+        .catch(err => console.warn('[log-page] upload queue:', err?.message || err)),
     )
   } catch (err: any) {
     // Never fatal. The client falls back to fetching, which is what it did

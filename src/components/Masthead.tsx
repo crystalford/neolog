@@ -24,10 +24,33 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
+/**
+ * ⚠️ 20 Sep — `index` is out, and `recordings` is in its place.
+ *
+ * The design package's masthead is home · search · index on every one of its
+ * pages, and this followed it. The operator, looking at `/pages`: *"what is
+ * 'the index'? why is it here? its blank, useless"* — and, told what it was,
+ * *"i don't know what that is so i guess remove it.. like .. the design was
+ * a starting point, if we have a blank page it doesn't make sense."*
+ *
+ * He is right about this log. A page is made only when he names something,
+ * nothing seeds them (deliberately — the log inventing pages is the log
+ * deciding what is significant in his life, deleted 8 Sep), and what he puts
+ * in is recordings. So the index would have stayed empty and sat in the nav
+ * anyway, which is a door onto a blank room.
+ *
+ * `/pages` is NOT deleted — it works, it is still linked from the log's
+ * footer, and the moment he names a person or a project it is where they
+ * live. It is only out of the masthead.
+ *
+ * What took the slot is the thing he could not find when he needed it: the
+ * recordings, and the bulk uploader on them. That was reachable only from a
+ * page reachable only from a dropdown that no longer exists.
+ */
 const NAV: { label: string; href: string; on: RegExp[] }[] = [
-  { label: 'home',   href: '/',       on: [/^\/$/, /^\/now/, /^\/entry\//, /^\/walk\//] },
-  { label: 'search', href: '/search', on: [/^\/search/] },
-  { label: 'index',  href: '/pages',  on: [/^\/pages/, /^\/page\//] },
+  { label: 'home',       href: '/',      on: [/^\/$/, /^\/now/, /^\/entry\//, /^\/walk\//] },
+  { label: 'search',     href: '/search', on: [/^\/search/] },
+  { label: 'recordings', href: '/vlogs', on: [/^\/vlogs/, /^\/vlog\//] },
 ]
 
 export function Masthead() {
