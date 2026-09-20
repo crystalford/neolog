@@ -85,6 +85,23 @@ jobs:
               "$BASE_URL$p"
           done
 
+      - name: The upload queue answers, and the index is out of the nav
+        run: |
+          echo "--- queue (peek: reports without dispatching) ---"
+          curl -s -S --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/api/v2/vlogs/queue?peek=1"
+          echo
+          echo "--- masthead: expect home/search/recordings, no index ---"
+          curl -s -S --max-time 60 -o /tmp/nav.html \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/"
+          for w in home search recordings index; do
+            printf '  %-12s %s\n' "$w" "$(grep -o ">$w<" /tmp/nav.html | wc -l)"
+          done
+
       - name: What the document actually contains
         # If the shell ships with no entries in it, the HTML is proof: the
         # content cannot appear until the client fetch resolves.
