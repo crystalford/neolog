@@ -78,10 +78,18 @@ jobs:
           "
 
       - name: Resolve parent ids carrying the split marker
+        # ⚠️ D1 rejects this exact LIKE pattern outright — even standalone,
+        # not just nested in an IN(...) subquery — with "LIKE or GLOB
+        # pattern too complex" (SQLITE_ERROR 7500). Confirmed by testing it
+        # alone. instr() does the same match (fixed prefix + fixed suffix,
+        # the only variable part is the number in the middle) without going
+        # through the LIKE/GLOB pattern engine at all.
         run: |
           wrangler d1 execute "$D1_NAME" --remote --json --command "
             SELECT id FROM log_entries
-             WHERE detail LIKE 'Split into % things you said in it. The whole take is kept.';
+             WHERE detail IS NOT NULL
+               AND instr(detail, 'Split into ') = 1
+               AND instr(detail, ' things you said in it. The whole take is kept.') > 0;
           " | tee /tmp/parents.json
           jq -r '.[0].results | length' /tmp/parents.json
           ids=$(jq -r '.[0].results[].id' /tmp/parents.json | tr '\n' ',' | sed 's/,$//')
