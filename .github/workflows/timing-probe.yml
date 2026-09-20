@@ -75,6 +75,16 @@ jobs:
           end=$(date +%s%N)
           echo "  wall clock for all six in parallel: $(( (end - start) / 1000000 ))ms"
 
+      - name: What it weighs over the wire, and whether the triage count fix landed
+        run: |
+          for p in "/" "/api/v2/triage" "/api/v2/triage?count=1"; do
+            curl -s -S --compressed -o /tmp/c.bin -w "  compressed $p -> %{size_download} bytes, %{time_total}s\n" \
+              --max-time 60 \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "$BASE_URL$p"
+          done
+
       - name: What the document actually contains
         # If the shell ships with no entries in it, the HTML is proof: the
         # content cannot appear until the client fetch resolves.
