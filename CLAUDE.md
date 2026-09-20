@@ -335,6 +335,79 @@ by turning it into several posts automatically, that impulse is the bug,
 not a feature to route around it.
 
 
+### ⚠️ 20 Sep — the home page shipped no content, and three things were found measuring it
+
+The operator: *"why does the whole page take a second to load.. like the
+content loads after the site .. it's not good."*
+
+Measured against the live site rather than guessed at
+(`.github/workflows/timing-probe.yml`, read-only, `workflow_dispatch`):
+**the HTML document was 12 KB and contained zero feed rows.** `/` was a
+`'use client'` component, so nothing could appear until the browser booted
+the JS and finished a round trip. The shell landed at ~650ms and the feed
+on top of it — the gap was the architecture, not a slow query.
+
+**`/` is a Server Component now.** It reads the feed straight out of D1 and
+hands it to `LogHomeClient`, which renders it on the first paint and skips
+its mount fetch; the same server+client split the Next 15 migration used
+for `/entry/[id]`, `/page/[id]` and `/month/[ym]`. Measured after:
+**200 rows and 40 day dividers in the document, TTFB 492ms warm**, against
+~1.7s to first content before.
+
+**The query moved to `src/lib/feed.ts` — one feed, one query, two callers.**
+§0.1 forbids a second AUTHORED feed, two queries that can disagree about
+what the log holds. It does not forbid two callers of one function, which
+is the shape `loadPublicFeed` already uses for the four public feeds. The
+route keeps everything after the first render: order, filter, search, and
+opening a folded period.
+
+⚠️ **If the server read fails the page still loads.** The whole read is
+wrapped and a failure hands the client `initial: null`, which is exactly
+the state it was in before. A slow home page is a complaint; a home page
+that 500s is the log being gone.
+
+**`/api/v2/onthisday` had been returning 500 on every request, forever.**
+It selected a column `r`; the column is `r2_key`. The rail card catches its
+own errors and hides itself, so *On This Day* silently never worked and
+nothing anywhere said so. ⚠️ `check-sql-columns.mjs` cannot see this class
+of bug: it validates **alias-qualified** references, and a query with no
+table alias has every bare name skipped. That is the same blind spot
+`check-dropped-tables.mjs` already learned about from the other side, and
+there may be more of them — the checker should resolve bare names against
+the single `FROM` table.
+
+**`/api/v2/triage` was signing sixty R2 URLs to produce one integer.** The
+rail card reads `total` and nothing else, and the endpoint was fetching
+sixty full rows and presigning every one of them, on every home page load
+— 1.2s, the slowest thing on the page by a factor of six. `?count=1`
+returns the count and nothing else; `/triage` itself still gets the rows,
+because it is the page that shows them.
+
+#### ⚠️ And one that was shipped and reverted within minutes
+
+`log-2028.html`, quoted in this file: *"the last 14 days open as rows, then
+one line per week, per month, per year."* Only the second half was true.
+`buildFold` covers everything older than `OPEN_DAYS`, and the row query had
+no window at all — so an entry older than a fortnight came back **twice**,
+once as an open row and again inside the folded line that counts it. That
+is most of the 563 KB the feed was returning.
+
+Applying the window looked obviously correct and **emptied the log.**
+`/api/v2/log` went from 563 KB to **145 bytes** on a log with four hundred
+recordings in it. `buildFold` folds `log_entries` and ONLY `log_entries` —
+the feed draws from three tables, and every recording lives in `vlogs`,
+months old. The window hid all of them and the fold had nothing to say in
+their place. **The fold was standing in for one table's rows while three
+tables' rows were being cut.**
+
+Caught by re-running the probe against the deploy, not by any check: `tsc`
+is happy, every column exists, every value is legal, and the page renders
+perfectly — empty. The duplication is back, because showing the recordings
+twice is a great deal better than not showing them at all, and the window
+waits on the fold covering what the feed covers. The reasoning sits in
+`feed.ts` at the place the window would go, so the next attempt starts from
+it rather than rediscovering it.
+
 ### A page is made when he names it
 
 **A page is made when he names it, and only then.** `POST /api/v2/pages`
@@ -2376,6 +2449,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | File | Purpose |
 |---|---|
 | `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
+| `feed.ts` | **The feed.** `loadFeed()` over `log_entries` + `vlogs` + `photos`, called by `GET /api/v2/log` and by the server-rendered home page. One feed, one query, two callers — §0.1 forbids a second authored feed, not a second caller. ⚠️ Read the open-window note in it before touching the row limit. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
 | `transcribe.ts` | Whisper, with word-level timestamps — for the transcript on a vlog's own page (with click-to-fix) and for keyword search. ⚠️ 20 Sep: `src/lib/read-recording.ts` and `src/lib/split-note.ts`, which used to turn these timings into several auto-generated log entries, are deleted — see the 20 Sep entry above. Nothing here writes an entry. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
