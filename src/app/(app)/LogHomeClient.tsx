@@ -618,7 +618,10 @@ function WhatArrived() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/v2/triage', { cache: 'no-store' })
+        // The count, not sixty rows and sixty signed URLs — this card shows
+        // a number, and asking for the rows made it the slowest call on the
+        // page by a factor of six.
+        const res = await fetch('/api/v2/triage?count=1', { cache: 'no-store' })
         if (res.ok) setN(((await res.json()) as { total: number }).total || 0)
       } catch { /* the card just doesn't show */ }
     })()

@@ -35,6 +35,32 @@ export async function GET(req: NextRequest) {
     throw e
   }
   const db = await readyDb(getDb(env), 'triage')
+  const url = new URL(req.url)
+
+  // ⚠️ `?count=1` — the count, and nothing else.
+  //
+  // The home page's rail card reads exactly one field off this endpoint,
+  // `total`, to decide whether to show "Arrived, not looked at" and what
+  // number to put beside it. It was getting that by fetching sixty full
+  // rows and signing sixty R2 URLs, every home page load, and throwing all
+  // of it away — measured at 1.2s, the slowest thing on the page by a
+  // factor of six.
+  //
+  // `/triage` itself still gets the rows; it is the page that shows them.
+  // A caller that wants a number asks for a number.
+  if (url.searchParams.get('count')) {
+    const n = await findMany<{ n: number }>(
+      db,
+      `SELECT COUNT(*) AS n FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND author = 'log' AND triaged_at IS NULL`,
+      operator.id,
+    )
+    return NextResponse.json(
+      { total: n[0]?.n || 0 },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
+  }
 
   const rows = await findMany<{
     id: string; text: string; detail: string | null

@@ -134,39 +134,33 @@ export async function loadFeed(
   // one up, since the dig-up control lives on the entry's own page.
   const wantBuried = filter === 'buried'
 
-  // ── The open window ──────────────────────────────────────────────────────
+  // ── ⚠️ The open window that cannot be applied yet ────────────────────────
   //
   // `log-2028.html`, and CLAUDE.md quoting it: "the last 14 days open as
-  // rows, then one line per week, per month, per year."
+  // rows, then one line per week, per month, per year." Only the second half
+  // is true here. `buildFold` covers everything older than `OPEN_DAYS`, and
+  // the row query below has no window at all — so an entry older than a
+  // fortnight is returned BOTH as an open row and inside the folded line
+  // that counts it. That is most of the payload, and it is why the feed
+  // measured 563 KB for one page load.
   //
-  // ⚠️ 20 Sep: only the second half of that was true. `buildFold` covered
-  // everything older than `OPEN_DAYS` — and the row query had no window at
-  // all, so it ALSO returned up to `limit` rows reaching back months. Every
-  // entry older than a fortnight was sent twice: once as an open row, and
-  // again inside the folded period line below it that counts it. The fold
-  // was decorative, sitting under a list of the very rows it claimed to
-  // stand for.
+  // ⚠️ **Cutting the rows at the window was tried on 20 Sep and reverted
+  // within minutes, because it emptied the log.** `buildFold` folds
+  // `log_entries` and ONLY `log_entries` — look at its query. The feed draws
+  // from three tables, and the four hundred recordings live in `vlogs`.
+  // Every one of them is months old, so the window hid all of them and the
+  // fold had nothing to say in their place: `/api/v2/log` went from 563 KB
+  // to 145 bytes, an empty feed, on a log with four hundred recordings in
+  // it. The fold was standing in for one table's rows while three tables'
+  // rows were being cut.
   //
-  // It was measured at **563 KB of JSON for one page load**, which is what
-  // made server-rendering this feed impractical — the document would have
-  // carried it twice over, as markup and again as hydration props.
-  //
-  // The window is applied on exactly the condition the fold already used, so
-  // the two halves of one rule cannot disagree: the DEFAULT view folds and
-  // opens a fortnight; a filtered, searched or range-opened view does
-  // neither, because a narrowed list is already the thing being looked for
-  // and folding it again would hide it.
+  // So the window waits on the fold covering what the feed covers. Until
+  // then the duplication stays, because showing the recordings twice is a
+  // great deal better than not showing them at all.
   const foldable = !q && filter === 'all' && !from && !to
-  const openFrom = foldable
-    ? new Date(Date.now() - OPEN_DAYS * 86400000).toISOString()
-    : null
-  const openSql = openFrom ? ` AND ${dateCol} >= ?` : ''
-  const openBinds: string[] = openFrom ? [openFrom] : []
 
   // `vlogs` and `photos` carry the two times under different names, so the
-  // window and range clauses are rewritten for each. This was already done
-  // inline for the range; it is a function now because the window needs the
-  // identical treatment and two copies of a regex pair is how they drift.
+  // range clause is rewritten for each.
   const forVlogs = (s: string) => s
     .replace(/COALESCE\(happened_at, occurred_at\)/g, 'COALESCE(recorded_at, created_at)')
     .replace(/COALESCE\(logged_at, created_at\)/g, 'created_at')
@@ -197,10 +191,10 @@ export async function loadFeed(
               original_filename, vlog_id, source_ref, led_from, relation
          FROM log_entries
         WHERE operator_id = ? AND deleted_at IS NULL
-          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}${rangeSql}${openSql}
+          AND buried_at IS ${wantBuried ? 'NOT NULL' : 'NULL'}${rangeSql}
         ORDER BY COALESCE(${order === 'logged' ? 'logged_at, created_at' : 'happened_at, occurred_at'}) DESC
         LIMIT ?`,
-      operatorId, ...rangeBinds, ...openBinds, limit,
+      operatorId, ...rangeBinds, limit,
     ),
     wantBuried ? Promise.resolve([]) : findMany<{
       id: string; original_filename: string | null
@@ -217,10 +211,10 @@ export async function loadFeed(
               vision_description, transcript_text, visibility,
               pipeline_status, pipeline_error
          FROM vlogs
-        WHERE operator_id = ? AND deleted_at IS NULL${forVlogs(rangeSql)}${forVlogs(openSql)}
+        WHERE operator_id = ? AND deleted_at IS NULL${forVlogs(rangeSql)}
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
         LIMIT ?`,
-      operatorId, ...rangeBinds, ...openBinds, limit,
+      operatorId, ...rangeBinds, limit,
     ),
     wantBuried ? Promise.resolve([]) : findMany<{
       id: string; thumbnail_r2_key: string | null; r2_key: string
@@ -231,10 +225,10 @@ export async function loadFeed(
       `SELECT id, thumbnail_r2_key, r2_key, caption, vision_description,
               taken_at, created_at, visibility
          FROM photos
-        WHERE operator_id = ? AND deleted_at IS NULL${forPhotos(rangeSql)}${forPhotos(openSql)}
+        WHERE operator_id = ? AND deleted_at IS NULL${forPhotos(rangeSql)}
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'taken_at, created_at'}) DESC
         LIMIT ?`,
-      operatorId, ...rangeBinds, ...openBinds, limit,
+      operatorId, ...rangeBinds, limit,
     ),
     findMany<{ n: number }>(
       db,
