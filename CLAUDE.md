@@ -299,20 +299,31 @@ seams for him); merge; and the `grounded` column's enforcement, which now
 guards a rewritten or split-by-hand entry rather than one this pipeline
 step produced.
 
-**The ~2,300+ entries the old mechanism had already written are being
-removed the same way the 8 Sep hallucinated entries were**: `deleted_at` set
-via the product's own undo, not buried — the operator's explicit call, in
-the same terms as the fabricated-transcript cleanup: *"the same 'should
-never have gone in' treatment... not just hidden, gone."* Every
-`log_entries` row with `source_ref LIKE 'said:%'` (the vlog-pipeline path's
-identifier) and every row identifiable as the composer's voice-note split
-(via its parent's `detail` marker and matching
-`led_from`/`relation`/`source_kind`) is in scope. The vlogs and the words
-they hold are untouched — only the posts the log manufactured from them go.
-This is a data migration against live D1, run separately from the code
-deploy via the same one-off GitHub Actions pattern the hallucination
-cleanup used; if this paragraph is being read before that has run, the feed
-may still show entries this section says are gone.
+**The 2,359 entries the old mechanism had already written were removed the
+same way the 8 Sep hallucinated entries were**: `deleted_at` set via the
+product's own undo, not buried — the operator's explicit call, in the same
+terms as the fabricated-transcript cleanup: *"the same 'should never have
+gone in' treatment... not just hidden, gone."* Done via
+`.github/workflows/remove-auto-split-entries.yml` (`workflow_dispatch`,
+dry-run by default, `execute: true` to write), the same one-off
+GitHub-Actions-against-live-D1 pattern the hallucination cleanup used. All
+2,359 matched `log_entries.source_ref LIKE 'said:%'` — the vlog-pipeline
+path's identifier, already used elsewhere in the codebase
+(`reset-to-recordings`, `corrections.ts`) to mean exactly this. The
+composer voice-note split's population (identified via a parent's `detail`
+marker plus matching `led_from`/`relation`/`source_kind`/`r2_key` on the
+child) **came back empty, twice, including a diagnostic that dropped the
+marker requirement entirely** — that code path apparently never left a
+surviving entry in production, so nothing there needed cleaning up. The
+vlogs and the words they hold are untouched — only the posts the log
+manufactured from them are gone. ⚠️ Building the migration surfaced a D1
+quirk worth knowing: `detail LIKE 'Split into % things you said in it. The
+whole take is kept.'` fails outright with `LIKE or GLOB pattern too
+complex` (`SQLITE_ERROR 7500`) — not only nested inside an `IN (SELECT ...)`
+subquery, but standalone. `instr(detail, 'prefix') = 1 AND instr(detail,
+'suffix') > 0` does the same fixed-prefix/fixed-suffix match without going
+through the LIKE engine at all; reach for it if a future migration needs to
+match a longer literal string with punctuation in it.
 
 **The lesson, stated plainly because it cost the operator months:** this
 file described the auto-split as the product's foundational feature for
