@@ -2167,6 +2167,37 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .shot.kept { opacity: .55; }
 .logpage .shot.kept .keep { color: var(--fg-1); border-color: var(--line-3); }
 
+/* ── Putting recordings in ────────────────────────────────────────────────
+   ⚠️ 21 Sep. `CapturePanel` is the one surface that survived 8 Sep with the
+   OLD product's design language intact, and on 20 Sep it was promoted into
+   the masthead — so the first thing the nav offered was a page in a
+   different vocabulary from everything around it. What it had: two
+   uppercase-letterspaced mono labels (design rule 2 forbids them outright:
+   "a label is a word, not a code"), an iOS-style toggle that appears
+   nowhere else in the product, cards nested inside cards, and four mode
+   buttons whose sub-labels were 9.5px — under the 10.5px floor, four times
+   over.
+
+   None of that was drift a check could see; it was a component written
+   before the package was vendored and never revisited. The chrome is the
+   page's own now: the pills are `.marks`, the explanation is a `.say` line,
+   and the panel has no frame of its own because it already sits in one. */
+.logpage .uploader { display: flex; flex-direction: column; gap: 18px; }
+.logpage .uploader .drop {
+  padding: 34px 24px; text-align: center; cursor: pointer;
+  border: 1px dashed var(--line-2); border-radius: 10px;
+  background: var(--bg-2); transition: border-color .15s, background .15s;
+}
+.logpage .uploader .drop:hover { border-color: var(--line-3); }
+.logpage .uploader .drop.on { border-color: var(--t-steel); background: var(--sig-soft); }
+.logpage .uploader .drop b {
+  display: block; font-size: 17px; font-weight: 400; color: var(--fg); margin-bottom: 5px;
+}
+.logpage .uploader .drop span { font-size: 13px; color: var(--fg-3); }
+.logpage .uploader .opt { display: flex; flex-direction: column; gap: 8px; }
+.logpage .uploader .opt .marks { margin-top: 0; }
+.logpage .uploader .opt .say { font-size: 13px; color: var(--fg-3); line-height: 1.5; }
+
 /* the title field in the paste box — a document has a name before it has a body */
 .logpage .paste .ti {
   width: 100%; background: #0a0a0b; color: var(--fg);

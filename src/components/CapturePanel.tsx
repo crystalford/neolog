@@ -52,10 +52,9 @@ interface FileEntry {
 
 export interface CapturePanelProps {
   onUploaded?: () => void
-  compact?: boolean
 }
 
-export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps) {
+export function CapturePanel({ onUploaded }: CapturePanelProps) {
   const [archive, setArchive] = useState(false)
   // Bad-wifi upload mode. Four-way:
   //   'full'        — normal multipart upload of the whole video. Default.
@@ -199,27 +198,13 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
   const failedCount = entries.filter(e => e.status === 'failed').length
 
   return (
-    <div style={{
-      background: 'var(--bg-1)',
-      border: '1px solid var(--line-1)',
-      borderRadius: 14,
-      padding: compact ? 16 : 22,
-      display: 'flex', flexDirection: 'column', gap: 14,
-    }}>
+    <div className="uploader">
       <div
+        className={`drop${dragging ? ' on' : ''}`}
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={() => setDragging(false)}
         onClick={() => inputRef.current?.click()}
-        style={{
-          padding: compact ? '24px 20px' : '40px 24px',
-          border: `2px dashed ${dragging ? 'var(--sig)' : 'var(--line-2)'}`,
-          background: dragging ? 'var(--sig-soft)' : 'var(--bg-2)',
-          borderRadius: 12,
-          textAlign: 'center',
-          cursor: 'pointer',
-          transition: 'all .15s',
-        }}
       >
         <input
           ref={inputRef}
@@ -231,124 +216,61 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
         />
         {entries.length === 0 ? (
           <>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: compact ? 16 : 20, fontWeight: 500,
-              color: 'var(--fg)', letterSpacing: '-0.3px', marginBottom: 6,
-            }}>
-              Drop vlogs here
-            </div>
-            <div style={{ fontSize: 12.5, color: 'var(--fg-3)' }}>
-              Or tap to pick. Multiple at once — MP4, MOV, M4A, WAV.
-            </div>
+            <b>Drop recordings here</b>
+            <span>Or tap to pick. As many at once as you like — MP4, MOV, M4A, WAV.</span>
           </>
         ) : (
           <>
-            <div style={{
-              fontFamily: 'var(--font-body)', fontSize: 16, fontWeight: 500,
-              color: 'var(--fg)', letterSpacing: '-0.3px', marginBottom: 4,
-            }}>
-              {entries.length} file{entries.length === 1 ? '' : 's'} in queue
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--fg-3)', fontFamily: 'var(--font-mono)' }}>
-              {(totalBytes / 1_000_000_000).toFixed(2)} GB total · tap to add more
-            </div>
+            <b>{entries.length} file{entries.length === 1 ? '' : 's'} ready</b>
+            <span>{(totalBytes / 1_000_000_000).toFixed(2)} GB · tap to add more</span>
           </>
         )}
       </div>
 
-      {/* Archive toggle */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '10px 14px',
-        background: 'var(--bg-2)',
-        border: '1px solid var(--line-1)',
-        borderRadius: 8,
-      }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
-            textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 2,
-          }}>Archive mode</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-            Skip auto-extraction. Process later from the vlog page.
-          </div>
+      {/* What happens to them once they land. Two states, said as words —
+          not a switch borrowed from a phone, and not a mono label in caps. */}
+      <div className="opt">
+        <div className="marks">
+          <button className={!archive ? 'on' : ''} onClick={() => setArchive(false)}>
+            Transcribe them
+          </button>
+          <button className={archive ? 'on' : ''} onClick={() => setArchive(true)}>
+            Just keep them
+          </button>
         </div>
-        <button
-          onClick={() => setArchive(a => !a)}
-          aria-pressed={archive}
-          style={{
-            width: 38, height: 22, borderRadius: 100,
-            background: archive ? 'var(--sig)' : 'var(--bg-4)',
-            border: `1px solid ${archive ? 'var(--sig)' : 'var(--line-2)'}`,
-            cursor: 'pointer', position: 'relative',
-            transition: 'all .15s',
-          }}
-        >
-          <span style={{
-            position: 'absolute', top: 2, left: archive ? 18 : 2,
-            width: 16, height: 16, borderRadius: '50%',
-            background: archive ? '#061735' : 'var(--fg-2)',
-            transition: 'left .15s',
-          }}/>
-        </button>
+        <span className="say">
+          {archive
+            ? 'Kept exactly as they arrive. Nothing is transcribed until you ask, on a recording’s own page.'
+            : 'They wait their turn and go through a few at a time, on their own.'}
+        </span>
       </div>
 
-      {/* Upload mode picker — 4 buttons, mutually exclusive */}
-      <div style={{
-        padding: '10px 14px',
-        background: 'var(--bg-2)',
-        border: '1px solid var(--line-1)',
-        borderRadius: 8,
-        display: 'flex', flexDirection: 'column', gap: 10,
-      }}>
-        <div>
-          <div style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: 1.5,
-            textTransform: 'uppercase', color: 'var(--fg-3)', marginBottom: 2,
-          }}>Upload mode</div>
-          <div style={{ fontSize: 12, color: 'var(--fg-2)' }}>
-            Pick how much of the video to upload. Lite modes are for bad wifi.
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+      {/* How much of each file goes up. The old panel put the explanation in
+          9.5px mono under every button — below the 10.5px floor, four times
+          over. One line under the row says it instead, for the one that is
+          chosen. */}
+      <div className="opt">
+        <div className="marks">
           {([
-            { key: 'full', label: 'Full', sub: 'Original quality' },
-            { key: 'compressed', label: 'Compressed', sub: '~250 kbps webm' },
-            { key: 'slideshow', label: 'Slideshow', sub: 'Stills + audio' },
-            { key: 'audio_only', label: 'Audio only', sub: 'No video' },
-          ] as const).map(m => {
-            const active = uploadMode === m.key
-            return (
-              <button
-                key={m.key}
-                onClick={() => setUploadMode(m.key)}
-                aria-pressed={active}
-                style={{
-                  padding: '8px 6px',
-                  background: active ? 'var(--sig-soft)' : 'var(--bg-3)',
-                  border: `1px solid ${active ? 'var(--sig)' : 'var(--line-2)'}`,
-                  color: active ? 'var(--fg)' : 'var(--fg-2)',
-                  borderRadius: 6,
-                  cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                  textAlign: 'center',
-                }}
-              >
-                <div style={{ fontSize: 12, fontWeight: 500 }}>{m.label}</div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--fg-3)', letterSpacing: 0.4 }}>
-                  {m.sub}
-                </div>
-              </button>
-            )
-          })}
+            { key: 'full', label: 'Full' },
+            { key: 'compressed', label: 'Compressed' },
+            { key: 'slideshow', label: 'Slideshow' },
+            { key: 'audio_only', label: 'Audio only' },
+          ] as const).map(m => (
+            <button
+              key={m.key}
+              onClick={() => setUploadMode(m.key)}
+              aria-pressed={uploadMode === m.key}
+              className={uploadMode === m.key ? 'on' : ''}
+            >{m.label}</button>
+          ))}
         </div>
-        {uploadMode !== 'full' && (
-          <div style={{ fontSize: 11, color: 'var(--fg-3)', lineHeight: 1.4 }}>
-            {uploadMode === 'compressed' && 'Real-time re-encode in your browser — runtime ≈ clip duration. Tab must stay open.'}
-            {uploadMode === 'slideshow' && 'One still every 5 sec + streaming audio. Vlog page plays them in sync.'}
-            {uploadMode === 'audio_only' && 'Streaming audio extract — real-time. Drop the original later to attach video.'}
-          </div>
-        )}
+        <span className="say">
+          {uploadMode === 'full' && 'The original file, untouched. What you want unless the connection is bad.'}
+          {uploadMode === 'compressed' && 'Re-encoded in your browser as it goes — takes about as long as the clip runs, and the tab has to stay open.'}
+          {uploadMode === 'slideshow' && 'One still every five seconds, plus the audio. The recording’s page plays them in step.'}
+          {uploadMode === 'audio_only' && 'The sound only, in real time. Drop the original in later to attach the picture.'}
+        </span>
       </div>
 
       {/* Queue summary + actions */}
