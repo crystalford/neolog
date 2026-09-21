@@ -2563,14 +2563,20 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 /* ── asking the log (`search.html`) ─────────────────────────────────────── */
 
 .logpage.pg-search mark { background:none; color:var(--fg); font-weight:450; border-bottom:1.5px solid var(--ochre); }
+/* ⚠️ 21 Sep — `.box` is scoped to `.q` and the markup closes `</section>`
+   before it, so the ask field got NO border, NO padding and NO font size.
+   The one control on /search — the second thing in the masthead — was an
+   invisible input on a near-empty page.
+   Same family as the eight fixed this morning, and the run-together check
+   could not see this one: an empty input has no text to collide with. */
 .logpage.pg-search .q { margin-top:44px; }
-.logpage.pg-search .q .box { display:flex; align-items:center; gap:14px; padding:16px 20px; border:1px solid var(--line-2); border-radius:12px; background:var(--bg-1); transition:border-color .15s; }
-.logpage.pg-search .q .box:focus-within { border-color:var(--line-3); }
-.logpage.pg-search .q .box svg { width:16px; height:16px; stroke:var(--fg-4); fill:none; stroke-width:1.6; flex-shrink:0; }
-.logpage.pg-search .q .box input { flex:1; font-size:21px; font-weight:300; letter-spacing:-0.4px; min-width:0; }
-.logpage.pg-search .q .box input::placeholder { color:var(--fg-4); }
-.logpage.pg-search .q .box .go { font-size:12.5px; color:var(--fg-3); white-space:nowrap; }
-.logpage.pg-search .q .box .go kbd { font-family:var(--mono); font-size:10.5px; border:1px solid var(--line-1); border-radius:4px; padding:2px 5px; margin-left:6px; color:var(--fg-4); }
+.logpage.pg-search .box { display:flex; align-items:center; gap:14px; padding:16px 20px; border:1px solid var(--line-2); border-radius:12px; background:var(--bg-1); transition:border-color .15s; }
+.logpage.pg-search .box:focus-within { border-color:var(--line-3); }
+.logpage.pg-search .box svg { width:16px; height:16px; stroke:var(--fg-4); fill:none; stroke-width:1.6; flex-shrink:0; }
+.logpage.pg-search .box input { flex:1; font-size:21px; font-weight:300; letter-spacing:-0.4px; min-width:0; }
+.logpage.pg-search .box input::placeholder { color:var(--fg-4); }
+.logpage.pg-search .box .go { font-size:12.5px; color:var(--fg-3); white-space:nowrap; }
+.logpage.pg-search .box .go kbd { font-family:var(--mono); font-size:10.5px; border:1px solid var(--line-1); border-radius:4px; padding:2px 5px; margin-left:6px; color:var(--fg-4); }
 /* ⚠️ 21 Sep — `.try` is a sibling of `section.q`, not a child, so scoping
    to `.q` meant the example queries ran together as one line of text. */
 .logpage.pg-search .try { margin-top:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; }

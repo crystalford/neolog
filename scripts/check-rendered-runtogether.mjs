@@ -98,6 +98,46 @@ const FIND = () => {
   return out
 }
 
+/**
+ * A control nobody can see.
+ *
+ * ⚠️ The run-together detector missed `/search`'s ask field entirely, and it
+ * had to: an EMPTY input has no text to collide with. `.box` was scoped to
+ * `.q` and the markup closes `</section>` before it, so the field got no
+ * border, no padding and no font size — the one control on the second item
+ * in the masthead rendered as nothing on a near-empty page.
+ *
+ * Same root cause, different symptom. A text input that a real stylesheet
+ * has reached has SOME visible affordance: a border, a background different
+ * from its parent, or an underline. One with none of those, at the browser's
+ * default font size, is one no rule ever touched.
+ */
+const FIND_INVISIBLE = () => {
+  const out = []
+  for (const el of document.querySelectorAll('input[type=text], input:not([type]), textarea')) {
+    const r = el.getBoundingClientRect()
+    if (!r.width || !r.height) continue          // genuinely hidden is a different question
+    const cs = getComputedStyle(el)
+    const parentBg = getComputedStyle(el.parentElement || document.body).backgroundColor
+    const hasBorder = ['Top', 'Right', 'Bottom', 'Left']
+      .some(s => parseFloat(cs[`border${s}Width`]) > 0)
+    const hasOwnBg = cs.backgroundColor !== parentBg
+      && cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
+    // The design never sets a control below 13px, so the UA default (13.33px
+    // in Chromium for form fields) is a reliable tell that nothing styled it.
+    const defaultSize = Math.abs(parseFloat(cs.fontSize) - 13.333) < 0.4
+    if (!hasBorder && !hasOwnBg && defaultSize) {
+      out.push({
+        el: el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\s+/).join('.') : ''),
+        parent: (el.parentElement?.tagName || '?').toLowerCase()
+          + (el.parentElement?.className ? '.' + String(el.parentElement.className).trim().split(/\s+/).join('.') : ''),
+        placeholder: el.getAttribute('placeholder') || '',
+      })
+    }
+  }
+  return out
+}
+
 const browser = await chromium.launch()
 const ctx = await browser.newContext({
   viewport: { width: 1440, height: 900 },
@@ -117,12 +157,17 @@ for (const path of PAGES) {
     await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 45000 })
     await page.waitForTimeout(1500)
     const hits = await page.evaluate(FIND)
-    if (hits.length) {
-      total += hits.length
+    const blind = await page.evaluate(FIND_INVISIBLE)
+    if (hits.length || blind.length) {
+      total += hits.length + blind.length
       console.log(`\n${path}`)
       for (const h of hits) {
         console.log(`  "${h.joined}"`)
         console.log(`     in ${h.parent}  —  ${h.a} + ${h.b}`)
+      }
+      for (const b of blind) {
+        console.log(`  a control with no styling at all${b.placeholder ? ` — "${b.placeholder}"` : ''}`)
+        console.log(`     ${b.el}  in ${b.parent}`)
       }
     }
   } catch (err) {
@@ -133,7 +178,7 @@ for (const path of PAGES) {
 await browser.close()
 
 if (total) {
-  console.log(`\n${total} place${total === 1 ? '' : 's'} where two labels render as one word.`)
+  console.log(`\n${total} thing${total === 1 ? "" : "s"} a reader would see as broken.`)
   console.log('A layout rule is not reaching the element the markup uses.')
   process.exit(1)
 }
