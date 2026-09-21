@@ -114,24 +114,42 @@ const FIND = () => {
  */
 const FIND_INVISIBLE = () => {
   const out = []
-  for (const el of document.querySelectorAll('input[type=text], input:not([type]), textarea')) {
+  const name = el => el.tagName.toLowerCase()
+    + (el.className ? '.' + String(el.className).trim().split(/\s+/).join('.') : '')
+
+  for (const el of document.querySelectorAll('input[type=text], input:not([type]), textarea, button')) {
     const r = el.getBoundingClientRect()
     if (!r.width || !r.height) continue          // genuinely hidden is a different question
     const cs = getComputedStyle(el)
     const parentBg = getComputedStyle(el.parentElement || document.body).backgroundColor
+    // Any border counts, including a single underline — `/search`'s example
+    // queries are border-bottom only and are styled on purpose.
     const hasBorder = ['Top', 'Right', 'Bottom', 'Left']
       .some(s => parseFloat(cs[`border${s}Width`]) > 0)
     const hasOwnBg = cs.backgroundColor !== parentBg
       && cs.backgroundColor !== 'rgba(0, 0, 0, 0)'
-    // The design never sets a control below 13px, so the UA default (13.33px
-    // in Chromium for form fields) is a reliable tell that nothing styled it.
-    const defaultSize = Math.abs(parseFloat(cs.fontSize) - 13.333) < 0.4
-    if (!hasBorder && !hasOwnBg && defaultSize) {
+    if (hasBorder || hasOwnBg) continue
+
+    if (name(el).startsWith('button')) {
+      // A button inherits the body font here (`button { font: inherit }`), so
+      // size proves nothing. What a styled one always has is room around the
+      // word. With no border, no background AND no padding, it is a word
+      // pretending to be a control — which is how "Keep something you made"
+      // on /writing rendered as a bare line of text.
+      const pad = ['Top', 'Right', 'Bottom', 'Left']
+        .reduce((n, s) => n + parseFloat(cs[`padding${s}`] || '0'), 0)
+      if (pad >= 4) continue
+      out.push({ el: name(el), parent: name(el.parentElement || document.body), label: (el.textContent || '').trim().slice(0, 40) })
+      continue
+    }
+
+    // The design never sets a field below 13px, so the UA default (13.33px in
+    // Chromium) is a reliable tell that nothing styled it.
+    if (Math.abs(parseFloat(cs.fontSize) - 13.333) < 0.4) {
       out.push({
-        el: el.tagName.toLowerCase() + (el.className ? '.' + String(el.className).trim().split(/\s+/).join('.') : ''),
-        parent: (el.parentElement?.tagName || '?').toLowerCase()
-          + (el.parentElement?.className ? '.' + String(el.parentElement.className).trim().split(/\s+/).join('.') : ''),
-        placeholder: el.getAttribute('placeholder') || '',
+        el: name(el),
+        parent: name(el.parentElement || document.body),
+        label: el.getAttribute('placeholder') || '',
       })
     }
   }
@@ -166,7 +184,7 @@ for (const path of PAGES) {
         console.log(`     in ${h.parent}  —  ${h.a} + ${h.b}`)
       }
       for (const b of blind) {
-        console.log(`  a control with no styling at all${b.placeholder ? ` — "${b.placeholder}"` : ''}`)
+        console.log(`  a control with no styling at all${b.label ? ` — "${b.label}"` : ''}`)
         console.log(`     ${b.el}  in ${b.parent}`)
       }
     }
