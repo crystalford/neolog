@@ -38,7 +38,9 @@ jobs:
           WIDTH: ${{ inputs.width }}
         run: |
           mkdir -p ops/shots
-          cat > /tmp/shoot.mjs <<'JS'
+          # ⚠️ In the workspace, not /tmp — node resolves `playwright` from
+          # the importing file's directory, and it is installed here.
+          cat > shoot.mjs <<'JS'
           import { chromium } from 'playwright'
 
           const BASE = 'https://neolog.ai'
@@ -100,7 +102,8 @@ jobs:
 
           await browser.close()
           JS
-          node /tmp/shoot.mjs
+          node shoot.mjs
+          rm -f shoot.mjs
           ls -la ops/shots/
 
       - name: Commit the frames
