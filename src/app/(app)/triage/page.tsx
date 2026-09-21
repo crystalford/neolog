@@ -200,10 +200,43 @@ export default function TriagePage() {
             skipping the pile costs nothing. The design says so on the page
             rather than leaving it to be inferred from the absence of a
             counter. */}
+        {/* ⚠️ 21 Sep — `.rules` is a THREE-COLUMN grid of `<div>`s, and this
+            shipped one bare `<b>` with loose text beside it. The `<b>` took
+            column one, the text became an anonymous grid item in column two,
+            and neither is a `>div` — which is the only selector that paints
+            `background:var(--bg)` over the container's line colour. So the
+            card rendered as a dead grey block with the sentence squeezed
+            into a third of the width.
+
+            Same family as every other row in CLAUDE.md's collision table:
+            the stylesheet describes one element and the markup is another.
+            The run-together check cannot see this one — nothing collides,
+            it is simply laid out wrong. */}
         <div className="rules">
-          <b>Already filed before you start.</b> Triage adds your words and
-          your marks. It never decides whether something is on the log — it
-          already is, placed by its own date, whether you open this or not.
+          <div>
+            <b>Already filed before you start.</b>
+            <p>
+              Triage adds your words and your marks. It never decides whether
+              something is on the log — it already is, placed by its own date,
+              whether you open this or not.
+            </p>
+          </div>
+          <div>
+            <b>Four keys, no wrong answers.</b>
+            <p>
+              Keep, bury, move, public. Every one is reversible, and the
+              default is keep — so pressing → fifty times is a fine way to go
+              through fifty things.
+            </p>
+          </div>
+          <div>
+            <b>Nothing waits on this.</b>
+            <p>
+              There is no badge and no count. Skip the whole pile for a year
+              and the log is exactly as complete — just with the log&rsquo;s
+              lines instead of yours.
+            </p>
+          </div>
         </div>
           </main>
 
