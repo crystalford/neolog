@@ -209,6 +209,15 @@ jobs:
       - name: Every kind on the log is reachable
         run: node scripts/test/kinds.mjs
 
+      # A recording's line is the one place a model writes a sentence that
+      # lands on the feed, and `clean()` is all that stands between the two.
+      # It also holds two invariants the feature rests on: the line comes
+      # from the word timings and never from `transcript_text` (which can
+      # hold a pre-8-Sep run's prose), and it writes `headline` and never
+      # the extraction engine's `title`/`summary`.
+      - name: What a model returns, and what is let through
+        run: node scripts/test/headline.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:

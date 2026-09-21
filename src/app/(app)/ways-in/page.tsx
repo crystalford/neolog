@@ -142,18 +142,53 @@ export default function WaysIn() {
           every one of them ends in the same one-line receipt.
         </div>
 
+        {/* ⚠️ 21 Sep — this said "the relog puts what you said in three
+            hundred existing recordings onto the log, at the second you said
+            it", linking to `/`. That is the auto-split, deleted on 20 Sep:
+            no recording's transcript becomes separate entries any more, and
+            nothing on `/` has ever done what the link promised. A page
+            offering a door that does not exist is worse than one that never
+            listed it — the rule this page draws for the seven unbuilt
+            sources, applied to itself. */}
         <div className="quiet" style={{ marginTop: 22 }}>
-          Everything already recorded is a way in too — the{' '}
-          <Link href="/">relog</Link> puts what you said in three hundred
-          existing recordings onto the log, at the second you said it.
+          A recording is a way in on its own. Drop one and it is on the log
+          the moment it lands, with the words following once it is
+          transcribed — nothing out of it becomes a separate entry unless you
+          write one yourself.
         </div>
-            {/* `connections.html`'s closing rule, which is the reason
-                there are eight doors rather than one. */}
+            {/* `connections.html`'s closing rules. ⚠️ THREE cells, not the
+                design's four: the design page carries an inline
+                `grid-template-columns:repeat(4,1fr)` and our rule is the
+                stylesheet's plain three, so a fourth wraps onto a row of its
+                own beside two grey cells. Its subject — off is
+                forward-only — is already said in full in `.off2` above.
+                A bare `<b>` with loose text is not a grid item at all and
+                rendered as a grey block; see the same note on /triage. */}
             <div className="rules">
-              <b>Eight doors, one receipt.</b> However something gets in —
-              typed, spoken, shared, forwarded — what comes back is the same
-              single line saying what happened, and one undo. Nothing asks a
-              question at the moment of input.
+              <div>
+                <b>Eight doors, one receipt.</b>
+                <p>
+                  However something gets in — typed, spoken, shared,
+                  forwarded — what comes back is the same single line saying
+                  what happened, and one undo. No door has its own rules.
+                </p>
+              </div>
+              <div>
+                <b>Nothing is asked at the moment of input.</b>
+                <p>
+                  Not what it is about, not when it happened, not who it is
+                  for. One line, one undo, then silence. The questions, if
+                  there are any, come later and there are few of them.
+                </p>
+              </div>
+              <div>
+                <b>Nothing records silently.</b>
+                <p>
+                  Every one of these is a door you walked through. There is no
+                  source switched on by default, and there is no connector
+                  pulling from anywhere — that absence is the enforcement.
+                </p>
+              </div>
             </div>
           </main>
 

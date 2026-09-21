@@ -130,11 +130,34 @@ export default function OnThisDay() {
         )}
         {/* `onthisday.html`: the one permitted resurfacing, and the page
             says what it will not do rather than leaving it to be noticed. */}
+        {/* ⚠️ `.rules` is a three-column grid of `<div>`s — see the same
+            note on /triage. A bare `<b>` and loose text rendered as a grey
+            block with the sentence in a third of the width. */}
         <div className="rules">
-          <b>It shows; it never says.</b> No &ldquo;one year ago today&rdquo;,
-          no count, no nudge. The entry appears as it was written. Dates the
-          log had to guess are left out — a guessed day has no business on the
-          surface whose whole discipline is not saying.
+          <div>
+            <b>It shows; it never says.</b>
+            <p>
+              No &ldquo;one year ago today&rdquo;, no count, no nudge. The
+              entry appears exactly as it was written. If seeing it makes you
+              write something, that is yours.
+            </p>
+          </div>
+          <div>
+            <b>A guessed date is left out.</b>
+            <p>
+              An entry the log had to date by inference never appears here.
+              Rounding &ldquo;summer 2003&rdquo; into a day would manufacture
+              an anniversary, on the one surface whose discipline is not
+              saying.
+            </p>
+          </div>
+          <div>
+            <b>A blank year is shown blank.</b>
+            <p>
+              Twenty-two years with nothing on this date is a fact, stated
+              once. There is no prompt to go and fill one in.
+            </p>
+          </div>
         </div>
       </div>
     </Shell>

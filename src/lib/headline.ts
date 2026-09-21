@@ -55,30 +55,53 @@ import type { D1Database } from '@cloudflare/workers-types'
 /** How much of the transcript the model is shown. */
 const WORDS_SENT = 1800
 
-/** A headline longer than this is a summary, and gets thrown away. */
-const MAX_CHARS = 160
+/**
+ * A headline longer than this is a summary.
+ *
+ * ⚠️ 21 Sep, after the first ten real ones: five came back and five did not,
+ * and the discards were length. Throwing a long line away entirely loses a
+ * true sentence over its tail, so anything over the cap is cut back to its
+ * last clause boundary and kept if what is left still stands as a line.
+ * Only a line with no usable clause in it is thrown away.
+ */
+const MAX_CHARS = 150
 
 export interface HeadlineEnv {
   AI: { run: (m: unknown, a: unknown) => Promise<unknown> }
 }
 
+/**
+ * ⚠️ The line completes a sentence: "Recorded a video about ___."
+ *
+ * That shape is the operator's own — *"uploaded a vlog about building
+ * neolog and the difficulties I've been having with it"* — so the model is
+ * asked for the phrase that goes after "about", not for a standalone
+ * headline. The first ten real ones proved the difference: asked for a
+ * headline it returned index-card topic labels ("Algorithms, attention, and
+ * culture, and their impact on economies and society, discussed with
+ * personal experiences"), which read as a filing system's description of him
+ * rather than as a sentence about what he did.
+ */
 const SYSTEM = [
-  'You write one short line saying what a video is about, from a transcript of what the speaker said.',
+  'You complete one sentence. The sentence is: "Recorded a video about ___."',
+  'You write only the part that goes in the blank, from a transcript of what the speaker said.',
   '',
   'Rules:',
-  '- One sentence. Under 20 words. No full stop needed.',
-  '- Say what it is ABOUT. Name the actual subjects, projects and people the speaker names.',
+  '- A phrase, not a sentence. Under 16 words. No full stop.',
+  '- Begin with a lowercase letter, unless the first word is a name.',
+  '- Name the actual things: the projects, places, people and subjects the speaker names.',
   '- Describe only. Never say whether it is good, interesting, important or worth watching.',
   '- Never address the speaker. Never use "you".',
-  '- Use only what is in the transcript. If the transcript is too short or says nothing',
-  '  identifiable, reply with exactly: NOTHING',
-  '- Do not begin with "The speaker", "This video", "A video about" or "In this".',
-  '  Begin with the subject itself.',
+  '- No filler tails: not "and its impact on society", not "discussed with personal',
+  '  experiences", not "among other topics", not "and related matters".',
+  '- Use only what is in the transcript. If it is too short or says nothing identifiable,',
+  '  reply with exactly: NOTHING',
   '',
   'Good: building neolog, and the difficulties with the upload pipeline',
-  'Good: driving to Ancaster, and a long argument about whether to sell the house',
+  'Good: driving to Ancaster, and whether to sell the house',
+  'Good: the brain-gut axis, and how it shows up in emotional regulation',
   'Bad: An interesting discussion of various topics',
-  'Bad: This video is about the speaker talking about his day',
+  'Bad: Algorithms, attention and culture, and their impact on economies and society',
 ].join('\n')
 
 /**
@@ -210,8 +233,12 @@ export function clean(raw: string): string | null {
 
   // Strip a wrapper the instructions asked it not to add.
   s = s.replace(/^["'`\s]+|["'`\s]+$/g, '')
-  s = s.replace(/^(headline|summary|line)\s*:\s*/i, '')
+  s = s.replace(/^(headline|summary|line|answer)\s*:\s*/i, '')
+  // Including the stem of the sentence it was asked to complete, which a
+  // model will sometimes hand back whole.
+  s = s.replace(/^(recorded|uploaded)\s+a\s+(video|vlog)\s+(about\s+)?/i, '')
   s = s.replace(/^(this video is|the video is|a video|this is)\s+(about\s+)?/i, '')
+  s = s.replace(/^(about|on)\s+/i, '')
   s = s.replace(/^the speaker\s+/i, '')
   s = s.trim()
   if (!s) return null
@@ -220,10 +247,20 @@ export function clean(raw: string): string | null {
   // rest is the summary nobody asked for.
   const firstBreak = s.search(/[.!?](\s|$)/)
   if (firstBreak > 0) s = s.slice(0, firstBreak)
-  s = s.replace(/[.\s]+$/, '').trim()
+  s = s.replace(/[.,;:\s]+$/, '').trim()
+
+  // ⚠️ Too long is cut, not discarded. Five of the first ten real lines were
+  // thrown away whole for overrunning, each of them true up to its tail — so
+  // the tail goes and the clause that carries the subject stays. A line with
+  // no clause boundary before the cap has nothing safe to keep and goes.
+  if (s.length > MAX_CHARS) {
+    const cut = s.slice(0, MAX_CHARS)
+    const at = Math.max(cut.lastIndexOf(', '), cut.lastIndexOf(' — '), cut.lastIndexOf('; '))
+    if (at < 20) return null
+    s = s.slice(0, at).replace(/[,;:\s]+$/, '').trim()
+  }
 
   if (s.length < 8) return null
-  if (s.length > MAX_CHARS) return null
   // A line with no letters in it is not a headline.
   if (!/[a-z]/i.test(s)) return null
   return s
