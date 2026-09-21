@@ -131,22 +131,30 @@ export default function ClearPage() {
                   <span>The four states</span>
                   <b>only one means delete it locally</b>
                 </div>
+                {/* ⚠️ 21 Sep — `b` and `p`, which is what the stylesheet
+                    styles. These four cells were two bare `<span>`s each,
+                    inside a `.row` wrapper no rule mentions, so the label and
+                    the description ran together as inline text: the first
+                    cell read "Not here yetStill uploading, or queued." Same
+                    family as `/settings`' `a.d` and `/footage`'s `.who` —
+                    markup and stylesheet describing different elements, which
+                    no text-level check can see. */}
                 <div className="states">
-                  <div className="row">
-                    <span className="s wait">Not here yet</span>
-                    <span>Still uploading, or queued. Don&rsquo;t touch it on the phone.</span>
+                  <div>
+                    <b>Not here yet</b>
+                    <p>Still uploading, or queued. Don&rsquo;t touch it on the phone.</p>
                   </div>
-                  <div className="row">
-                    <span className="s chk">Kept · checking</span>
-                    <span>Stored. The log is confirming the copy is byte-for-byte the original.</span>
+                  <div>
+                    <b>Kept · checking</b>
+                    <p>Stored. The log is confirming the copy is byte-for-byte the original.</p>
                   </div>
-                  <div className="row">
-                    <span className="s ok">Kept · checked · clear it</span>
-                    <span>Stored, verified, in the export. <b>The only state that means delete locally.</b></span>
+                  <div>
+                    <b>Kept · checked · clear it</b>
+                    <p>Stored, verified, in the export. The only state that means delete locally.</p>
                   </div>
-                  <div className="row">
-                    <span className="s warn">Didn&rsquo;t match</span>
-                    <span>The copy differs from the original. The log re-sends on its own and says so. Never clear one of these.</span>
+                  <div>
+                    <b>Didn&rsquo;t match</b>
+                    <p>The copy differs from the original. The log re-sends on its own and says so. Never clear one of these.</p>
                   </div>
                 </div>
 

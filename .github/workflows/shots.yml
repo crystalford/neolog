@@ -80,8 +80,13 @@ jobs:
 
           for (const [name, path] of PAGES) {
             try {
-              await page.goto(BASE + path, { waitUntil: 'networkidle', timeout: 60000 })
-              await page.waitForTimeout(1200)
+              // ⚠️ `domcontentloaded`, not `networkidle`. /vlogs polls the
+              // upload queue every fifteen seconds and the home page drains
+              // it after the response, so the network never goes idle —
+              // every such page sat out its full 60s timeout and one run
+              // took a quarter of an hour.
+              await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 45000 })
+              await page.waitForTimeout(1800)
               await page.screenshot({ path: `ops/shots/${name}.png` })
               console.log('shot', name)
             } catch (err) {
@@ -91,7 +96,7 @@ jobs:
 
           // The uploader, open — it is behind a button, so nothing else sees it.
           try {
-            await page.goto(BASE + '/vlogs', { waitUntil: 'networkidle', timeout: 60000 })
+            await page.goto(BASE + '/vlogs', { waitUntil: 'domcontentloaded', timeout: 45000 })
             await page.getByRole('button', { name: /put recordings in/i }).click()
             await page.waitForTimeout(1200)
             await page.screenshot({ path: 'ops/shots/uploader.png' })
@@ -106,7 +111,18 @@ jobs:
           rm -f shoot.mjs
           ls -la ops/shots/
 
+      # The frames are for a person to look at. This is the same pass with
+      # the boxes measured instead — it fails the job on two labels that
+      # render as one word, which is what three separate pages were doing on
+      # 21 Sep with every text-level check green.
+      - name: Nothing renders as run-together text
+        env:
+          CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: node scripts/check-rendered-runtogether.mjs
+
       - name: Commit the frames
+        if: always()
         run: |
           git config user.name  "neolog-shot-bot"
           git config user.email "bot@neolog.ai"
