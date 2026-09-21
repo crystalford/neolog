@@ -32,6 +32,7 @@ import { Rail } from '@/components/Rail'
 
 interface Vlog {
   id: string; title: string | null; original_filename: string | null
+  headline: string | null
   play_url: string | null; poster_url: string | null
   duration_seconds: number | null; file_size_bytes: number | null
   mime_type: string | null
@@ -157,6 +158,19 @@ export default function Recording() {
                   the recording", and it went with the rest of the engine. A
                   recording is named by its own file, or not at all. */}
               <h1>{v.original_filename || 'A recording'}</h1>
+              {/* What it is about, from what he said in it — and marked as
+                  the log's, which is the rule that does not bend. The file
+                  keeps the H1 because the file is what this page holds; this
+                  is the line that makes it findable among four hundred. */}
+              {v.headline && (
+                <p className="lede" style={{ marginBottom: 0 }}>
+                  {v.headline}
+                  <em style={{
+                    display: 'block', fontStyle: 'normal', marginTop: 6,
+                    fontSize: 12.5, color: 'var(--fg-4)',
+                  }}>the log’s line, from what you said in it — your words are below, untouched</em>
+                </p>
+              )}
             </div>
             {/* `vlog.css` calls this `.meta` and styles it in nine rules,
                 none of which were reaching anything — the page rendered

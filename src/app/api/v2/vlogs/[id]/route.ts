@@ -61,6 +61,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
     read_at: string | null
     vision_description: string | null; frame_note: string | null
     usable: number | null
+    headline: string | null
   }>(
     db,
     `SELECT id, visibility, original_filename, r2_key, transcoded_r2_key,
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
             mime_type, recorded_at, recorded_at_source, created_at,
             transcript_text, transcript_provider, transcript_completed_at,
             pipeline_status, extraction_outcomes, read_at,
-            vision_description, frame_note, usable
+            vision_description, frame_note, usable, headline
        FROM vlogs
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     params.id, operator.id,

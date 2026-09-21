@@ -37,6 +37,7 @@ import { loadFeed, type FeedEnv } from '@/lib/feed'
 import { requireOperatorFromHeaders } from '@/lib/access'
 import { lookAtHeldBacklog } from '@/lib/log-intake'
 import { drainUploadQueue } from '@/lib/upload-queue'
+import { headlineBacklog } from '@/lib/headline'
 import type { FeedFilter } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 import LogHomeClient, { type InitialFeed } from './LogHomeClient'
@@ -102,6 +103,15 @@ export default async function LogHome({ searchParams }: {
     getCloudflareContext().ctx?.waitUntil?.(
       drainUploadQueue(env as never, db, operator.id)
         .catch(err => console.warn('[log-page] upload queue:', err?.message || err)),
+    )
+
+    // And say what the newest transcribed recordings are about. Same shape
+    // as the two above and for the same reason: bounded per visit, newest
+    // first, and a recording already looked at is never asked again.
+    // Settings has the button for working through a backlog in bulk.
+    getCloudflareContext().ctx?.waitUntil?.(
+      headlineBacklog(env as never, db, operator.id, 4)
+        .catch(err => console.warn('[log-page] headlines:', err?.message || err)),
     )
   } catch (err: any) {
     // Never fatal. The client falls back to fetching, which is what it did

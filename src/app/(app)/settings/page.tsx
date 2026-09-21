@@ -29,6 +29,7 @@ import { FreeStuckButton } from './FreeStuckButton'
 import { OperatorSentence } from './OperatorSentence'
 import { SameAs } from './SameAs'
 import { Retranscribe } from './Retranscribe'
+import { Headlines } from './Headlines'
 import { StartAgain } from './StartAgain'
 
 interface Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
@@ -94,6 +95,9 @@ export default async function SettingsPage() {
 
         <div className="sh"><span>the recordings, and what the log has read</span></div>
         <Retranscribe/>
+
+        <div className="sh"><span>what each recording is about</span></div>
+        <Headlines/>
 
         <div className="sh"><span>when a recording gets stuck</span></div>
         <div className="doors">

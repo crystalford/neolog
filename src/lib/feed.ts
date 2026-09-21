@@ -35,6 +35,7 @@ import {
   type Author, type EntryKind, type MediaRef,
   vlogSentence, photoSentence, matchesFilter,
 } from './log-entry'
+import { recordingSentence } from './headline'
 import type { D1Database } from '@cloudflare/workers-types'
 
 export type FeedEnv = R2Env
@@ -204,12 +205,13 @@ export async function loadFeed(
       vision_description: string | null
       transcript_text: string | null; visibility: string | null
       pipeline_status: string | null; pipeline_error: string | null
+      headline: string | null
     }>(
       db,
       `SELECT id, original_filename, thumbnail_r2_key, thumbnail_url,
               duration_seconds, recorded_at, recorded_at_source, created_at,
               vision_description, transcript_text, visibility,
-              pipeline_status, pipeline_error
+              pipeline_status, pipeline_error, headline
          FROM vlogs
         WHERE operator_id = ? AND deleted_at IS NULL${forVlogs(rangeSql)}
         ORDER BY COALESCE(${order === 'logged' ? 'created_at' : 'recorded_at, created_at'}) DESC
@@ -383,7 +385,12 @@ export async function loadFeed(
       id: v.id,
       source: 'vlog',
       kind: 'made',
-      sentence: vlogSentence(v.duration_seconds),
+      // ⚠️ 21 Sep — the line says what the recording is ABOUT when the log
+      // has read it, and how long it is when it has not. Both sentences are
+      // the log's, which is why `author: 'log'` below does not change either
+      // way. `src/lib/headline.ts` carries the argument for why a model
+      // writing this one line is not the auto-split deleted on 20 Sep.
+      sentence: recordingSentence(v.headline, vlogSentence(v.duration_seconds)),
       // The entry appears immediately, before anything has been read — and
       // then says where it has got to, in words rather than a spinner. A
       // recording mid-transcription and one whose pipeline died looked

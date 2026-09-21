@@ -1668,6 +1668,17 @@ export const MIGRATIONS: Migration[] = [
   // writes on reset, so the column is what tells a waiting recording from
   // one that has already been sent. NULL means still in the queue.
   { name: '2026-09-20_vlogs_dispatched_at', sql: `ALTER TABLE vlogs ADD COLUMN dispatched_at TEXT` },
+
+  // One line saying what a recording is about, written from its transcript.
+  //
+  // ⚠️ Deliberately NOT `vlogs.title`. That column is in
+  // `MODEL_WRITTEN_COLUMNS` and CI fails on a read of it — it holds the
+  // deleted extraction engine's AI-written titles, and writing into it would
+  // make the old prose indistinguishable from the new. A new column, so only
+  // the new one is ever read. `src/lib/headline.ts` says why this is allowed
+  // at all and what keeps it honest.
+  { name: '2026-09-21_vlogs_headline', sql: `ALTER TABLE vlogs ADD COLUMN headline TEXT` },
+  { name: '2026-09-21_vlogs_headline_at', sql: `ALTER TABLE vlogs ADD COLUMN headline_at TEXT` },
 ]
 
 // `no such table` is deliberately NOT here. That is how a table which failed
