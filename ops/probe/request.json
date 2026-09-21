@@ -1,4 +1,5 @@
 {
-  "method": "DELETE",
-  "path": "/api/v2/log/intake?entry=01M2SGJ01GMVYS5HFDARQNBBPV&nonce=hallucination-cleanup-8"
+  "method": "POST",
+  "path": "/api/v2/admin/headlines",
+  "body": { "limit": 10 }
 }
