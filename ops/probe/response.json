@@ -1,11 +1,35 @@
 {
-  "requested_at": "2026-09-19T21:07:48Z",
-  "method": "DELETE",
-  "path": "/api/v2/log/intake?entry=01M2SGJ01GMVYS5HFDARQNBBPV&nonce=hallucination-cleanup-8",
+  "requested_at": "2026-09-21T20:10:17Z",
+  "method": "POST",
+  "path": "/api/v2/admin/headlines",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3db8fdf2c76e619-IAD\r|",
-  "body": "{\"ok\":true}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3ebb63d9a50d19a-MCI\r|",
+  "body": "{\"written\":5,\"nothing\":5,\"left\":404,\"lines\":[{\"id\":\"01KXZMT8J9HSPT4ZG8KE8AKYN9\",\"headline\":\"Brain-gut axis and its relation to emotional regulation and neurological conditions\"},{\"id\":\"01KXZNF44CAEGRXR1V200XMV9N\",\"headline\":\"Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini\"},{\"id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"headline\":\"Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences\"},{\"id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"headline\":\"Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety\"},{\"id\":\"01KXZMR8EV3ANV2FK1YGE4KN34\",\"headline\":\"America as an idea versus a country based on people, blood, and soil, related to government and nation\"}]}",
   "body_json": {
-    "ok": true
+    "written": 5,
+    "nothing": 5,
+    "left": 404,
+    "lines": [
+      {
+        "id": "01KXZMT8J9HSPT4ZG8KE8AKYN9",
+        "headline": "Brain-gut axis and its relation to emotional regulation and neurological conditions"
+      },
+      {
+        "id": "01KXZNF44CAEGRXR1V200XMV9N",
+        "headline": "Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini"
+      },
+      {
+        "id": "01KXZQTFA63BN68T7E93Q0N1P7",
+        "headline": "Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences"
+      },
+      {
+        "id": "01KXZVK86V2MMSNQCTF9K1J9BJ",
+        "headline": "Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety"
+      },
+      {
+        "id": "01KXZMR8EV3ANV2FK1YGE4KN34",
+        "headline": "America as an idea versus a country based on people, blood, and soil, related to government and nation"
+      }
+    ]
   }
 }
