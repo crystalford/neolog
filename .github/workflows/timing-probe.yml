@@ -93,6 +93,18 @@ jobs:
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             "$BASE_URL/api/v2/vlogs/queue?peek=1"
           echo
+          echo "--- what state the corpus is actually in ---"
+          curl -s -S --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/api/v2/admin/pipeline-state"
+          echo
+          echo "--- how many recordings, how many transcribed ---"
+          curl -s -S --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/api/v2/log/read"
+          echo
           echo "--- masthead: expect home/search/recordings, no index ---"
           curl -s -S --max-time 60 -o /tmp/nav.html \
             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \

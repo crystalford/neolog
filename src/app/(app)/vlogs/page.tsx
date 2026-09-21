@@ -181,10 +181,24 @@ export default function Recordings() {
                   {!v.has_transcript && ' · not transcribed'}
                 </em>
               </span>
+              {/* ⚠️ 21 Sep — this said "not read yet" on every transcribed
+                  recording, and it was a state that could never change.
+                  "Read" meant the auto-split step that cut a transcript into
+                  separate entries; that step is a no-op since 20 Sep and the
+                  entries it had written were deleted, so `entry_count` is
+                  zero everywhere and always will be. The column was
+                  promising work that nothing was ever going to do.
+
+                  The operator: "they all say not read yet but aren't all
+                  these read? like these are all the old ones."
+
+                  What a recording's state actually IS now is whether its
+                  words are down — that is what fills the transcript on its
+                  own page and what `/search` can reach. So the column says
+                  that, and says nothing at all when the answer is the
+                  ordinary one. */}
               <span className={`c${v.entry_count ? '' : ' none'}`}>
-                {v.entry_count
-                  ? `${v.entry_count} on the log`
-                  : v.has_transcript ? 'not read yet' : ''}
+                {v.entry_count ? `${v.entry_count} on the log` : ''}
               </span>
             </Link>
           ))}

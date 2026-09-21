@@ -125,6 +125,36 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
     setEntries(prev => prev.filter(e => e.status !== 'done' && e.status !== 'skipped'))
   }, [])
 
+  /**
+   * ⚠️ 21 Sep — put a failed file back in the queue.
+   *
+   * A file that failed already did not block the others: the run loop takes
+   * the next `queued` entry and keeps going, and a part that drops is
+   * retried three times inside `uploadPartWithRetry` before the file is
+   * given up on. What there was no way to do was try a failed one AGAIN —
+   * it sat red until it was removed and the same file dropped in a second
+   * time, which on a fifty-file drop means finding which of fifty it was.
+   *
+   * The operator: *"there should be a bulk uploader that is bulletproof."*
+   * Bulletproof is not "never fails" — a two-gigabyte file over a home
+   * connection will sometimes fail. It is that a failure costs one press.
+   *
+   * The `File` is still in memory, so this is just the status going back.
+   */
+  const retryEntry = useCallback((id: string) => {
+    setEntries(prev => prev.map(e =>
+      e.id === id && e.status === 'failed'
+        ? { ...e, status: 'queued', error: undefined, progress: 0, bytes_uploaded: 0 }
+        : e))
+  }, [])
+
+  const retryAllFailed = useCallback(() => {
+    setEntries(prev => prev.map(e =>
+      e.status === 'failed'
+        ? { ...e, status: 'queued', error: undefined, progress: 0, bytes_uploaded: 0 }
+        : e))
+  }, [])
+
   const entriesRef = useRef<FileEntry[]>([])
   entriesRef.current = entries
   const getLatestEntry = useCallback((id: string) => entriesRef.current.find(e => e.id === id), [])
@@ -339,6 +369,14 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
               {failedCount > 0 && <> · <strong style={{ color: 'var(--t-terra)' }}>{failedCount} failed</strong></>}
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              {/* One press to put every failure back in the queue. A drop of
+                  fifty where three dropped their connection should cost one
+                  click, not finding which three. */}
+              {!running && failedCount > 0 && (
+                <button onClick={retryAllFailed} className="btn" style={{ fontSize: 12 }}>
+                  Try {failedCount} again
+                </button>
+              )}
               {!running && queuedCount > 0 && (
                 <button onClick={startQueue} className="btn primary" style={{ fontSize: 12 }}>
                   Start · {queuedCount} file{queuedCount === 1 ? '' : 's'}
@@ -365,7 +403,9 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
 
           {/* Per-file list */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 600, overflowY: 'auto' }}>
-            {entries.map(e => <FileRow key={e.id} entry={e} onRemove={removeEntry} running={running}/>)}
+            {entries.map(e => (
+              <FileRow key={e.id} entry={e} onRemove={removeEntry} onRetry={retryEntry} running={running}/>
+            ))}
           </div>
         </>
       )}
@@ -373,7 +413,12 @@ export function CapturePanel({ onUploaded, compact = false }: CapturePanelProps)
   )
 }
 
-function FileRow({ entry, onRemove, running }: { entry: FileEntry; onRemove: (id: string) => void; running: boolean }) {
+function FileRow({ entry, onRemove, onRetry, running }: {
+  entry: FileEntry
+  onRemove: (id: string) => void
+  onRetry: (id: string) => void
+  running: boolean
+}) {
   const e = entry
   const sizeMb = (e.file.size / 1_000_000).toFixed(1)
   const pct = Math.round(e.progress * 100)
@@ -431,6 +476,20 @@ function FileRow({ entry, onRemove, running }: { entry: FileEntry; onRemove: (id
             textDecoration: 'none', position: 'relative',
           }}
         >Open →</a>
+      )}
+      {/* The file is still in memory, so trying again is the status going
+          back to queued — not finding it on disk a second time. */}
+      {e.status === 'failed' && !running && (
+        <button
+          onClick={() => onRetry(e.id)}
+          style={{
+            background: 'transparent', color: 'var(--t-terra)',
+            cursor: 'pointer', fontSize: 12, padding: '4px 10px',
+            border: '1px solid var(--t-terra)', borderRadius: 100,
+            position: 'relative',
+          }}
+          title="Put this one back in the queue"
+        >Try again</button>
       )}
       {removable && !running && (
         <button
