@@ -408,6 +408,97 @@ waits on the fold covering what the feed covers. The reasoning sits in
 `feed.ts` at the place the window would go, so the next attempt starts from
 it rather than rediscovering it.
 
+### ⚠️ 21 Sep — a selector that reaches nothing, eight times, and nothing could see it
+
+The operator, on the deployed site: *"the whole site still looks like a
+frankenstein patchwork of bubble gum and duct tape."*
+
+He was right, and nothing in this repo had ever looked. **CLAUDE.md's own
+rule — "look at the page before changing its CSS" — could not be followed
+from a Claude Code session at all**: `neolog.ai` is behind Access and the
+sandbox has no egress to it. So `.github/workflows/shots.yml` drives a real
+browser on a runner with the Access service-token headers and commits the
+frames into `ops/shots/`, where they can be read. That took under a minute
+and immediately showed three pages rendering nonsense:
+
+```
+/settings  "the recordingsCloudflare R2 · neolog-videosyours"
+/footage   "usablenofix what's in it"
+/clear     "Not here yetStill uploading, or queued."
+```
+
+**Every one is the same shape: the stylesheet describes one element and the
+markup is another**, so the layout rule matched nothing, the children fell
+back to inline, and two labels concatenated into a non-word.
+
+| where | the rule | the markup |
+|---|---|---|
+| `/settings` | `.doors a.d` | `<span className="d">` — the rows don't link anywhere |
+| `/footage` | `.paste .who` | a `.who` inside a result card |
+| `/clear` | `.states b` + `p` | two bare `<span>`s in a `.row` no rule mentions |
+| `.acts` (4 pages) | `.pg-entry .acts` | `Rail.tsx` renders it on *every* page with a rail |
+| `/search` | `.pg-search .q .try` | `.try` is a **sibling** of `section.q` |
+| `/month` | `.pg-month .crumb .nav2` | `.nav2` is a **sibling** of `.crumb` |
+| `/month` | `.pg-month .strip .k` | bare spans directly in `.strip` |
+
+⚠️ **All three text-level checks pass every one of these, and did.**
+`check-design.mjs` asks whether the class is in the markup — it is.
+`check-design-css.mjs` asks whether the values match the design — they do.
+`check-css-vars.mjs` asks whether the variables resolve — they do. **A
+selector that cannot reach its element is invisible to all of them.** It is
+the exact mirror of the failure this file already records — "a rule the
+design has and we never wrote at all" — and it has the same answer: only a
+rendered page shows it.
+
+**`scripts/check-rendered-runtogether.mjs` holds the line.** It renders
+every surface and, for each pair of adjacent inline siblings that carry
+text, sit on the same line and touch with no gap, asks whether a reader
+would see two things or one word. It found five of the eight on its first
+run, on pages nobody had squinted at. Guarded against crying wolf — both
+sides must be inline, both must carry real text, and the join must be word
+character against word character, so `"12"+"px"` and a trailing comma do
+not register.
+
+It runs in the screenshots workflow against the DEPLOYED site, because
+these pages read D1 and presign R2 and there is no local render of them.
+⚠️ Both browser passes originally waited for `networkidle`, which never
+arrives on a page that polls the upload queue — every such page sat out its
+full timeout and one run took a quarter of an hour. `domcontentloaded` plus
+a settle; a run is now about thirty-five seconds.
+
+`ops/shots/` is disposable. Delete it when the look is settled.
+
+### ⚠️ 21 Sep — the uploader was the last of the old product, and it was in the nav
+
+`CapturePanel` is the one surface that came through the 8 Sep deletion with
+the OLD product's visual vocabulary intact, because nothing imported it
+from a page anyone was looking at. On **20 Sep it was promoted into the
+masthead** — so the first thing the nav offered was a page that looked like
+a different product, and that is a large part of what "frankenstein
+patchwork" meant.
+
+Measured against the design's own binding rules:
+
+- `ARCHIVE MODE` and `UPLOAD MODE` in **uppercase letterspaced mono**. Rule
+  2 forbids them outright: *"a label is a word, not a code."*
+- four mode buttons with **9.5px** mono sub-labels. Rule 1: nothing below
+  10.5px. Four times over.
+- an **iOS-style toggle switch** that appears nowhere else in the product
+- cards nested inside cards, inside the page's own card
+
+The chrome is the page's own now: the pills are `.marks` (shared with
+`/footage` and the composer), the explanation is one `.say` line under the
+row for whichever mode is chosen, and the panel has no frame of its own
+because it already sits in one. *"Drop recordings here"*, because every
+other surface says recordings. And the archive line no longer says *"skip
+auto-extraction"* or *"process later from the vlog page"* — the extraction
+engine went on 8 Sep and the queue does the processing.
+
+⚠️ **The lesson is about promotion, not about CSS.** Putting a surface in
+the nav is a claim that it belongs to this product. Nothing had rendered
+that component since the design package was vendored, and it took one
+screenshot to see it. **Look at a page before you put it in front of him.**
+
 ### ⚠️ 20 Sep — the bulk uploader was never missing, it was unreachable
 
 The operator: *"where is the upload video like there used to be a bulk
