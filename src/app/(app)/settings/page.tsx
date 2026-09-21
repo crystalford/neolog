@@ -81,7 +81,10 @@ export default async function SettingsPage() {
         <div className="doors">
           <span className="d"><span className="n">the recordings</span><span className="w">Cloudflare R2 · neolog-videos</span><span className="c">yours</span></span>
           <span className="d"><span className="n">the log</span><span className="w">Cloudflare D1 · neolog</span><span className="c">yours</span></span>
-          <span className="d"><span className="n">the site</span><span className="w">Cloudflare Pages · neolog.ai</span><span className="c">yours</span></span>
+          {/* Not Pages — the 19 Sep migration moved hosting to a Worker with
+              static assets, via the OpenNext adapter. This line is the log
+              saying where his things are; it has to be true. */}
+          <span className="d"><span className="n">the site</span><span className="w">Cloudflare Workers · neolog.ai</span><span className="c">yours</span></span>
         </div>
         <p className="none">
           Nothing here is on anyone else&rsquo;s service. Taking all of it out

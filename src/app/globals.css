@@ -1923,7 +1923,16 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 
 /* the door: one row per address, the count on the right */
 .logpage .doors { margin-top: 26px; border-top: 1px solid var(--line); }
-.logpage .doors a.d {
+/* ⚠️ 21 Sep — `.d`, not `a.d`.
+   The layout was scoped to an ANCHOR, and `/settings` builds these rows out
+   of `<span className="d">` because a row saying where the recordings are
+   kept does not go anywhere. So the grid never matched: the three spans
+   inside rendered inline with no columns and no gap, and the section read
+   "the recordingsCloudflare R2 · neolog-videosyours". Found by screenshotting
+   the deployed page — every text-level check passes this, because the class
+   IS in the markup and its values DO match the design. `:hover` stays on the
+   anchor, where the rows really are links. */
+.logpage .doors .d {
   display: grid; grid-template-columns: 168px minmax(0, 1fr) auto; gap: 24px;
   padding: 15px 0; border-bottom: 1px solid var(--line); align-items: baseline;
 }
@@ -2042,13 +2051,25 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 }
 .logpage .paste textarea:focus { border-color: var(--line-3); }
 .logpage .paste textarea::placeholder { color: var(--fg-4); }
-.logpage .paste .who { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
-.logpage .paste .who button {
+/* ⚠️ 21 Sep — `.marks` rides along with `.paste .who`.
+   `/footage`'s per-clip mark row used `.who` too, but from inside a result
+   card rather than inside a `.paste` — so it matched none of this and fell
+   through to the ATTRIBUTION `.who` rules (`.transcript .who` and friends,
+   which are 11.5px grey text). Three buttons rendered as inline text with no
+   padding and no gap: "usablenofix what's in it".
+   A different thing gets a different class rather than a specificity fight,
+   so the row is `.marks` now and shares the pills here. */
+.logpage .paste .who,
+.logpage .marks { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.logpage .paste .who button,
+.logpage .marks button {
   font-size: 13.5px; color: var(--fg-2); padding: 6px 14px;
   border: 1px solid var(--line-1); border-radius: 100px;
 }
-.logpage .paste .who button:hover { color: var(--fg); border-color: var(--line-3); }
-.logpage .paste .who button.on { color: #04211c; background: var(--fg); border-color: var(--fg); }
+.logpage .paste .who button:hover,
+.logpage .marks button:hover { color: var(--fg); border-color: var(--line-3); }
+.logpage .paste .who button.on,
+.logpage .marks button.on { color: #04211c; background: var(--fg); border-color: var(--fg); }
 .logpage .paste .who em {
   font-style: normal; font-size: 12.5px; color: var(--fg-4); flex-basis: 100%;
 }

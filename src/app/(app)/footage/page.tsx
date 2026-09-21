@@ -191,7 +191,7 @@ export default function Footage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="who" style={{ marginTop: 10 }}>
+                  <div className="marks">
                     <button
                       className={c.usable === 1 ? 'on' : ''}
                       onClick={() => void patch({ id: c.id, usable: c.usable === 1 ? null : true })}
