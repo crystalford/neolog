@@ -1,16 +1,26 @@
 {
-  "requested_at": "2026-09-21T20:51:24Z",
+  "requested_at": "2026-09-22T00:38:15Z",
   "method": "POST",
   "path": "/api/v2/admin/headlines",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3ebf279f930ebe3-SJC\r|",
-  "body": "{\"written\":3,\"nothing\":7,\"left\":399,\"asked_again\":1,\"lines\":[{\"id\":\"01KXZRFKQFZSZ1ZRK95Y11Y18E\",\"headline\":\"Uber, DoorDash, and Osmos pickup experiences\"},{\"id\":\"01KXZNC9FHTEP4TYPNKJ5CCZHX\",\"headline\":\"a film with deep causal chains of events and subtle nuanced layering about behavior\"},{\"id\":\"01KXZMPRYW7YPZRTQGQRE6SDVM\",\"headline\":\"the manuscript\"},{\"id\":\"01KXZMT8J9HSPT4ZG8KE8AKYN9\",\"headline\":\"Brain-gut axis and its relation to emotional regulation and neurological conditions\"},{\"id\":\"01KXZNF44CAEGRXR1V200XMV9N\",\"headline\":\"Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini\"},{\"id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"headline\":\"Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences\"},{\"id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"headline\":\"Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety\"},{\"id\":\"01KXZMR8EV3ANV2FK1YGE4KN34\",\"headline\":\"America as an idea versus a country based on people, blood, and soil, related to government and nation\"}]}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3ed3ecfcdd7ee17-SJC\r|",
+  "body": "{\"written\":1,\"nothing\":7,\"left\":398,\"why\":{\"model_said_nothing\":3,\"too_short\":4,\"written\":1},\"refused\":[],\"asked_again\":3,\"lines\":[{\"id\":\"01KY0292XRJVBF1485FFTY8CTR\",\"headline\":\"doing a U.S\"},{\"id\":\"01KXZRFKQFZSZ1ZRK95Y11Y18E\",\"headline\":\"Uber, DoorDash, and Osmos pickup experiences\"},{\"id\":\"01KXZNC9FHTEP4TYPNKJ5CCZHX\",\"headline\":\"a film with deep causal chains of events and subtle nuanced layering about behavior\"},{\"id\":\"01KXZMPRYW7YPZRTQGQRE6SDVM\",\"headline\":\"the manuscript\"},{\"id\":\"01KXZMT8J9HSPT4ZG8KE8AKYN9\",\"headline\":\"Brain-gut axis and its relation to emotional regulation and neurological conditions\"},{\"id\":\"01KXZNF44CAEGRXR1V200XMV9N\",\"headline\":\"Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini\"},{\"id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"headline\":\"Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences\"},{\"id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"headline\":\"Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety\"}]}",
   "body_json": {
-    "written": 3,
+    "written": 1,
     "nothing": 7,
-    "left": 399,
-    "asked_again": 1,
+    "left": 398,
+    "why": {
+      "model_said_nothing": 3,
+      "too_short": 4,
+      "written": 1
+    },
+    "refused": [],
+    "asked_again": 3,
     "lines": [
+      {
+        "id": "01KY0292XRJVBF1485FFTY8CTR",
+        "headline": "doing a U.S"
+      },
       {
         "id": "01KXZRFKQFZSZ1ZRK95Y11Y18E",
         "headline": "Uber, DoorDash, and Osmos pickup experiences"
@@ -38,10 +48,6 @@
       {
         "id": "01KXZVK86V2MMSNQCTF9K1J9BJ",
         "headline": "Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety"
-      },
-      {
-        "id": "01KXZMR8EV3ANV2FK1YGE4KN34",
-        "headline": "America as an idea versus a country based on people, blood, and soil, related to government and nation"
       }
     ]
   }
