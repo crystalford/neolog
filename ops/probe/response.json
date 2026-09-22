@@ -1,20 +1,57 @@
 {
-  "requested_at": "2026-09-22T22:33:31Z",
+  "requested_at": "2026-09-22T22:40:01Z",
   "method": "POST",
   "path": "/api/v2/admin/headlines",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3f4c54e9b79b873-SJC\r|",
-  "body": "{\"written\":10,\"nothing\":0,\"left\":327,\"why\":{\"written\":10},\"refused\":[],\"asked_again\":0,\"lines\":[{\"id\":\"01KXZN6JBGBPNPFKW0VRY02SXB\",\"headline\":\"an inefficient delivery of a $5 subway order across the city\"},{\"id\":\"01KXZNT00QGKDKX9ZS5BEJS1C0\",\"headline\":\"recording a video about halfway to fruit land\"},{\"id\":\"01KXZN4W3ATBRNCWC9KK2AHWGX\",\"headline\":\"playing a part, being tongue-in-cheek, and the character of cool guy\"},{\"id\":\"01KXZPCTWA7R27Z7GAENV4RAAM\",\"headline\":\"the blank slate thing, and translation from mind to medium\"},{\"id\":\"01KXZS7JX7C6XXEP3Y9XKBSF9D\",\"headline\":\"my struggles with gut health and its impact on work, and making content\"},{\"id\":\"01KXZY7CXK8MQXCCGYQCWY6MX1\",\"headline\":\"gig work and its ambiguousness about predestination\"},{\"id\":\"01KXZNJ5FP20EY0XMDMGYCRE6T\",\"headline\":\"building neolog, and the difficulties with the upload pipeline\"},{\"id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"headline\":\"driving to Ancaster, and whether to sell the house\"},{\"id\":\"01KXZMS75R1JRJCV5R6KWVR7ZJ\",\"headline\":\"cutting out the middleman, optimizing in a digital environment, removing friction\"},{\"id\":\"01KXZNYG7QKAEV5JBVSKT0MTTW\",\"headline\":\"building neolog, and the difficulties with the upload pipeline\"}]}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3f4cef1c85a6d82-DFW\r|",
+  "body": "{\"written\":8,\"nothing\":2,\"left\":317,\"why\":{\"written\":8,\"rejected\":1,\"model_said_nothing\":1},\"refused\":[\"Recorded a video about carney\"],\"asked_again\":0,\"echoes_cleared\":0,\"lines\":[{\"id\":\"01KXZXA21FYKBBH6P7C3Z1VJKG\",\"headline\":\"the post-wiki shape, a zoomable view into an unbounded graph\"},{\"id\":\"01KY005PW7NBJRX4EJVPVTS8CJ\",\"headline\":\"the graph, citable pages, and rich media artifacts\"},{\"id\":\"01KXZRZ32VX8JPT71NRYF9N5PQ\",\"headline\":\"citable snapshots, the graph, and ingestion into it\"},{\"id\":\"01KXZWDQX524KCF4KHC18B69VM\",\"headline\":\"building Neolog and the development process\"},{\"id\":\"01KY04EZQEZXPFAGGYDGESKWM4\",\"headline\":\"building the database, and losing progress on multiple projects\"},{\"id\":\"01KXZNNYBKGMZ590YTQWFFJ5W8\",\"headline\":\"Tim Hortons\"},{\"id\":\"01KXZPJ8FEYX50KNT019FFEA0B\",\"headline\":\"building out mark carney's profile\"},{\"id\":\"01KXZR0GGBMEEWNG9BEA85RVNM\",\"headline\":\"content types, specifically timeline pages and object embeddable types\"},{\"id\":\"01KXZN6JBGBPNPFKW0VRY02SXB\",\"headline\":\"an inefficient delivery of a $5 subway order across the city\"},{\"id\":\"01KXZNT00QGKDKX9ZS5BEJS1C0\",\"headline\":\"recording a video about halfway to fruit land\"}]}",
   "body_json": {
-    "written": 10,
-    "nothing": 0,
-    "left": 327,
+    "written": 8,
+    "nothing": 2,
+    "left": 317,
     "why": {
-      "written": 10
+      "written": 8,
+      "rejected": 1,
+      "model_said_nothing": 1
     },
-    "refused": [],
+    "refused": [
+      "Recorded a video about carney"
+    ],
     "asked_again": 0,
+    "echoes_cleared": 0,
     "lines": [
+      {
+        "id": "01KXZXA21FYKBBH6P7C3Z1VJKG",
+        "headline": "the post-wiki shape, a zoomable view into an unbounded graph"
+      },
+      {
+        "id": "01KY005PW7NBJRX4EJVPVTS8CJ",
+        "headline": "the graph, citable pages, and rich media artifacts"
+      },
+      {
+        "id": "01KXZRZ32VX8JPT71NRYF9N5PQ",
+        "headline": "citable snapshots, the graph, and ingestion into it"
+      },
+      {
+        "id": "01KXZWDQX524KCF4KHC18B69VM",
+        "headline": "building Neolog and the development process"
+      },
+      {
+        "id": "01KY04EZQEZXPFAGGYDGESKWM4",
+        "headline": "building the database, and losing progress on multiple projects"
+      },
+      {
+        "id": "01KXZNNYBKGMZ590YTQWFFJ5W8",
+        "headline": "Tim Hortons"
+      },
+      {
+        "id": "01KXZPJ8FEYX50KNT019FFEA0B",
+        "headline": "building out mark carney's profile"
+      },
+      {
+        "id": "01KXZR0GGBMEEWNG9BEA85RVNM",
+        "headline": "content types, specifically timeline pages and object embeddable types"
+      },
       {
         "id": "01KXZN6JBGBPNPFKW0VRY02SXB",
         "headline": "an inefficient delivery of a $5 subway order across the city"
@@ -22,38 +59,6 @@
       {
         "id": "01KXZNT00QGKDKX9ZS5BEJS1C0",
         "headline": "recording a video about halfway to fruit land"
-      },
-      {
-        "id": "01KXZN4W3ATBRNCWC9KK2AHWGX",
-        "headline": "playing a part, being tongue-in-cheek, and the character of cool guy"
-      },
-      {
-        "id": "01KXZPCTWA7R27Z7GAENV4RAAM",
-        "headline": "the blank slate thing, and translation from mind to medium"
-      },
-      {
-        "id": "01KXZS7JX7C6XXEP3Y9XKBSF9D",
-        "headline": "my struggles with gut health and its impact on work, and making content"
-      },
-      {
-        "id": "01KXZY7CXK8MQXCCGYQCWY6MX1",
-        "headline": "gig work and its ambiguousness about predestination"
-      },
-      {
-        "id": "01KXZNJ5FP20EY0XMDMGYCRE6T",
-        "headline": "building neolog, and the difficulties with the upload pipeline"
-      },
-      {
-        "id": "01KXZP7Z3B7G9E3K0BX5MSCK6M",
-        "headline": "driving to Ancaster, and whether to sell the house"
-      },
-      {
-        "id": "01KXZMS75R1JRJCV5R6KWVR7ZJ",
-        "headline": "cutting out the middleman, optimizing in a digital environment, removing friction"
-      },
-      {
-        "id": "01KXZNYG7QKAEV5JBVSKT0MTTW",
-        "headline": "building neolog, and the difficulties with the upload pipeline"
       }
     ]
   }
