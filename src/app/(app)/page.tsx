@@ -78,6 +78,7 @@ export default async function LogHome({ searchParams }: {
       items: payload.items,
       buried: payload.buried,
       coverage: payload.coverage,
+      totals: payload.totals,
       fold: payload.fold,
       buried_by_day: payload.buried_by_day,
     }

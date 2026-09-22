@@ -66,6 +66,17 @@ const WORDS_SENT = 1800
  */
 const MAX_CHARS = 150
 
+/**
+ * Below this many words there is nothing to be about.
+ *
+ * ⚠️ It is the BACKLOG's filter as well as the guard inside
+ * `writeHeadline`, and that is the point: a clip of eight words was picked
+ * up on every pass, answered "too short" every time, and stayed in `left`
+ * forever — so the count never fell to zero and the Settings loop had no
+ * way to finish. A recording that cannot have a line is not work left to do.
+ */
+const MIN_WORDS = 25
+
 export interface HeadlineEnv {
   AI: { run: (m: unknown, a: unknown) => Promise<unknown> }
 }
@@ -161,7 +172,7 @@ export async function writeHeadline(
   const words = (row?.words || '').trim()
   // Under a couple of sentences there is nothing to be about. Not stamped:
   // a recording can be transcribed again and have words the next time.
-  if (words.split(/\s+/).filter(Boolean).length < 25) {
+  if (words.split(/\s+/).filter(Boolean).length < MIN_WORDS) {
     return { outcome: 'too_short', line: null }
   }
 
@@ -238,10 +249,10 @@ export async function headlineBacklog(
     `SELECT v.id FROM vlogs v
       WHERE v.operator_id = ? AND v.deleted_at IS NULL
         AND v.headline IS NULL AND v.headline_at IS NULL
-        AND EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
+        AND (SELECT COUNT(*) FROM transcript_words w WHERE w.vlog_id = v.id) >= ?
       ORDER BY COALESCE(v.recorded_at, v.created_at) DESC
       LIMIT ?`,
-    operatorId, max,
+    operatorId, MIN_WORDS, max,
   )
 
   let written = 0
@@ -269,8 +280,8 @@ export async function headlineBacklog(
     `SELECT COUNT(*) AS n FROM vlogs v
       WHERE v.operator_id = ? AND v.deleted_at IS NULL
         AND v.headline IS NULL AND v.headline_at IS NULL
-        AND EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)`,
-    operatorId,
+        AND (SELECT COUNT(*) FROM transcript_words w WHERE w.vlog_id = v.id) >= ?`,
+    operatorId, MIN_WORDS,
   )
   return { written, nothing, left: rest?.n ?? 0, why, refused }
 }
@@ -303,7 +314,12 @@ export function clean(raw: string): string | null {
 
   // One sentence. If it produced several, the first is the headline and the
   // rest is the summary nobody asked for.
-  const firstBreak = s.search(/[.!?](\s|$)/)
+  // ⚠️ A sentence break, not any full stop. The first real line this
+  // produced was "doing a U.S" — the transcript said "doing a U.S. road
+  // trip" and the cut fired on the abbreviation's own period. So a break is
+  // a stop FOLLOWED by a space and a capital (or the end), and never one
+  // sitting after a lone capital letter.
+  const firstBreak = sentenceBreak(s)
   if (firstBreak > 0) s = s.slice(0, firstBreak)
   s = s.replace(/[.,;:\s]+$/, '').trim()
 
@@ -322,6 +338,29 @@ export function clean(raw: string): string | null {
   // A line with no letters in it is not a headline.
   if (!/[a-z]/i.test(s)) return null
   return s
+}
+
+/**
+ * Where the first sentence ends, or -1.
+ *
+ * `s.search(/[.!?](\s|$)/)` was wrong in the one way that matters here:
+ * "doing a U.S. road trip" has a full stop four words in, and cutting there
+ * produced "doing a U.S" — shipped, on the feed, as what a recording was
+ * about. An abbreviation's period is not the end of a sentence.
+ */
+function sentenceBreak(s: string): number {
+  for (let i = 0; i < s.length; i++) {
+    if (!'.!?'.includes(s[i])) continue
+    // A lone capital before it is an initial or an abbreviation: U.S., J.
+    if (s[i] === '.' && i >= 1 && /[A-Z]/.test(s[i - 1]) && (i < 2 || !/[A-Za-z]/.test(s[i - 2]))) continue
+    const after = s.slice(i + 1)
+    if (after === '') return i
+    // A real break is followed by a space and then a new sentence.
+    if (!/^\s/.test(after)) continue
+    const next = after.trimStart()
+    if (next === '' || /^[A-Z0-9"“]/.test(next)) return i
+  }
+  return -1
 }
 
 /**

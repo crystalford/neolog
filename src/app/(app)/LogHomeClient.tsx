@@ -108,10 +108,13 @@ const PRECISION_LABELS: { p: DatePrecision; label: string }[] = [
  * render could not produce it — the page falls back to fetching on mount,
  * exactly as it did before, rather than failing. This page must load.
  */
+export interface Totals { recordings: number; photos: number; wrote: number }
+
 export interface InitialFeed {
   items: LogEntry[]
   buried: number
   coverage: Record<string, number>
+  totals: Totals | null
   fold: FoldBucket[]
   buried_by_day: Record<string, number>
 }
@@ -150,6 +153,8 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
   // Coverage describes the whole log, so it comes from the server and does
   // not move when the feed is filtered.
   const [coverage, setCoverage] = useState<Record<string, number>>(initial?.coverage ?? {})
+  // Over the whole log, not the window — see `ArrivedOnItsOwn`.
+  const [totals, setTotals] = useState<Totals | null>(initial?.totals ?? null)
   // Everything older than the open window, as one line per period.
   const [fold, setFold] = useState<FoldBucket[]>(initial?.fold ?? [])
   const [buriedByDay, setBuriedByDay] = useState<Record<string, number>>(initial?.buried_by_day ?? {})
@@ -177,12 +182,13 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
       if (!res.ok) { setItems([]); return }
       const data = await res.json() as {
         items: LogEntry[]; buried: number
-        coverage?: Record<string, number>; fold?: FoldBucket[]
+        coverage?: Record<string, number>; totals?: Totals; fold?: FoldBucket[]
         buried_by_day?: Record<string, number>
       }
       setItems(data.items || [])
       setBuried(data.buried || 0)
       if (data.coverage) setCoverage(data.coverage)
+      if (data.totals) setTotals(data.totals)
       // Empty on a filtered or searched feed — that is already a narrowed
       // list, and folding it again would hide the thing being looked for.
       setFold(data.fold || [])
@@ -519,7 +525,7 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
           <aside className="rail">
             <OpenQuestions onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
-            <ArrivedOnItsOwn items={items} />
+            <ArrivedOnItsOwn totals={totals} />
             <WhatArrived />
             <OnThisDay />
             <SafeToClear />
@@ -570,28 +576,31 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
 // Derived from the rows, not written by hand. The design's card breaks the
 // count down by where things came from, and a hand-written sentence would go
 // stale the first time the mix changed.
+//
+// ⚠️ 21 Sep — it counted `items`, which is the 200-row WINDOW, and printed
+// "200 recordings" beside a log holding four hundred and twenty-one. A count
+// of what is on screen presented as a count of the log is the same mistake
+// the coverage bar below made and was fixed for. The numbers come from the
+// server now, over the whole log; `items` is not consulted.
 
-function ArrivedOnItsOwn({ items }: { items: LogEntry[] }) {
-  const arrived = items.filter(i => i.author === 'log')
-  if (!arrived.length) return null
+function ArrivedOnItsOwn({ totals }: {
+  totals: { recordings: number; photos: number; wrote: number } | null
+}) {
+  if (!totals) return null
+  const parts = [
+    [totals.recordings, 'recordings'] as const,
+    [totals.photos, 'photos'] as const,
+    [totals.wrote, totals.wrote === 1 ? 'line the log wrote' : 'lines the log wrote'] as const,
+  ].filter(([n]) => n > 0)
+  if (!parts.length) return null
 
-  const bySource: Record<string, number> = {}
-  for (const i of arrived) {
-    const k = i.source === 'vlog' ? 'recordings'
-      : i.source === 'photo' ? 'photos'
-      : i.media.length ? 'files'
-      : 'lines the log wrote'
-    bySource[k] = (bySource[k] || 0) + 1
-  }
-  const parts = Object.entries(bySource)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, n]) => `${n} ${k}`)
+  const all = parts.reduce((n, [c]) => n + c, 0)
 
   return (
     <div className="rc">
-      <div className="h">Arrived on its own <span>{arrived.length}</span></div>
+      <div className="h">Arrived on its own <span>{all.toLocaleString('en-GB')}</span></div>
       <div className="i">
-        {parts.join(' · ')}
+        {parts.map(([n, k]) => `${n.toLocaleString('en-GB')} ${k}`).join(' · ')}
         <em>every line the log wrote is correctable in one tap</em>
       </div>
     </div>
@@ -765,7 +774,6 @@ function WrittenDown({ coverage, onYear }: {
   }, [coverage])
 
   if (!stats) return null
-  const pct = Math.round((stats.covered / stats.bars.length) * 100)
 
   return (
     <div className="rc">
@@ -786,12 +794,32 @@ function WrittenDown({ coverage, onYear }: {
         ))}
       </div>
       <div className="yl"><span>{stats.from}</span><span>{stats.to}</span></div>
+      {/* ⚠️ 21 Sep — this read "100% of these years has anything on it.
+          1 year is nearly empty." Three things wrong at once.
+
+          The percentage is over a range DERIVED FROM THE DATA, so it is
+          always near 100 and says nothing. `log.html`'s own number — "39% of
+          your life" — is over a lifetime, which the log does not know and
+          will not guess. So the count says how many years have something and
+          out of how many, which is a fact either way.
+
+          "nearly empty" is a reading. The rule underneath it is a real one —
+          under a tenth of the fullest year, the same threshold the fold's
+          year bands use — so the line states the rule instead, the way every
+          count on /numbers and /corrections does.
+
+          And "this is where filling in the past starts" is the log telling
+          him to go and fill in his life. §0 rule 2: the log is quiet, and it
+          never comments on what is on it. The years are clickable; that is
+          the whole invitation. */}
       <div className="i">
-        {pct}% of these years has anything on it.
+        {stats.covered === stats.bars.length
+          ? <>Every year here has something on it.</>
+          : <>{stats.covered} of {stats.bars.length} years have something on them.</>}
         {stats.thin > 0 && (
-          <> <b>{stats.thin} {stats.thin === 1 ? 'year is' : 'years are'} nearly empty.</b></>
+          <> <b>{stats.thin} {stats.thin === 1 ? 'is' : 'are'} under a tenth of the fullest.</b></>
         )}
-        <em>this is where filling in the past starts</em>
+        <em>click a year to see what is there</em>
       </div>
     </div>
   )

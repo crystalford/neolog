@@ -59,6 +59,12 @@ export interface FeedPayload {
   buried: number
   buried_by_day: Record<string, number>
   coverage: Record<string, number>
+  /**
+   * How many of each the log holds, over the WHOLE log rather than the
+   * window. The rail counts what arrived on its own, and counting the rows
+   * it had been handed printed "200 recordings" against a log of 421.
+   */
+  totals: { recordings: number; photos: number; wrote: number }
   fold: FoldBucket[]
   open_days: number
 }
@@ -172,7 +178,7 @@ export async function loadFeed(
   // Pull a generous slice from each table, merge, then cap. Each table is
   // capped at `limit` because after the merge only `limit` rows survive
   // anyway — no table can starve another out of the window.
-  const [entryRows, vlogRows, photoRows, buriedRow, buriedDayRows, coverageRows] = await Promise.all([
+  const [entryRows, vlogRows, photoRows, buriedRow, buriedDayRows, coverageRows, totalRows] = await Promise.all([
     findMany<{
       id: string; text: string; detail: string | null
       occurred_at: string; created_at: string
@@ -271,6 +277,29 @@ export async function loadFeed(
          FROM photos
         WHERE operator_id = ? AND deleted_at IS NULL
         GROUP BY y`,
+      operatorId, operatorId, operatorId,
+    ),
+    // ⚠️ 21 Sep — how many of each the log ACTUALLY holds.
+    //
+    // The rail's "arrived on its own" card counted the rows it had been
+    // handed, which is the 200-row window, and printed "200 recordings"
+    // beside a log that holds four hundred and twenty-one. A count of what
+    // is on screen presented as a count of the log is the same mistake the
+    // coverage bar made and was fixed for, one card lower down.
+    //
+    // One statement, three counts, in the same batch as everything else —
+    // not three round trips on the hot path.
+    findMany<{ k: string; n: number }>(
+      db,
+      `SELECT 'recordings' AS k, COUNT(*) AS n FROM vlogs
+        WHERE operator_id = ? AND deleted_at IS NULL
+       UNION ALL
+       SELECT 'photos', COUNT(*) FROM photos
+        WHERE operator_id = ? AND deleted_at IS NULL
+       UNION ALL
+       SELECT 'wrote', COUNT(*) FROM log_entries
+        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
+          AND author = 'log'`,
       operatorId, operatorId, operatorId,
     ),
   ])
@@ -518,6 +547,12 @@ export async function loadFeed(
     items: trimmed, total, order, filter,
     buried: buriedRow[0]?.n || 0,
     buried_by_day: Object.fromEntries(buriedDayRows.filter(r => r.d).map(r => [r.d, r.n])),
-    coverage, fold, open_days: OPEN_DAYS,
+    coverage,
+    totals: {
+      recordings: totalRows.find(r => r.k === 'recordings')?.n || 0,
+      photos: totalRows.find(r => r.k === 'photos')?.n || 0,
+      wrote: totalRows.find(r => r.k === 'wrote')?.n || 0,
+    },
+    fold, open_days: OPEN_DAYS,
   }
 }
