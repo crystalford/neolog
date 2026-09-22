@@ -115,18 +115,25 @@ export default function ExportPage() {
 
         {/* `takeout.html`: export at three levels. The whole log is the
             last of them, not the only one. */}
+        {/* ⚠️ 21 Sep — these three carried `className="row"` and a
+            `<span>`, and `takeout.css` styles `.levels>div` and `.levels p`.
+            So the generic `.row` (a flex row) laid each cell out sideways,
+            the `<span>` matched no rule, and the third cell's text was
+            clipped at the column edge: "Everything | Th… as… w… or…".
+            The design's own children are a bare `<div>` with a `<b>` and a
+            `<p>`. */}
         <div className="levels">
-          <div className="row">
+          <div>
             <b>One entry</b>
-            <span>From any entry: a Markdown file and its original.</span>
+            <p>From any entry: a Markdown file and its original.</p>
           </div>
-          <div className="row">
+          <div>
             <b>One page</b>
-            <span>Every entry under it, as a document you could hand to someone.</span>
+            <p>Every entry under it, as a document you could hand to someone.</p>
           </div>
-          <div className="row">
+          <div>
             <b>Everything</b>
-            <span>The whole log as plain files — words, originals, versions, the manifest.</span>
+            <p>The whole log as plain files — words, originals, versions, the manifest.</p>
           </div>
         </div>
 
@@ -143,20 +150,33 @@ export default function ExportPage() {
         </div>
 
         <div className="sh"><span>What to pull out</span></div>
-        <div className="out">
+        {/* ⚠️ 21 Sep — these three option cards were wrapped in `.out`,
+            which `takeout.css` defines as the page's ACTION row: a
+            `1fr auto` grid holding one big statement and the buttons beside
+            it. Three cards in a two-column grid put two side by side and
+            the third on a row of its own — and `.i` has no rule at this
+            scope, so every card's `<b>` and `<em>` ran together into
+            "A rangeLeave either side empty…". The action row itself was
+            NESTED inside the third card, which is why "198.79 GB — every
+            entry…" rendered in a 190px column.
 
-          <div className="i">
+            A different thing gets a different class: `.picks`/`.pk`, three
+            up, the same shape `.levels` above already uses. The action row
+            is a sibling after them, full width, where the design puts it. */}
+        <div className="picks">
+
+          <div className="pk">
             <b>A range</b>
             <em>Leave either side empty for &ldquo;everything up to&rdquo; or &ldquo;everything since&rdquo;.</em>
             <div className="fixrow" style={{ alignItems: 'center' }}>
               <input
                 type="date" value={from} onChange={e => setFrom(e.target.value)}
-                style={dateStyle} aria-label="From"
+                aria-label="From"
               />
               <span style={{ fontSize: 12, color: 'var(--fg-4)' }}>to</span>
               <input
                 type="date" value={to} onChange={e => setTo(e.target.value)}
-                style={dateStyle} aria-label="To"
+                aria-label="To"
               />
               {(from || to) && (
                 <button onClick={() => { setFrom(''); setTo('') }}>whole log</button>
@@ -164,7 +184,7 @@ export default function ExportPage() {
             </div>
           </div>
 
-          <div className="i">
+          <div className="pk">
             <b>A page</b>
             <em>Everything the log gathered under one name.</em>
             <select value={pageId} onChange={e => setPageId(e.target.value)}>
@@ -177,7 +197,7 @@ export default function ExportPage() {
             </select>
           </div>
 
-          <div className="i">
+          <div className="pk">
             <b>
               {counting ? 'Counting…'
                 : count === null ? 'Ready'
@@ -204,10 +224,16 @@ export default function ExportPage() {
                 manifest and the originals stay in R2, so quoting 19 GB
                 against a download button would be a promise the file does
                 not keep. The line says which is which. */}
-            {/* `.out` is the two-column frame `takeout.css` gives this:
-                what you get on the left, the buttons on the right. Without
-                it `.big`, `.sub` and `.go` match no rule at all — every one
-                of them is scoped under `.out`. */}
+          </div>
+        </div>
+
+        {/* `.out` is the two-column frame `takeout.css` gives this: what you
+            get on the left, the buttons on the right. Without it `.big`,
+            `.sub` and `.go` match no rule at all — every one of them is
+            scoped under `.out`. ⚠️ It is a SIBLING of the option cards, not
+            a child of one: nested inside the third card it was squeezed into
+            a third of the width, with the size of the whole log set in a
+            190px column. */}
             <div className="out">
             {bill && (
               <>
@@ -239,8 +265,6 @@ export default function ExportPage() {
               </em>
             </div>
             </div>
-          </div>
-        </div>
 
         {/* ── What is in it ─────────────────────────────────────────────
             `takeout.html`'s `.tree`. The shape of what he is about to
@@ -349,15 +373,4 @@ export default function ExportPage() {
       </div>
     </Shell>
   )
-}
-
-const dateStyle: React.CSSProperties = {
-  background: 'var(--bg-2)',
-  border: '1px solid var(--line-1)',
-  borderRadius: 7,
-  color: 'var(--fg-1)',
-  font: 'inherit',
-  fontSize: 12.5,
-  padding: '5px 9px',
-  colorScheme: 'dark',
 }

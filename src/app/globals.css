@@ -4137,6 +4137,31 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage.pg-takeout .levels b { display:block; font-size:13.5px; font-weight:450; color:var(--fg); }
 .logpage.pg-takeout .levels p { font-size:12.5px; color:var(--fg-3); margin-top:4px; line-height:1.5; }
 .logpage.pg-takeout .levels a { color:var(--fg-2); border-bottom:1px solid var(--line-2); }
+
+/* ⚠️ 21 Sep — `.picks`/`.pk`: the three things he chooses before pulling an
+   export out. There is no design rule for these because `takeout.html`'s
+   range picker lives elsewhere on the page — this is our control surface, so
+   it gets our class and takes the shape `.levels` directly above already
+   uses, three up in one frame.
+
+   They were wrapped in `.out`, which is the page's ACTION row (`1fr auto`,
+   one big statement and the buttons beside it). Three cards in a two-column
+   grid, and `.i` matching no rule at this scope, so every card's label and
+   its explanation ran together as inline text: "A rangeLeave either side
+   empty…". A different thing gets a different class. */
+.logpage.pg-takeout .picks { margin-top:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.logpage.pg-takeout .picks .pk { background:var(--bg-1); padding:14px 16px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; }
+.logpage.pg-takeout .picks .pk b { display:block; font-size:13.5px; font-weight:450; color:var(--fg); line-height:1.4; }
+.logpage.pg-takeout .picks .pk em { display:block; font-style:normal; font-size:12px; color:var(--fg-4); line-height:1.5; margin-top:-4px; }
+.logpage.pg-takeout .picks .pk .fixrow { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+/* The browser's own date field and select, given the page's chrome. The
+   picker itself stays native — a hand-built one is a calendar widget nobody
+   asked for, and the native one is the one his phone already knows. */
+.logpage.pg-takeout .picks .pk input[type=date],
+.logpage.pg-takeout .picks .pk select { font:inherit; font-size:12.5px; color:var(--fg-1); background:var(--bg); border:1px solid var(--line-2); border-radius:7px; padding:7px 9px; outline:none; max-width:100%; color-scheme:dark; }
+.logpage.pg-takeout .picks .pk select { width:100%; }
+.logpage.pg-takeout .picks .pk input[type=date]::-webkit-calendar-picker-indicator { filter:invert(0.6); cursor:pointer; }
+.logpage.pg-takeout .picks .pk button { font-size:12px; color:var(--fg-2); border:1px solid var(--line-2); border-radius:6px; padding:6px 10px; }
 .logpage.pg-takeout .bill { border:1px solid var(--line-1); border-radius:12px; overflow:hidden; }
 .logpage.pg-takeout .bill .h { padding:12px 18px; border-bottom:1px solid var(--line); background:var(--bg-1); display:flex; justify-content:space-between; align-items:baseline; gap:12px; }
 .logpage.pg-takeout .bill .h b { font-size:14px; font-weight:450; color:var(--fg); }
