@@ -105,6 +105,34 @@ const SYSTEM = [
 ].join('\n')
 
 /**
+ * Why a recording has no line.
+ *
+ * ⚠️ 21 Sep — the first two real batches reported "written 5, nothing 5"
+ * and "written 3, nothing 7" and NOTHING ANYWHERE SAID WHY. A silence with
+ * no reason behind it is the shape of bug this repo keeps paying for: it
+ * reads as "the model had nothing to say" when it can equally be a rejected
+ * line, a truncated answer or a failed call, and each of those wants a
+ * different fix. So every path names itself.
+ */
+export type HeadlineOutcome =
+  | 'written'
+  /** Fewer than 25 words of transcript. Nothing to be about. */
+  | 'too_short'
+  /** The model used its escape hatch, or answered with a refusal in prose. */
+  | 'model_said_nothing'
+  /** It answered, and `clean()` would not let the answer through. */
+  | 'rejected'
+  /** The call itself failed. Not stamped — the backlog retries it. */
+  | 'call_failed'
+
+export interface HeadlineResult {
+  outcome: HeadlineOutcome
+  line: string | null
+  /** What the model actually said, kept only for a `rejected` answer. */
+  raw?: string
+}
+
+/**
  * Ask for the line. Returns null when there is nothing honest to say.
  *
  * Every failure path returns null and the row keeps its plain sentence,
@@ -116,7 +144,7 @@ export async function writeHeadline(
   db: D1Database,
   vlogId: string,
   operatorId: string,
-): Promise<string | null> {
+): Promise<HeadlineResult> {
   // The words as he said them, in order. `transcript_words` is the only
   // source — `transcript_text` can hold prose from a pre-8-Sep run with no
   // timings behind it, and a headline off that is a summary of a summary.
@@ -133,21 +161,30 @@ export async function writeHeadline(
   const words = (row?.words || '').trim()
   // Under a couple of sentences there is nothing to be about. Not stamped:
   // a recording can be transcribed again and have words the next time.
-  if (words.split(/\s+/).filter(Boolean).length < 25) return null
+  if (words.split(/\s+/).filter(Boolean).length < 25) {
+    return { outcome: 'too_short', line: null }
+  }
 
   let said: string
   try {
     const res = await callChat(env as never, {
       system: SYSTEM,
       messages: [{ role: 'user', content: words }],
-      maxTokens: 60,
+      // ⚠️ 60 was too tight. A model that opens with a few words of
+      // preamble before the phrase runs out of room mid-sentence, and a
+      // truncated answer is indistinguishable from a refusal by the time it
+      // reaches `clean()`. The line itself is capped at 150 characters, so
+      // the ceiling here only needs to be past that with room for a
+      // preamble to be stripped.
+      maxTokens: 120,
       temperature: 0.2,
     })
     said = (res?.text || '').trim()
-  } catch {
+  } catch (err: any) {
     // A call that failed is not an answer. Nothing is stamped, so the
     // backlog picks this one up again.
-    return null
+    console.warn(`[headline] call failed for ${vlogId}: ${err?.message || err}`)
+    return { outcome: 'call_failed', line: null }
   }
 
   const line = clean(said)
@@ -164,7 +201,12 @@ export async function writeHeadline(
       WHERE id = ? AND operator_id = ?`,
     line, vlogId, operatorId,
   )
-  return line
+  if (line) return { outcome: 'written', line }
+  // It answered and the answer was not usable, or it declined. Different
+  // facts, and the count has to be able to tell them apart.
+  return /^nothing\b/i.test(said)
+    ? { outcome: 'model_said_nothing', line: null }
+    : { outcome: 'rejected', line: null, raw: said.slice(0, 220) }
 }
 
 /**
@@ -182,7 +224,15 @@ export async function headlineBacklog(
   db: D1Database,
   operatorId: string,
   max = 4,
-): Promise<{ written: number; nothing: number; left: number }> {
+): Promise<{
+  written: number
+  nothing: number
+  left: number
+  /** How many ended each way — see `HeadlineOutcome` for why this exists. */
+  why: Record<string, number>
+  /** What was said and refused, so a rejection can be read rather than counted. */
+  refused: string[]
+}> {
   const rows = await findMany<{ id: string }>(
     db,
     `SELECT v.id FROM vlogs v
@@ -196,12 +246,20 @@ export async function headlineBacklog(
 
   let written = 0
   let nothing = 0
+  const why: Record<string, number> = {}
+  const refused: string[] = []
   for (const r of rows) {
     try {
-      const line = await writeHeadline(env, db, r.id, operatorId)
-      if (line) written++; else nothing++
+      const res = await writeHeadline(env, db, r.id, operatorId)
+      why[res.outcome] = (why[res.outcome] || 0) + 1
+      if (res.line) written++
+      else {
+        nothing++
+        if (res.raw) refused.push(res.raw)
+      }
     } catch (err: any) {
       console.warn(`[headline] ${r.id}: ${err?.message || err}`)
+      why.threw = (why.threw || 0) + 1
       nothing++
     }
   }
@@ -214,7 +272,7 @@ export async function headlineBacklog(
         AND EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)`,
     operatorId,
   )
-  return { written, nothing, left: rest?.n ?? 0 }
+  return { written, nothing, left: rest?.n ?? 0, why, refused }
 }
 
 /**
