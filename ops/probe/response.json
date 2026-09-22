@@ -1,53 +1,59 @@
 {
-  "requested_at": "2026-09-22T00:38:15Z",
+  "requested_at": "2026-09-22T22:33:31Z",
   "method": "POST",
   "path": "/api/v2/admin/headlines",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3ed3ecfcdd7ee17-SJC\r|",
-  "body": "{\"written\":1,\"nothing\":7,\"left\":398,\"why\":{\"model_said_nothing\":3,\"too_short\":4,\"written\":1},\"refused\":[],\"asked_again\":3,\"lines\":[{\"id\":\"01KY0292XRJVBF1485FFTY8CTR\",\"headline\":\"doing a U.S\"},{\"id\":\"01KXZRFKQFZSZ1ZRK95Y11Y18E\",\"headline\":\"Uber, DoorDash, and Osmos pickup experiences\"},{\"id\":\"01KXZNC9FHTEP4TYPNKJ5CCZHX\",\"headline\":\"a film with deep causal chains of events and subtle nuanced layering about behavior\"},{\"id\":\"01KXZMPRYW7YPZRTQGQRE6SDVM\",\"headline\":\"the manuscript\"},{\"id\":\"01KXZMT8J9HSPT4ZG8KE8AKYN9\",\"headline\":\"Brain-gut axis and its relation to emotional regulation and neurological conditions\"},{\"id\":\"01KXZNF44CAEGRXR1V200XMV9N\",\"headline\":\"Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini\"},{\"id\":\"01KXZQTFA63BN68T7E93Q0N1P7\",\"headline\":\"Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences\"},{\"id\":\"01KXZVK86V2MMSNQCTF9K1J9BJ\",\"headline\":\"Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety\"}]}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3f4c54e9b79b873-SJC\r|",
+  "body": "{\"written\":10,\"nothing\":0,\"left\":327,\"why\":{\"written\":10},\"refused\":[],\"asked_again\":0,\"lines\":[{\"id\":\"01KXZN6JBGBPNPFKW0VRY02SXB\",\"headline\":\"an inefficient delivery of a $5 subway order across the city\"},{\"id\":\"01KXZNT00QGKDKX9ZS5BEJS1C0\",\"headline\":\"recording a video about halfway to fruit land\"},{\"id\":\"01KXZN4W3ATBRNCWC9KK2AHWGX\",\"headline\":\"playing a part, being tongue-in-cheek, and the character of cool guy\"},{\"id\":\"01KXZPCTWA7R27Z7GAENV4RAAM\",\"headline\":\"the blank slate thing, and translation from mind to medium\"},{\"id\":\"01KXZS7JX7C6XXEP3Y9XKBSF9D\",\"headline\":\"my struggles with gut health and its impact on work, and making content\"},{\"id\":\"01KXZY7CXK8MQXCCGYQCWY6MX1\",\"headline\":\"gig work and its ambiguousness about predestination\"},{\"id\":\"01KXZNJ5FP20EY0XMDMGYCRE6T\",\"headline\":\"building neolog, and the difficulties with the upload pipeline\"},{\"id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"headline\":\"driving to Ancaster, and whether to sell the house\"},{\"id\":\"01KXZMS75R1JRJCV5R6KWVR7ZJ\",\"headline\":\"cutting out the middleman, optimizing in a digital environment, removing friction\"},{\"id\":\"01KXZNYG7QKAEV5JBVSKT0MTTW\",\"headline\":\"building neolog, and the difficulties with the upload pipeline\"}]}",
   "body_json": {
-    "written": 1,
-    "nothing": 7,
-    "left": 398,
+    "written": 10,
+    "nothing": 0,
+    "left": 327,
     "why": {
-      "model_said_nothing": 3,
-      "too_short": 4,
-      "written": 1
+      "written": 10
     },
     "refused": [],
-    "asked_again": 3,
+    "asked_again": 0,
     "lines": [
       {
-        "id": "01KY0292XRJVBF1485FFTY8CTR",
-        "headline": "doing a U.S"
+        "id": "01KXZN6JBGBPNPFKW0VRY02SXB",
+        "headline": "an inefficient delivery of a $5 subway order across the city"
       },
       {
-        "id": "01KXZRFKQFZSZ1ZRK95Y11Y18E",
-        "headline": "Uber, DoorDash, and Osmos pickup experiences"
+        "id": "01KXZNT00QGKDKX9ZS5BEJS1C0",
+        "headline": "recording a video about halfway to fruit land"
       },
       {
-        "id": "01KXZNC9FHTEP4TYPNKJ5CCZHX",
-        "headline": "a film with deep causal chains of events and subtle nuanced layering about behavior"
+        "id": "01KXZN4W3ATBRNCWC9KK2AHWGX",
+        "headline": "playing a part, being tongue-in-cheek, and the character of cool guy"
       },
       {
-        "id": "01KXZMPRYW7YPZRTQGQRE6SDVM",
-        "headline": "the manuscript"
+        "id": "01KXZPCTWA7R27Z7GAENV4RAAM",
+        "headline": "the blank slate thing, and translation from mind to medium"
       },
       {
-        "id": "01KXZMT8J9HSPT4ZG8KE8AKYN9",
-        "headline": "Brain-gut axis and its relation to emotional regulation and neurological conditions"
+        "id": "01KXZS7JX7C6XXEP3Y9XKBSF9D",
+        "headline": "my struggles with gut health and its impact on work, and making content"
       },
       {
-        "id": "01KXZNF44CAEGRXR1V200XMV9N",
-        "headline": "Ancaster as an ad network and the future of agentic communication with email management by AI agents like Gemini"
+        "id": "01KXZY7CXK8MQXCCGYQCWY6MX1",
+        "headline": "gig work and its ambiguousness about predestination"
       },
       {
-        "id": "01KXZQTFA63BN68T7E93Q0N1P7",
-        "headline": "Algorithms, attention, and culture, and their impact on economies and society, discussed with personal experiences"
+        "id": "01KXZNJ5FP20EY0XMDMGYCRE6T",
+        "headline": "building neolog, and the difficulties with the upload pipeline"
       },
       {
-        "id": "01KXZVK86V2MMSNQCTF9K1J9BJ",
-        "headline": "Emotional dysregulation, exposure therapy, and self-awareness of driving-related stress and anxiety"
+        "id": "01KXZP7Z3B7G9E3K0BX5MSCK6M",
+        "headline": "driving to Ancaster, and whether to sell the house"
+      },
+      {
+        "id": "01KXZMS75R1JRJCV5R6KWVR7ZJ",
+        "headline": "cutting out the middleman, optimizing in a digital environment, removing friction"
+      },
+      {
+        "id": "01KXZNYG7QKAEV5JBVSKT0MTTW",
+        "headline": "building neolog, and the difficulties with the upload pipeline"
       }
     ]
   }
