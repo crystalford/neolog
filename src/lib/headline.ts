@@ -93,6 +93,39 @@ export interface HeadlineEnv {
  * personal experiences"), which read as a filing system's description of him
  * rather than as a sentence about what he did.
  */
+/**
+ * The examples in the prompt, and the reason they are about nothing.
+ *
+ * ⚠️ 21 Sep — a ten-for-ten batch came back with TWO lines that were
+ * my own examples, word for word: "building neolog, and the difficulties
+ * with the upload pipeline" and "driving to Ancaster, and whether to sell
+ * the house". Both are real subjects of his, which is exactly why they were
+ * chosen and exactly why they were the wrong choice — an echo of the prompt
+ * is indistinguishable from a reading of the transcript, and there is no way
+ * to tell afterwards which of the two happened.
+ *
+ * A line the model copied out of its instructions is a line the log invented
+ * about his life. §0 rule 3. So the examples are now about subjects he has
+ * never recorded, and `clean()` refuses any answer that matches one — the
+ * shape is still taught, and the content cannot leak.
+ */
+const EXAMPLES = {
+  good: [
+    'keeping bees over the winter, and losing the second hive',
+    'the ferry timetable changing, and rebooking the Tuesday crossing',
+    'a knee injury, and how it changed the way I walk uphill',
+  ],
+  bad: [
+    'An interesting discussion of various topics',
+    'Algorithms, attention and culture, and their impact on economies and society',
+  ],
+}
+
+/** Everything the prompt says out loud, so an echo of it can be caught. */
+const EXAMPLE_TEXT = new Set(
+  [...EXAMPLES.good, ...EXAMPLES.bad].map(e => e.toLowerCase()),
+)
+
 const SYSTEM = [
   'You complete one sentence. The sentence is: "Recorded a video about ___."',
   'You write only the part that goes in the blank, from a transcript of what the speaker said.',
@@ -108,11 +141,8 @@ const SYSTEM = [
   '- Use only what is in the transcript. If it is too short or says nothing identifiable,',
   '  reply with exactly: NOTHING',
   '',
-  'Good: building neolog, and the difficulties with the upload pipeline',
-  'Good: driving to Ancaster, and whether to sell the house',
-  'Good: the brain-gut axis, and how it shows up in emotional regulation',
-  'Bad: An interesting discussion of various topics',
-  'Bad: Algorithms, attention and culture, and their impact on economies and society',
+  EXAMPLES.good.map(g => `Good: ${g}`).join('\n'),
+  EXAMPLES.bad.map(b => `Bad: ${b}`).join('\n'),
 ].join('\n')
 
 /**
@@ -221,6 +251,32 @@ export async function writeHeadline(
 }
 
 /**
+ * Clear any line that is an echo of the prompt, so it can be asked again.
+ *
+ * ⚠️ Narrow on purpose: it matches the example strings and nothing else.
+ * It is not a way to re-ask a line the log does not like the look of — the
+ * point of `headline_at` is that a recording already read is not read again
+ * until it answers. These are lines that were never a reading in the first
+ * place.
+ */
+export async function clearEchoedHeadlines(
+  db: D1Database,
+  operatorId: string,
+): Promise<number> {
+  let cleared = 0
+  for (const e of EXAMPLE_TEXT) {
+    const r = await run(
+      db,
+      `UPDATE vlogs SET headline = NULL, headline_at = NULL
+        WHERE operator_id = ? AND deleted_at IS NULL AND LOWER(headline) = ?`,
+      operatorId, e,
+    )
+    cleared += (r as { meta?: { changes?: number } })?.meta?.changes ?? 0
+  }
+  return cleared
+}
+
+/**
  * Work through the recordings that have words and no headline yet.
  *
  * Bounded per call and drained from a page visit, the shape
@@ -305,7 +361,7 @@ export function clean(raw: string): string | null {
   s = s.replace(/^(headline|summary|line|answer)\s*:\s*/i, '')
   // Including the stem of the sentence it was asked to complete, which a
   // model will sometimes hand back whole.
-  s = s.replace(/^(recorded|uploaded)\s+a\s+(video|vlog)\s+(about\s+)?/i, '')
+  s = s.replace(/^(recorded|recording|uploaded|uploading)\s+an?\s+(video|vlog)\s+(about\s+)?/i, '')
   s = s.replace(/^(this video is|the video is|a video|this is)\s+(about\s+)?/i, '')
   s = s.replace(/^(about|on)\s+/i, '')
   s = s.replace(/^the speaker\s+/i, '')
@@ -337,6 +393,8 @@ export function clean(raw: string): string | null {
   if (s.length < 8) return null
   // A line with no letters in it is not a headline.
   if (!/[a-z]/i.test(s)) return null
+  // ⚠️ And never an example out of its own instructions. See `EXAMPLES`.
+  if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
   return s
 }
 

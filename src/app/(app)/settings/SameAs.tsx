@@ -79,8 +79,11 @@ export function SameAs() {
         <input
           value={kind}
           onChange={e => setKind(e.target.value)}
-          placeholder="what it is — github, the company"
-          style={{ maxWidth: 220 }}
+          /* Short enough to be READ in the field it sits in. The old one —
+             "what it is — github, the company" — was clipped mid-word at
+             220px, so the only guidance on the control was cut off. */
+          placeholder="github, the company…"
+          style={{ maxWidth: 200, flex: '0 1 200px' }}
         />
         <input
           value={url}

@@ -27,6 +27,16 @@ const SRC = RAW
 
 const MAX_CHARS = 150
 
+// The prompt's own examples, mirrored from the source — `clean()` must never
+// let one of them through as a headline.
+const EXAMPLE_TEXT = new Set([
+  'keeping bees over the winter, and losing the second hive',
+  'the ferry timetable changing, and rebooking the Tuesday crossing',
+  'a knee injury, and how it changed the way I walk uphill',
+  'An interesting discussion of various topics',
+  'Algorithms, attention and culture, and their impact on economies and society',
+].map(e => e.toLowerCase()))
+
 function sentenceBreak(s) {
   for (let i = 0; i < s.length; i++) {
     if (!'.!?'.includes(s[i])) continue
@@ -47,7 +57,7 @@ function clean(raw) {
 
   s = s.replace(/^["'`\s]+|["'`\s]+$/g, '')
   s = s.replace(/^(headline|summary|line|answer)\s*:\s*/i, '')
-  s = s.replace(/^(recorded|uploaded)\s+a\s+(video|vlog)\s+(about\s+)?/i, '')
+  s = s.replace(/^(recorded|recording|uploaded|uploading)\s+an?\s+(video|vlog)\s+(about\s+)?/i, '')
   s = s.replace(/^(this video is|the video is|a video|this is)\s+(about\s+)?/i, '')
   s = s.replace(/^(about|on)\s+/i, '')
   s = s.replace(/^the speaker\s+/i, '')
@@ -67,6 +77,7 @@ function clean(raw) {
 
   if (s.length < 8) return null
   if (!/[a-z]/i.test(s)) return null
+  if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
   return s
 }
 
@@ -112,6 +123,7 @@ is(clean('a'.repeat(200)), null, 'an overlong line with no clause boundary goes'
 // ── The stem it was asked to complete, handed back whole ────────────────
 is(clean('Recorded a video about building neolog'), 'building neolog', 'the sentence stem is stripped')
 is(clean('Uploaded a vlog about the drive to Ancaster'), 'the drive to Ancaster', 'so is the other wording of it')
+is(clean('Recording a video about halfway to fruit land'), 'halfway to fruit land', 'and the present-participle form of it')
 is(clean('About the brain-gut axis'), 'the brain-gut axis', 'and a bare leading "about"')
 is(clean('Headline: selling the house'), 'selling the house', 'and a label the prompt did not ask for')
 is(clean('"driving to Ancaster, and the argument"'), 'driving to Ancaster, and the argument', 'and surrounding quotes')
@@ -147,6 +159,27 @@ is(
   clean('the 3.5 hour drive to Ancaster'),
   'the 3.5 hour drive to Ancaster',
   'and a decimal point is not one either',
+)
+
+// ── An example is not a reading ─────────────────────────────────────────
+// ⚠️ A ten-for-ten batch came back with two lines that were the prompt's
+// own examples, word for word. An echo of the instructions is
+// indistinguishable from a reading of the transcript, and a line the model
+// copied out of its instructions is a line the log invented about his life.
+is(
+  clean('keeping bees over the winter, and losing the second hive'),
+  null,
+  'a good example, handed straight back, is refused',
+)
+is(
+  clean('An interesting discussion of various topics'),
+  null,
+  'and so is a bad one',
+)
+is(
+  clean('Keeping Bees Over The Winter, And Losing The Second Hive'),
+  null,
+  'and case does not get one past',
 )
 
 // ── Nothing usable ──────────────────────────────────────────────────────
@@ -193,6 +226,11 @@ is(/SET title|SET summary/.test(SRC), false, 'and never `title` or `summary`')
 // `headline_at` is stamped either way, which is what stops a refused
 // recording being asked again until it answers.
 is(/headline_at = CURRENT_TIMESTAMP/.test(SRC), true, 'the stamp goes on whether or not there is a line')
+// ⚠️ The examples must stay about subjects he has never recorded. An example
+// drawn from his own life cannot be told apart from a reading of it.
+is(SRC.includes('EXAMPLE_TEXT.has'), true, 'an answer matching an example is still refused')
+is(/neolog|Ancaster|brain-gut/i.test(SRC.slice(SRC.indexOf('const EXAMPLES'), SRC.indexOf('const EXAMPLE_TEXT'))), false,
+   'and no example is drawn from a subject of his')
 
 console.log(`\n${n} assertions, ${bad} failed`)
 if (bad) process.exit(1)

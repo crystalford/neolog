@@ -315,7 +315,7 @@ export default function SearchPage() {
                 </div>
               </div>
             ) : null}
-            goesTo={[{ href: '/', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/asks', label: 'the questions' }]}
+            goesTo={[{ href: '/', label: 'the log' }, { href: '/pages', label: 'names and places' }, { href: '/asks', label: 'the questions' }]}
           />
         </div>
       </div>

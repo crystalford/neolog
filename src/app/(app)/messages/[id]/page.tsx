@@ -273,7 +273,7 @@ export default function Thread() {
 
           <Rail goesTo={[
             { href: '/messages', label: 'every conversation' },
-            { href: '/pages', label: 'the index' },
+            { href: '/pages', label: 'names and places' },
           ]} />
         </div>
       </div>

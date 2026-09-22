@@ -150,7 +150,7 @@ export function PageViewClient({ id }: { id: string }) {
     return (
       <Shell>
         <div className="logpage pg-person">
-          <div className="crumb"><Link href="/pages">the index</Link></div>
+          <div className="crumb"><Link href="/pages">names and places</Link></div>
           <div className="none">There&rsquo;s no page here.</div>
         </div>
       </Shell>
@@ -163,7 +163,7 @@ export function PageViewClient({ id }: { id: string }) {
         <div className="crumb">
           <Link href="/">the log</Link>
           <span>·</span>
-          <Link href="/pages">the index</Link>
+          <Link href="/pages">names and places</Link>
         </div>
 
         {/* `person.html`: the name and its facts sit above the grid, not

@@ -367,7 +367,7 @@ export default function ExportPage() {
           <Rail goesTo={[
             { href: '/', label: 'the log' },
             { href: '/clear', label: 'safe to clear' },
-            { href: '/pages', label: 'the index' },
+            { href: '/pages', label: 'names and places' },
           ]} />
         </div>
       </div>

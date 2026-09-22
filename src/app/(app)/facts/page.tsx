@@ -282,7 +282,7 @@ export default function Facts() {
             </div>
           </main>
 
-          <Rail goesTo={[{ href: '/public', label: 'the log' }, { href: '/pages', label: 'the index' }, { href: '/numbers', label: 'the numbers' }]} />
+          <Rail goesTo={[{ href: '/public', label: 'the log' }, { href: '/pages', label: 'names and places' }, { href: '/numbers', label: 'the numbers' }]} />
         </div>
 
         {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />}

@@ -2076,6 +2076,36 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .paste .bar { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 14px; }
 .logpage .paste .bar .say { font-size: 13px; color: var(--fg-2); line-height: 1.5; }
 
+/* ⚠️ 21 Sep — `.paste .bar` laid its children out in a row and styled NONE
+   of them. On /settings that meant "Keep it" and "Add it" — the two buttons
+   that save his one sentence and add a link to it — rendered as bare lines
+   of text, and the two fields beside "Add it" had no border at all, so the
+   only thing visible was a placeholder floating in the page.
+
+   Same shape as `/search`'s ask field and `/writing`'s "Keep something you
+   made", both found the same morning: a container rule that reaches, and
+   nothing inside it that does. A control with no affordance is not a
+   control. Every `.paste .bar` on every page picks these up — there is one
+   button shape in this product, not one per surface. */
+.logpage .paste .bar button {
+  font-size: 12.5px; font-weight: 500; padding: 8px 14px; border-radius: 7px;
+  border: 1px solid var(--line-2); color: var(--fg-1); background: transparent;
+  white-space: nowrap; transition: border-color .12s, color .12s;
+}
+.logpage .paste .bar button:hover:not(:disabled) { color: var(--fg); border-color: var(--line-3); }
+/* The one that commits, in the bone-on-ink this product uses everywhere for
+   a primary action. */
+.logpage .paste .bar button.p { background: var(--fg); color: #000; border-color: var(--fg); }
+.logpage .paste .bar button.p:hover:not(:disabled) { color: #000; }
+.logpage .paste .bar button:disabled { opacity: .42; cursor: default; }
+.logpage .paste .bar input {
+  font: inherit; font-size: 13.5px; color: var(--fg-1); background: var(--bg-2);
+  border: 1px solid var(--line-1); border-radius: 8px; padding: 8px 12px;
+  outline: none; flex: 1; min-width: 170px;
+}
+.logpage .paste .bar input:focus { border-color: var(--line-3); }
+.logpage .paste .bar input::placeholder { color: var(--fg-4); }
+
 .logpage .msgs { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; max-width: 660px; }
 .logpage .msg { padding: 12px 16px; border-radius: 12px; max-width: 82%; }
 .logpage .msg.operator { align-self: flex-end; background: var(--bg-2); }

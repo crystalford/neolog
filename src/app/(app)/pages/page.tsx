@@ -105,7 +105,14 @@ export default function PagesIndex() {
         <div className="grid">
           <main>
             <div className="top">
-              <h1>The index</h1>
+              {/* ⚠️ 21 Sep — this page was called "the index" everywhere:
+                  the H1, the footer, and a rail entry on seven other pages.
+                  The operator, on being shown it: *"what is 'the index'? why
+                  is it here? its blank, useless"* — and, told what it was,
+                  *"i don't know what that is."* The word is the problem. The
+                  page says what it holds directly underneath, so the title
+                  says it too. */}
+              <h1>Names and places</h1>
               <span className="sub">
                 {items.length} · every name, place, project and subject on the
                 log — each one a page, pointing at everything about it
@@ -212,7 +219,7 @@ export default function PagesIndex() {
         </div>
 
         <footer className="ft">
-          <span>neolog · the index</span>
+          <span>neolog · names and places</span>
           <span className="r">
             <Link href="/">the log</Link>
             <Link href="/everything">everything</Link>

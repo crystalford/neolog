@@ -544,7 +544,7 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
           <span className="r">
             <Link href="/now">now</Link>
             <Link href="/search">search</Link>
-            <Link href="/pages">the index</Link>
+            <Link href="/pages">names and places</Link>
             <Link href="/public">what&rsquo;s public</Link>
             <Link href="/export">export</Link>
             <Link href="/ways-in">ways in</Link>

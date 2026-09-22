@@ -164,7 +164,7 @@ export default function PublicLog() {
           <span className="r">
             <Link href="/">the log</Link>
             <Link href="/facts">the facts</Link>
-            <Link href="/pages">the index</Link>
+            <Link href="/pages">names and places</Link>
             <Link href="/export">export</Link>
             <Link href="/everything">everything</Link>
           </span>

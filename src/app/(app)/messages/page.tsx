@@ -193,7 +193,7 @@ export default function Messages() {
         </div>
                 </main>
 
-          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/ways-in', label: 'the ways in' }]} />
+          <Rail goesTo={[{ href: '/pages', label: 'names and places' }, { href: '/ways-in', label: 'the ways in' }]} />
         </div>
       </div>
     </Shell>

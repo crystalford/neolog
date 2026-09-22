@@ -119,7 +119,7 @@ export default function Glossary() {
         {!loading && !items.length && (
           <div className="none">
             Nothing has a page yet. Pages are made from the names the log
-            found in what you have already said — <Link href="/pages">the index</Link> is
+            found in what you have already said — <Link href="/pages">names and places</Link> is
             where they are made.
           </div>
         )}
@@ -199,7 +199,7 @@ export default function Glossary() {
         )}
                 </main>
 
-          <Rail goesTo={[{ href: '/pages', label: 'the index' }, { href: '/public', label: 'the log' }, { href: '/asks', label: 'the questions' }]} />
+          <Rail goesTo={[{ href: '/pages', label: 'names and places' }, { href: '/public', label: 'the log' }, { href: '/asks', label: 'the questions' }]} />
         </div>
       </div>
     </Shell>
