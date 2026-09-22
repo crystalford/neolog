@@ -22,6 +22,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { readyDb } from '@/lib/ready-db'
 import { getDb, findMany, findOne, run } from '@/lib/d1'
 import { presignGetUrl, putObject, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
@@ -283,7 +284,7 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(searchParams.get('offset') || '0', 10)
 
   let sql = `
-    SELECT id, original_filename, file_size_bytes, mime_type, duration_seconds,
+    SELECT id, original_filename, headline, file_size_bytes, mime_type, duration_seconds,
            recorded_at, recorded_at_source, uploaded_at, thumbnail_url, thumbnail_r2_key,
            r2_key, transcoded_r2_key,
            pipeline_status, pipeline_error, visibility, transcript_text IS NOT NULL AS has_transcript,
@@ -311,10 +312,14 @@ export async function GET(req: NextRequest) {
   sql += ` ORDER BY recorded_at DESC, created_at DESC LIMIT ? OFFSET ?`
   binds.push(limit, offset)
 
-  const db = getDb(env)
+  // ⚠️ `headline` is a recently-added column, so this read waits for the
+  // migration rather than racing it — the first request of a cold isolate
+  // would otherwise query a column that does not exist yet (src/lib/ready-db.ts).
+  const db = await readyDb(getDb(env), 'vlogs-list')
   const rows = await findMany<{
     id: string
     original_filename: string
+    headline: string | null
     file_size_bytes: number
     mime_type: string
     duration_seconds: number | null

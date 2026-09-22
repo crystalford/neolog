@@ -25,6 +25,7 @@ interface VlogRow {
   id: string
   title: string | null
   original_filename: string | null
+  headline: string | null
   file_size_bytes: number | null
   duration_seconds: number | null
   recorded_at: string | null
@@ -171,13 +172,25 @@ export default function Recordings() {
           {shown.map(v => (
             <Link className="d" key={v.id} href={`/vlog/${v.id}`}>
               <span className="n">{day(v.recorded_at || v.uploaded_at)}</span>
+              {/* ⚠️ 21 Sep — the row led with the filename, so four hundred
+                  recordings read as `DJI_2026…_0047_D.MP4` four hundred
+                  times over and the list could not be scanned at all. The
+                  operator, on the vlog page's H1: *"again should never be a
+                  filename should be a title of a video"* — the same is true
+                  of the row. What it is about goes first; the filename stays
+                  beside the duration, which is where a fact about the file
+                  belongs. */}
               <span className="w">
-                {v.original_filename || 'a recording'}
+                {v.headline || v.original_filename || 'a recording'}
                 <em style={{
                   display: 'block', fontStyle: 'normal', marginTop: 5,
                   fontSize: 12.5, color: 'var(--fg-4)',
                 }}>
-                  {[clock(v.duration_seconds), mb(v.file_size_bytes)].filter(Boolean).join(' · ')}
+                  {[
+                    v.headline ? v.original_filename : null,
+                    clock(v.duration_seconds),
+                    mb(v.file_size_bytes),
+                  ].filter(Boolean).join(' · ')}
                   {!v.has_transcript && ' · not transcribed'}
                 </em>
               </span>

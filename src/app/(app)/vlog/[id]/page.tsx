@@ -151,24 +151,25 @@ export default function Recording() {
         {v && r && (
           <>
             <div className="pghead">
-              {/* ⚠️ `v.title` was first here, so the largest text on this
-                  page was the extraction engine's title for his recording.
-                  Nothing has written that column since 8 Sep — the pass that
-                  did was "an AI-written title and summary written back onto
-                  the recording", and it went with the rest of the engine. A
-                  recording is named by its own file, or not at all. */}
-              <h1>{v.original_filename || 'A recording'}</h1>
-              {/* What it is about, from what he said in it — and marked as
-                  the log's, which is the rule that does not bend. The file
-                  keeps the H1 because the file is what this page holds; this
-                  is the line that makes it findable among four hundred. */}
+              {/* ⚠️ 21 Sep — the H1 was the FILENAME, with what the
+                  recording is about demoted to a line underneath. The
+                  operator, looking at it: *"again should never be a filename
+                  should be a title of a video"*. He is right — a page
+                  headed `DJI_20260627095001_0047_D.MP4` is a file browser,
+                  not a record of an afternoon.
+
+                  ⚠️ This is NOT `v.title` coming back. That column held
+                  the deleted extraction engine's prose, nothing has written
+                  it since 8 Sep, and it is in `MODEL_WRITTEN_COLUMNS` — CI
+                  fails on a read of it. This is `headline`, written from his
+                  own transcript, and it says whose line it is directly
+                  underneath. The filename is still on the page, in `.meta`
+                  with the other facts about the file. */}
+              <h1>{v.headline || v.original_filename || 'A recording'}</h1>
               {v.headline && (
-                <p className="lede" style={{ marginBottom: 0 }}>
-                  {v.headline}
-                  <em style={{
-                    display: 'block', fontStyle: 'normal', marginTop: 6,
-                    fontSize: 12.5, color: 'var(--fg-4)',
-                  }}>the log’s line, from what you said in it — your words are below, untouched</em>
+                <p className="lede" style={{ marginBottom: 0, fontSize: 12.5, color: 'var(--fg-4)' }}>
+                  the log’s line, from what you said in it — your words are
+                  below, untouched
                 </p>
               )}
             </div>
@@ -177,6 +178,10 @@ export default function Recording() {
                 `.stamp`, which is a different page's class. */}
             <div className="meta">
               <time dateTime={v.recorded_at || v.created_at}>{day(v.recorded_at || v.created_at)}</time>
+              {/* The file's own name, with the other facts about the file.
+                  It is still here — it is what is in R2 and what he would
+                  look for on the phone — it is just not the title. */}
+              {v.headline && v.original_filename && <span>{v.original_filename}</span>}
               {v.duration_seconds && <span>{clock(v.duration_seconds)}</span>}
               {v.file_size_bytes && <span>{mb(v.file_size_bytes)}</span>}
               {v.word_count > 0 && <span>{v.word_count.toLocaleString('en-GB')} words</span>}
