@@ -31,10 +31,23 @@
  *   from the filename, never from nothing. A recording with no
  *   `transcript_words` gets NO headline and keeps "Recorded a video." — the
  *   same rule the read path held: silence beats a guess.
- * - **It describes; it does not judge.** The prompt forbids an opinion about
- *   whether the recording is good, interesting or worth keeping. §0 rule 2:
- *   the log is quiet. A headline that said "a great conversation about X"
- *   would be the log having a view about his life.
+ * - **It describes; it does not judge**, and that is enforced in `clean()`
+ *   rather than asked for in the prompt. §0 rule 2: the log is quiet. A
+ *   headline saying "a couple of very interesting videos" is the log telling
+ *   him which of his recordings were worth making — see `OPINION`.
+ * - **It never speaks as him.** A line beginning "my" is the log writing in
+ *   his voice, against the first promise this product makes. See
+ *   `FIRST_PERSON`.
+ * - **It is never an echo of its own instructions.** Two of the prompt's
+ *   examples reached the feed as headlines on real recordings, and an echo
+ *   cannot be told apart from a reading. See `EXAMPLES` and
+ *   `RETIRED_EXAMPLES`.
+ *
+ * ⚠️ **A prompt is not an enforcement.** Every one of the three above was
+ * forbidden in the prompt from its first version and reached the feed
+ * anyway. Anything checkable after the model answers is checked after the
+ * model answers. `recleanHeadlines` exists for the same reason: fixing
+ * `clean()` does nothing for the lines already in the column.
  * - **It is one sentence and it is capped.** Anything longer than a headline
  *   is a summary, and a summary of what he said is the paraphrase this
  *   product exists to refuse.
