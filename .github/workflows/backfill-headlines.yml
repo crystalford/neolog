@@ -40,12 +40,24 @@ jobs:
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       BASE_URL: https://neolog.ai
     steps:
+      # ⚠️ Status and body, never a bare pipe into jq. The first run of
+      # this died on "jq: parse error: Invalid numeric literal at line 1,
+      # column 10" and threw away the thing that would have said why — the
+      # exact failure this whole feature has been paying for: a silence with
+      # no reason behind it. Whatever comes back gets printed.
       - name: Where it stands before
         run: |
-          curl -s -S --max-time 60 \
+          code=$(curl -s -S --max-time 60 -o /tmp/before.txt -w '%{http_code}' \
             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            "$BASE_URL/api/v2/admin/headlines" | jq .
+            "$BASE_URL/api/v2/admin/headlines") || code=000
+          echo "HTTP $code"
+          if jq . /tmp/before.txt 2>/dev/null; then :; else
+            echo "not JSON — the first 600 bytes of what came back:"
+            head -c 600 /tmp/before.txt
+            echo ""
+            exit 1
+          fi
 
       - name: Work through them
         env:
@@ -72,15 +84,19 @@ jobs:
               reclean_once=false
             fi
 
-            out=$(curl -s -S --max-time 300 -X POST \
+            code=$(curl -s -S --max-time 300 -X POST -o /tmp/batch.txt -w '%{http_code}' \
               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
               -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
               -H "Content-Type: application/json" \
               --data "$body" \
-              "$BASE_URL/api/v2/admin/headlines") || out=''
+              "$BASE_URL/api/v2/admin/headlines") || code=000
+            out=$(cat /tmp/batch.txt 2>/dev/null || echo '')
 
-            if [ -z "$out" ]; then
-              echo "batch $i: no response — stopping rather than hammering it"
+            # ⚠️ A response that is not JSON is printed, not swallowed.
+            if ! echo "$out" | jq -e . >/dev/null 2>&1; then
+              echo "batch $i: HTTP $code, and not JSON. The first 600 bytes:"
+              head -c 600 /tmp/batch.txt
+              echo ""
               break
             fi
 
@@ -118,8 +134,10 @@ jobs:
       - name: Where it stands after, and twenty of the lines
         if: always()
         run: |
-          curl -s -S --max-time 60 \
+          code=$(curl -s -S --max-time 60 -o /tmp/after.txt -w '%{http_code}' \
             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            "$BASE_URL/api/v2/admin/headlines?sample=20" \
-            | jq -r '"\(.with_words) transcribed · \(.written) with a line · \(.nothing_to_say) the log had nothing to say about · \(.left) to go", "", (.lines[] | "  \(.headline)")'
+            "$BASE_URL/api/v2/admin/headlines?sample=20") || code=000
+          echo "HTTP $code"
+          jq -r '"\(.with_words) transcribed · \(.written) with a line · \(.nothing_to_say) the log had nothing to say about · \(.left) to go", "", (.lines[] | "  \(.headline)")' /tmp/after.txt \
+            || { echo "not JSON — the first 600 bytes:"; head -c 600 /tmp/after.txt; echo ""; }
