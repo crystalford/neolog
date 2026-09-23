@@ -257,6 +257,17 @@ export default function Screenshots() {
             a thing you wanted for a second — grouped and offered in one go.
             Buried is reversible; nothing is ever deleted.
           </div>
+          {/* ⚠️ 21 Sep — `.rules` here is `repeat(3,1fr)` and held two
+              cells, so a third of the card rendered as a grey slab. The
+              third rule was already true of this page and simply unwritten:
+              the sort is regexes, not a model, and that IS the design. */}
+          <div>
+            <b>The sort is a rule, not an opinion.</b> A currency amount
+            beside a receipt word, a named speaker with a sentence behind the
+            colon, a route and an arrival time — facts anyone can check
+            against the picture. No model is asked whether it is worth
+            keeping.
+          </div>
         </div>
           </main>
 

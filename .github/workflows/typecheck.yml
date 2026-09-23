@@ -218,6 +218,16 @@ jobs:
       - name: What a model returns, and what is let through
         run: node scripts/test/headline.mjs
 
+      # ⚠️ A grid with named columns is a contract about how many children it
+      # takes, and nothing here could read that contract. Three shipped in
+      # one morning and each looked like a different bug: /triage's card as a
+      # grey slab, /export's action row 190px wide, and /corrections' empty
+      # state rendering EIGHTY-EIGHT pixels wide in the date column. Every
+      # text-level check is green through all three, and the rendered check
+      # only sees the ones where two labels happen to collide.
+      - name: Every fixed-column grid is given what it declares
+        run: node scripts/check-grid-children.mjs
+
       # Five routes answer without signing in. A sixth is not an error
       # anywhere — it builds, typechecks, deploys, and serves whatever it
       # queries to anyone who asks. And being open is not itself the bug:

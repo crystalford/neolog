@@ -116,13 +116,19 @@ export default function Corrections() {
                 <b>Corrections, newest first</b>
                 <span>each one dated · each one keeps what it replaced</span>
               </div>
-              {loading && <div className="r"><span className="w">Reading.</span></div>}
+              {/* ⚠️ 21 Sep — both of these were `.r`, which is a four-column
+                  grid (`88px 1fr 130px 96px`). A single child lands in the
+                  FIRST column, so "Nothing has been corrected yet. This page
+                  fills itself as the log gets things wrong." rendered eighty-
+                  eight pixels wide — one or two words a line, ten lines tall,
+                  in the date column. Neither of these is a row; they are the
+                  page having nothing to show, which is what `.none` is for
+                  everywhere else in this product. */}
+              {loading && <div className="none" style={{ padding: '22px 20px' }}>Reading.</div>}
               {!loading && rows.length === 0 && (
-                <div className="r">
-                  <span className="w">
-                    Nothing has been corrected yet. This page fills itself as
-                    the log gets things wrong.
-                  </span>
+                <div className="none" style={{ padding: '22px 20px' }}>
+                  Nothing has been corrected yet. This page fills itself as
+                  the log gets things wrong.
                 </div>
               )}
               {rows.map(c => (

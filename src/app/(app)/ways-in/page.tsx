@@ -119,16 +119,59 @@ export default function WaysIn() {
             <i>not built</i>
             <p>There is no inbox address to forward to.</p>
           </div>
+          {/* ⚠️ 21 Sep — `connections.html` lists SEVEN sources that would
+              bring things in on their own, and this named three of them,
+              one of which lumped three together. Three cells in a
+              four-column grid left a quarter of the card as a grey slab,
+              and more to the point the page's own rule is that a door which
+              is not there is worse than one never listed. So all seven are
+              named, each with what it would take — which is the only
+              honest way to say a thing is not built. */}
           <div className="w off">
-            <b>Camera roll, calendar, messages</b>
+            <b>Camera roll</b>
             <i>not built</i>
             <p>
-              No automatic source is connected. When one is, SPEC §1 governs
-              it: explicit, per-source, revocable, and turned on only after
-              showing the first ten real things it would take. Nothing records
-              silently.
+              Photos and video from the phone, placed by the date in the file.
+              Today they go in the same way everything else does — you drop
+              them in.
             </p>
           </div>
+          <div className="w off">
+            <b>Calendar</b>
+            <i>not built</i>
+            <p>Events, at their time. Nothing reads a calendar.</p>
+          </div>
+          <div className="w off">
+            <b>Email and receipts</b>
+            <i>not built</i>
+            <p>
+              Orders, tickets, bookings. There is no inbox address, and
+              nothing reads a mailbox.
+            </p>
+          </div>
+          <div className="w off">
+            <b>Conversations</b>
+            <i>forwarded only</i>
+            <p>
+              A conversation is the one thing half somebody else&rsquo;s, so it
+              is pasted in by hand and never pulled. That absence is the
+              enforcement — see <Link href="/messages">the message rule</Link>.
+            </p>
+          </div>
+          <div className="w off">
+            <b>Location</b>
+            <i>not built</i>
+            <p>Where you were, and for how long. Nothing tracks position.</p>
+          </div>
+        </div>
+
+        {/* SPEC §1's rule for the day one of them IS connected, said once,
+            as a state. Not an offer and not a roadmap — the page above says
+            what is not there, and this says what would have to be true. */}
+        <div className="off2">
+          If one is ever connected it is explicit, per-source and revocable,
+          and it is turned on only after showing the first ten real things it
+          would take. Nothing records silently.
         </div>
 
         <div className="off2">
