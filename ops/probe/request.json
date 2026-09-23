@@ -1,8 +1,4 @@
 {
-  "method": "POST",
-  "path": "/api/v2/admin/headlines",
-  "body": {
-    "limit": 10,
-    "reclean": true
-  }
+  "method": "GET",
+  "path": "/"
 }
