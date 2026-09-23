@@ -35,6 +35,11 @@ const EXAMPLE_TEXT = new Set([
   'a knee injury, and how it changed the way I walk uphill',
   'An interesting discussion of various topics',
   'Algorithms, attention and culture, and their impact on economies and society',
+  // Retired, and still refused — two of these reached the feed as headlines
+  // on real recordings before the examples were replaced.
+  'building neolog, and the difficulties with the upload pipeline',
+  'driving to Ancaster, and whether to sell the house',
+  'the brain-gut axis, and how it shows up in emotional regulation',
 ].map(e => e.toLowerCase()))
 
 function sentenceBreak(s) {
@@ -101,11 +106,19 @@ is(clean('nothing identifiable in this transcript'), null, 'a refusal in prose')
 is(clean(''), null, 'an empty answer')
 is(clean('   '), null, 'whitespace only')
 
-// ── The real lines from the first ten ───────────────────────────────────
+// ── The real lines from the corpus ──────────────────────────────────────
+// ⚠️ Not one of the prompt's examples, retired or current. This assertion
+// used to use "building neolog, and the difficulties with the upload
+// pipeline", which is now refused on purpose — see the echo section below.
 is(
-  clean('building neolog, and the difficulties with the upload pipeline'),
-  'building neolog, and the difficulties with the upload pipeline',
+  clean('an inefficient delivery of a $5 subway order across the city'),
+  'an inefficient delivery of a $5 subway order across the city',
   'a good line passes through unchanged',
+)
+is(
+  clean('gig work and its ambiguousness about predestination'),
+  'gig work and its ambiguousness about predestination',
+  'and so does another',
 )
 
 // ⚠️ This is the case the cap used to throw away whole. It is true up to
@@ -121,7 +134,7 @@ is(/[,;:]$/.test(cutLong), false, 'and it does not end on the punctuation it was
 is(clean('a'.repeat(200)), null, 'an overlong line with no clause boundary goes')
 
 // ── The stem it was asked to complete, handed back whole ────────────────
-is(clean('Recorded a video about building neolog'), 'building neolog', 'the sentence stem is stripped')
+is(clean('Recorded a video about the manuscript'), 'the manuscript', 'the sentence stem is stripped')
 is(clean('Uploaded a vlog about the drive to Ancaster'), 'the drive to Ancaster', 'so is the other wording of it')
 is(clean('Recording a video about halfway to fruit land'), 'halfway to fruit land', 'and the present-participle form of it')
 is(clean('About the brain-gut axis'), 'the brain-gut axis', 'and a bare leading "about"')
@@ -181,6 +194,18 @@ is(
   null,
   'and case does not get one past',
 )
+// ⚠️ The two that actually reached the feed. Replacing the examples stops
+// new echoes; only refusing the retired strings finds the ones written down.
+is(
+  clean('building neolog, and the difficulties with the upload pipeline'),
+  null,
+  'a retired example is refused too',
+)
+is(
+  clean('driving to Ancaster, and whether to sell the house'),
+  null,
+  'including the other one that reached a real recording',
+)
 
 // ── Nothing usable ──────────────────────────────────────────────────────
 is(clean('a talk'), null, 'too short to be a line')
@@ -229,8 +254,14 @@ is(/headline_at = CURRENT_TIMESTAMP/.test(SRC), true, 'the stamp goes on whether
 // ⚠️ The examples must stay about subjects he has never recorded. An example
 // drawn from his own life cannot be told apart from a reading of it.
 is(SRC.includes('EXAMPLE_TEXT.has'), true, 'an answer matching an example is still refused')
-is(/neolog|Ancaster|brain-gut/i.test(SRC.slice(SRC.indexOf('const EXAMPLES'), SRC.indexOf('const EXAMPLE_TEXT'))), false,
-   'and no example is drawn from a subject of his')
+// ⚠️ The LIVE examples only. `RETIRED_EXAMPLES` sits between them and
+// holds exactly these words on purpose — they are what a stale echo is
+// matched against, and nothing is ever removed from that list.
+is(/neolog|Ancaster|brain-gut/i.test(SRC.slice(SRC.indexOf('const EXAMPLES'), SRC.indexOf('const RETIRED_EXAMPLES'))), false,
+   'and no live example is drawn from a subject of his')
+is(SRC.includes('const RETIRED_EXAMPLES'), true, 'a retired example is still matched against')
+is(SRC.includes('export async function recleanHeadlines'), true,
+   'and a line already written can be re-read against the current rules')
 
 console.log(`\n${n} assertions, ${bad} failed`)
 if (bad) process.exit(1)

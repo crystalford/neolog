@@ -121,9 +121,29 @@ const EXAMPLES = {
   ],
 }
 
+/**
+ * Examples the prompt USED to carry, kept so their echoes can still be
+ * caught.
+ *
+ * ⚠️ These are real subjects of his, which is why they were chosen and
+ * why they had to go. Two of them reached the feed as headlines on real
+ * recordings before the examples were replaced, and a line copied out of a
+ * prompt is indistinguishable from a reading of the transcript. Removing
+ * them from `EXAMPLES` stops new echoes; this list is what finds the ones
+ * already written down.
+ *
+ * Nothing is ever removed from here. A retired example is exactly as
+ * unusable as a current one.
+ */
+const RETIRED_EXAMPLES = [
+  'building neolog, and the difficulties with the upload pipeline',
+  'driving to Ancaster, and whether to sell the house',
+  'the brain-gut axis, and how it shows up in emotional regulation',
+]
+
 /** Everything the prompt says out loud, so an echo of it can be caught. */
 const EXAMPLE_TEXT = new Set(
-  [...EXAMPLES.good, ...EXAMPLES.bad].map(e => e.toLowerCase()),
+  [...EXAMPLES.good, ...EXAMPLES.bad, ...RETIRED_EXAMPLES].map(e => e.toLowerCase()),
 )
 
 const SYSTEM = [
@@ -251,29 +271,61 @@ export async function writeHeadline(
 }
 
 /**
- * Clear any line that is an echo of the prompt, so it can be asked again.
+ * Run every line already written through the current rules again.
  *
- * ⚠️ Narrow on purpose: it matches the example strings and nothing else.
- * It is not a way to re-ask a line the log does not like the look of — the
- * point of `headline_at` is that a recording already read is not read again
- * until it answers. These are lines that were never a reading in the first
- * place.
+ * ⚠️ `clean()` has been wrong three times, and each time the wrong lines
+ * were already on the feed: "doing a U.S" (a sentence cut at an
+ * abbreviation), "recording a video about halfway to fruit land" (the
+ * sentence stem handed back in the present participle, which the strip did
+ * not cover), and two lines that were the prompt's own examples. Fixing the
+ * function does nothing for a line that is already in the column.
+ *
+ * So this re-reads each one. A line the rules now trim comes back trimmed;
+ * a line the rules now REFUSE is cleared along with its stamp, so the
+ * backlog asks about that recording properly.
+ *
+ * ⚠️ It re-cleans; it does not re-ask. Nothing here calls the model, and
+ * a line the rules still accept is left exactly as it is — `headline_at`
+ * exists so a recording already read is not read again until it answers,
+ * and "the log does not like the look of this one" is not a reason to go
+ * back and ask until it does.
  */
-export async function clearEchoedHeadlines(
+export async function recleanHeadlines(
   db: D1Database,
   operatorId: string,
-): Promise<number> {
+): Promise<{ trimmed: number; cleared: number }> {
+  const rows = await findMany<{ id: string; headline: string }>(
+    db,
+    `SELECT id, headline FROM vlogs
+      WHERE operator_id = ? AND deleted_at IS NULL AND headline IS NOT NULL`,
+    operatorId,
+  )
+
+  let trimmed = 0
   let cleared = 0
-  for (const e of EXAMPLE_TEXT) {
-    const r = await run(
-      db,
-      `UPDATE vlogs SET headline = NULL, headline_at = NULL
-        WHERE operator_id = ? AND deleted_at IS NULL AND LOWER(headline) = ?`,
-      operatorId, e,
-    )
-    cleared += (r as { meta?: { changes?: number } })?.meta?.changes ?? 0
+  for (const r of rows) {
+    const now = clean(r.headline)
+    if (now === r.headline) continue
+    if (now === null) {
+      await run(
+        db,
+        `UPDATE vlogs SET headline = NULL, headline_at = NULL,
+                          updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND operator_id = ?`,
+        r.id, operatorId,
+      )
+      cleared++
+    } else {
+      await run(
+        db,
+        `UPDATE vlogs SET headline = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND operator_id = ?`,
+        now, r.id, operatorId,
+      )
+      trimmed++
+    }
   }
-  return cleared
+  return { trimmed, cleared }
 }
 
 /**

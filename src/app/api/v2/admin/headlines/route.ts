@@ -26,7 +26,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, findMany, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import { headlineBacklog, clearEchoedHeadlines, type HeadlineEnv } from '@/lib/headline'
+import { headlineBacklog, recleanHeadlines, type HeadlineEnv } from '@/lib/headline'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -103,11 +103,20 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({})) as {
-    limit?: number; ask_again?: boolean; clear_echoes?: boolean
+    limit?: number; ask_again?: boolean; reclean?: boolean
   }
   const limit = Math.min(MAX_BATCH, Math.max(1, body.limit ?? 5))
 
   const db = await readyDb(getDb(env), 'admin/headlines')
+
+  // ⚠️ `clean()` has been wrong three times and each time the wrong lines
+  // were already on the feed. Fixing the function does nothing for a line
+  // already in the column, so this re-reads every one of them against the
+  // current rules. It re-cleans; it does not re-ask — see the note on
+  // `recleanHeadlines`.
+  const recleaned = body.reclean
+    ? await recleanHeadlines(db, operator.id)
+    : null
 
   // ⚠️ `ask_again` clears the stamp on recordings the model looked at and had
   // nothing to say about, so the backlog picks them up once more. It exists
@@ -116,12 +125,6 @@ export async function POST(req: NextRequest) {
   // question repeatedly eventually produces an answer by persistence rather
   // than by reading, which is why `headline_at` is stamped in the first
   // place. Nothing calls this on a schedule and nothing should.
-  // A line the model copied out of its own instructions was never a reading
-  // of the recording. `src/lib/headline.ts` explains why these exist at all.
-  const echoes_cleared = body.clear_echoes
-    ? await clearEchoedHeadlines(db, operator.id)
-    : 0
-
   let asked_again = 0
   if (body.ask_again) {
     const r = await run(
@@ -145,5 +148,5 @@ export async function POST(req: NextRequest) {
     operator.id, limit,
   )
 
-  return NextResponse.json({ ...result, asked_again, echoes_cleared, lines })
+  return NextResponse.json({ ...result, asked_again, recleaned, lines })
 }
