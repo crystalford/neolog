@@ -1,4 +1,4 @@
 {
   "method": "GET",
-  "path": "/api/v2/log?order=happened&filter=all&limit=200"
+  "path": "/api/v2/log?order=happened&filter=all&limit=250"
 }
