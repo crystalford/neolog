@@ -3,6 +3,7 @@
   "path": "/api/v2/admin/headlines",
   "body": {
     "limit": 10,
-    "clear_echoes": true
+    "reclean": true,
+    "ask_again": true
   }
 }
