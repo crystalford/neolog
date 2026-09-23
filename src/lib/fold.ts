@@ -72,7 +72,30 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ]
 
-/** How far back stays open as ordinary rows. Everything older folds. */
+/**
+ * How far back stays open as ordinary rows. Everything older folds.
+ *
+ * `log-2028.html`: "the last 14 days open as rows, then one line per week,
+ * per month, per year." Fourteen is the design's number and it assumes a log
+ * in daily use — the page it is drawn on holds 4,212 entries.
+ *
+ * ⚠️ 21 Sep, worth knowing before changing it: on THIS log the window leaves
+ * **one open row**. The corpus is four hundred recordings imported in bulk
+ * from January to July and one from September, so almost nothing falls
+ * inside a fortnight. The fold stands for the rest honestly — nine lines,
+ * each saying what it holds and each opening to its own entries — but the
+ * home page is sparse in a way the design page is not.
+ *
+ * Both halves move together off this one number: `buildFold` folds what is
+ * older than it and `loadFeed` opens what is newer. That is deliberate, and
+ * it is why they take the same constant rather than two that can disagree —
+ * when they were decided separately the rows reached back months while the
+ * fold claimed to stand for them.
+ *
+ * Raising it is the operator's call, not a correctness fix: it is a question
+ * about what his home page is FOR — the recent, or the whole log — and the
+ * log does not get to have a view about that.
+ */
 export const OPEN_DAYS = 14
 
 function iso(d: Date): string { return d.toISOString().slice(0, 10) }
