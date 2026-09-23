@@ -919,6 +919,21 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .en mark { background: none; color: var(--fg); border-bottom: 1.5px solid var(--t-ochre); padding-bottom: 1px; }
 
 .logpage .none { padding: 40px 0; font-size: 14px; color: var(--fg-3); }
+/* ⚠️ 21 Sep — `.dim` is the MODIFIER: a value in a row that is absent or
+   not worth the reader's eye. It used to be `.none`, which is the page's
+   EMPTY STATE — forty pixels of padding top and bottom, meant to stand alone
+   in a column.
+
+   As a modifier that padding lands inside a row, so on `/everything` "the
+   facts", "the numbers" and every door with no count rendered eighty pixels
+   taller than the ones beside them, and `/vlogs` gave the same treatment to
+   every recording with nothing read out of it — which is all of them. The
+   recordings list read as enormously sparse for that one reason.
+
+   Same shape as every row in CLAUDE.md's collision table: one class name,
+   two jobs, and the one that loses is the one nobody looked at. A different
+   thing gets a different class. */
+.logpage .dim { color: var(--fg-4); }
 .logpage .none button { font-size: 13px; color: var(--fg); border-bottom: 1px solid var(--line-2); margin-left: 6px; background: none; border-top: 0; border-left: 0; border-right: 0; cursor: pointer; }
 
 /* ── The rail ───────────────────────────────────────────────────────── */

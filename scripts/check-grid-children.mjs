@@ -251,3 +251,89 @@ if (findings.length) {
 }
 
 console.log(`${contracts.length} fixed-column grid rules checked. Every one is given what it declares.`)
+
+// ── A block-level class used as a modifier ──────────────────────────────
+//
+// ⚠️ 21 Sep, and it is the same family one level along. `.logpage .none` is
+// the page's EMPTY STATE — forty pixels of padding, meant to stand alone in
+// a column. It was also being used as a MODIFIER: `className="c none"` on a
+// value inside a row, meaning "there is nothing here, dim it".
+//
+// The padding lands inside the row either way. On `/everything` every door
+// with no count rendered eighty pixels taller than the ones beside it, and
+// `/vlogs` gave the same treatment to every recording with nothing read out
+// of it — which is all of them — so the recordings list read as enormously
+// sparse for that one reason.
+//
+// Nothing could see it: the class is in the markup, its values match the
+// design, its variables resolve, and no two labels collide. So this asks
+// the one question that separates the two uses — is a class the stylesheet
+// gives standalone block padding ever written ALONGSIDE another class?
+const CSS_FLAT = strip(CSS)
+const BLOCKY = new Set()
+for (const m of CSS_FLAT.matchAll(/\.logpage\s+\.([\w-]+)\s*\{([^}]*)\}/g)) {
+  const cls = m[1]
+  const body = m[2].replace(/\s+/g, '')
+  // A generous floor: a modifier never needs 20px of its own padding.
+  const pad = /padding:(\d+)px/.exec(body)
+  if (!pad || parseInt(pad[1], 10) < 20) continue
+  // ⚠️ Two exemptions, both principled rather than convenient.
+  //
+  // A positioned overlay's padding is its OWN layout — it insets content
+  // from the viewport — not something that lands inside a row. `.lb`, the
+  // lightbox, is `position:fixed; inset:0; padding:48px 64px`.
+  if (/position:(fixed|absolute)/.test(body)) continue
+  // And a compound selector in the stylesheet — `.lb.on { display:flex }` —
+  // is the stylesheet SAYING the pairing is intended. That is the strongest
+  // signal available and it is the one that clears the false positive this
+  // check opened with.
+  if (new RegExp(`\\.${cls}\\.[\\w-]+\\s*[,{]`).test(CSS_FLAT)) continue
+  BLOCKY.add(cls)
+}
+
+const modifiers = []
+for (const file of FILES) {
+  const src = strip(readFileSync(file, 'utf8'))
+  for (const cls of BLOCKY) {
+    // `className="x y"` and `` className={`x${… ' y'}`} `` both count.
+    // ⚠️ Word-bounded in BOTH branches. Without it in the
+    // template-literal one, `.sh` matched `shots`, `isheld` and `show`,
+    // and the check opened with seven findings that were all the same
+    // substring — the "cries wolf" failure this repo has written down
+    // three times. Built by concatenation rather than as a template
+    // literal, because a backtick inside one is more trouble than it
+    // is worth.
+    const BT = String.fromCharCode(96)
+    const re = new RegExp(
+      'className=(?:"[^"]*\\b' + cls + '\\b[^"]*"'
+      + '|\\{' + BT + '[^' + BT + ']*\\b' + cls + '\\b[^' + BT + ']*' + BT + '\\})',
+      'g')
+    for (const m of src.matchAll(re)) {
+      const attr = m[0]
+      // Alone is the correct use. Alongside anything else is the bug.
+      const names = attr.replace(/^className=/, '')
+        .replace(/[{}`"$]/g, ' ')
+        .replace(/\?[^:]*:/g, ' ')
+        .split(/[\s']+/).filter(w => /^[\w-]+$/.test(w))
+      if (names.length <= 1) continue
+      modifiers.push({
+        file, cls,
+        line: src.slice(0, m.index).split('\n').length,
+        attr: attr.slice(0, 64),
+      })
+    }
+  }
+}
+
+if (modifiers.length) {
+  console.log(`\n${modifiers.length} block-level class${modifiers.length === 1 ? '' : 'es'} used as a modifier:\n`)
+  for (const m of modifiers) {
+    console.log(`  ${m.file}:${m.line}`)
+    console.log(`     .${m.cls} carries standalone padding — ${m.attr}`)
+    console.log('')
+  }
+  console.log('That padding lands inside whatever row it is written on. A class')
+  console.log('that means "this is empty" is not the same as one that means')
+  console.log('"dim this value" — give the second one its own name.')
+  process.exit(1)
+}

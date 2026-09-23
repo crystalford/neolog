@@ -210,7 +210,7 @@ export default function Recordings() {
                   own page and what `/search` can reach. So the column says
                   that, and says nothing at all when the answer is the
                   ordinary one. */}
-              <span className={`c${v.entry_count ? '' : ' none'}`}>
+              <span className={`c${v.entry_count ? '' : ' dim'}`}>
                 {v.entry_count ? `${v.entry_count} on the log` : ''}
               </span>
             </Link>

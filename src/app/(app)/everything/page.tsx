@@ -86,7 +86,7 @@ export default function Everything() {
                 <a className="d" key={f.href} href={f.href}>
                   <span className="n">{f.name}</span>
                   <span className="w">{f.what}</span>
-                  <span className="c none">{f.href}</span>
+                  <span className="c dim">{f.href}</span>
                 </a>
               ))}
             </div>
@@ -108,7 +108,7 @@ function DoorRow({ d }: { d: Door }) {
     <Link className="d" href={d.href}>
       <span className="n">{d.name}</span>
       <span className="w">{d.what}</span>
-      <span className={`c${d.count === null ? ' none' : ''}`}>
+      <span className={`c${d.count === null ? ' dim' : ''}`}>
         {d.count === null ? '' : d.count === 0 ? 'nothing yet' : d.count}
       </span>
     </Link>
