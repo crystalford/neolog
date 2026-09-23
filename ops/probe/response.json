@@ -1,28 +1,56 @@
 {
-  "requested_at": "2026-09-23T02:28:37Z",
+  "requested_at": "2026-09-23T02:35:12Z",
   "method": "POST",
   "path": "/api/v2/admin/headlines",
   "http_status": 200,
-  "access_headers": "set-cookie: <redacted>|cf-ray: a3f61dc29970c9a4-IAD\r|",
-  "body": "{\"written\":4,\"nothing\":6,\"left\":315,\"why\":{\"model_said_nothing\":5,\"written\":4,\"rejected\":1},\"refused\":[\"Recorded a video about carney\"],\"asked_again\":5,\"recleaned\":{\"trimmed\":1,\"cleared\":3},\"lines\":[{\"id\":\"01KXZP37NKX2MFRN011EN91SGY\",\"headline\":\"the research artifact and the editorial artifact\"},{\"id\":\"01KXZNA77J7Z61FYYAJNDTWJ4Y\",\"headline\":\"two graph structure\"},{\"id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"headline\":\"my struggles with structure and productivity, and feeling stuck in life\"},{\"id\":\"01KXZNJ5FP20EY0XMDMGYCRE6T\",\"headline\":\"a couple of very interesting videos\"},{\"id\":\"01KXZXA21FYKBBH6P7C3Z1VJKG\",\"headline\":\"the post-wiki shape, a zoomable view into an unbounded graph\"},{\"id\":\"01KY005PW7NBJRX4EJVPVTS8CJ\",\"headline\":\"the graph, citable pages, and rich media artifacts\"},{\"id\":\"01KXZRZ32VX8JPT71NRYF9N5PQ\",\"headline\":\"citable snapshots, the graph, and ingestion into it\"},{\"id\":\"01KXZWDQX524KCF4KHC18B69VM\",\"headline\":\"building Neolog and the development process\"},{\"id\":\"01KY04EZQEZXPFAGGYDGESKWM4\",\"headline\":\"building the database, and losing progress on multiple projects\"},{\"id\":\"01KXZNNYBKGMZ590YTQWFFJ5W8\",\"headline\":\"Tim Hortons\"}]}",
+  "access_headers": "set-cookie: <redacted>|cf-ray: a3f627694f3a4848-ORD\r|",
+  "body": "{\"written\":7,\"nothing\":3,\"left\":306,\"why\":{\"rejected\":1,\"written\":7,\"model_said_nothing\":2},\"refused\":[\"a couple of very interesting videos\"],\"asked_again\":0,\"recleaned\":{\"trimmed\":0,\"cleared\":1},\"lines\":[{\"id\":\"01KT996S06VMF04HF5BNN4QWP9\",\"headline\":\"stuckness and trying to break out of it\"},{\"id\":\"01KT997ME0MKFWG3A6KNQA80N6\",\"headline\":\"stuckness, doing uber and doordash, gauge park\"},{\"id\":\"01KWM3DM4VWYP33SKHK01MEY3N\",\"headline\":\"my life, a train wreck\"},{\"id\":\"01KXZRPY3DS8394K4VBY6QF89N\",\"headline\":\"utilizing you Claude, research passes, and dozens of research artifacts\"},{\"id\":\"01KXZZ568THTEG5HTVBCVJKNK5\",\"headline\":\"ingesting a research artifact about the city of Hamilton's budget and storefront costs\"},{\"id\":\"01KY016ARTEZV3N5QVD783MRBV\",\"headline\":\"how knowledge accretes in a graph, specifically with research artifacts and entity foundations\"},{\"id\":\"01KXZR8CN6Z9MNW46WPA23J0KZ\",\"headline\":\"Canopticon\"},{\"id\":\"01KXZP37NKX2MFRN011EN91SGY\",\"headline\":\"the research artifact and the editorial artifact\"},{\"id\":\"01KXZNA77J7Z61FYYAJNDTWJ4Y\",\"headline\":\"two graph structure\"},{\"id\":\"01KXZP7Z3B7G9E3K0BX5MSCK6M\",\"headline\":\"my struggles with structure and productivity, and feeling stuck in life\"}]}",
   "body_json": {
-    "written": 4,
-    "nothing": 6,
-    "left": 315,
+    "written": 7,
+    "nothing": 3,
+    "left": 306,
     "why": {
-      "model_said_nothing": 5,
-      "written": 4,
-      "rejected": 1
+      "rejected": 1,
+      "written": 7,
+      "model_said_nothing": 2
     },
     "refused": [
-      "Recorded a video about carney"
+      "a couple of very interesting videos"
     ],
-    "asked_again": 5,
+    "asked_again": 0,
     "recleaned": {
-      "trimmed": 1,
-      "cleared": 3
+      "trimmed": 0,
+      "cleared": 1
     },
     "lines": [
+      {
+        "id": "01KT996S06VMF04HF5BNN4QWP9",
+        "headline": "stuckness and trying to break out of it"
+      },
+      {
+        "id": "01KT997ME0MKFWG3A6KNQA80N6",
+        "headline": "stuckness, doing uber and doordash, gauge park"
+      },
+      {
+        "id": "01KWM3DM4VWYP33SKHK01MEY3N",
+        "headline": "my life, a train wreck"
+      },
+      {
+        "id": "01KXZRPY3DS8394K4VBY6QF89N",
+        "headline": "utilizing you Claude, research passes, and dozens of research artifacts"
+      },
+      {
+        "id": "01KXZZ568THTEG5HTVBCVJKNK5",
+        "headline": "ingesting a research artifact about the city of Hamilton's budget and storefront costs"
+      },
+      {
+        "id": "01KY016ARTEZV3N5QVD783MRBV",
+        "headline": "how knowledge accretes in a graph, specifically with research artifacts and entity foundations"
+      },
+      {
+        "id": "01KXZR8CN6Z9MNW46WPA23J0KZ",
+        "headline": "Canopticon"
+      },
       {
         "id": "01KXZP37NKX2MFRN011EN91SGY",
         "headline": "the research artifact and the editorial artifact"
@@ -34,34 +62,6 @@
       {
         "id": "01KXZP7Z3B7G9E3K0BX5MSCK6M",
         "headline": "my struggles with structure and productivity, and feeling stuck in life"
-      },
-      {
-        "id": "01KXZNJ5FP20EY0XMDMGYCRE6T",
-        "headline": "a couple of very interesting videos"
-      },
-      {
-        "id": "01KXZXA21FYKBBH6P7C3Z1VJKG",
-        "headline": "the post-wiki shape, a zoomable view into an unbounded graph"
-      },
-      {
-        "id": "01KY005PW7NBJRX4EJVPVTS8CJ",
-        "headline": "the graph, citable pages, and rich media artifacts"
-      },
-      {
-        "id": "01KXZRZ32VX8JPT71NRYF9N5PQ",
-        "headline": "citable snapshots, the graph, and ingestion into it"
-      },
-      {
-        "id": "01KXZWDQX524KCF4KHC18B69VM",
-        "headline": "building Neolog and the development process"
-      },
-      {
-        "id": "01KY04EZQEZXPFAGGYDGESKWM4",
-        "headline": "building the database, and losing progress on multiple projects"
-      },
-      {
-        "id": "01KXZNNYBKGMZ590YTQWFFJ5W8",
-        "headline": "Tim Hortons"
       }
     ]
   }
