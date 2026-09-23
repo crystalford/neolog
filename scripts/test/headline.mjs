@@ -53,6 +53,8 @@ const OPINION = new RegExp(
   ].join('|') + ')\\b', 'i',
 )
 
+const FIRST_PERSON = /\b(i|i'm|i've|i'd|i'll|me|my|mine|myself|we|we're|our|ours|us)\b/i
+
 function sentenceBreak(s) {
   for (let i = 0; i < s.length; i++) {
     if (!'.!?'.includes(s[i])) continue
@@ -95,6 +97,7 @@ function clean(raw) {
   if (!/[a-z]/i.test(s)) return null
   if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
   if (OPINION.test(s)) return null
+  if (FIRST_PERSON.test(s)) return null
   return s
 }
 
@@ -233,6 +236,31 @@ is(
   'a description with no verdict in it still passes',
 )
 
+// ── The log does not speak as him ───────────────────────────────────────
+// ⚠️ A good batch returned "my struggles with gut health", "my life, a
+// train wreck" and "my struggles with structure and productivity". All true
+// readings, all the log writing in HIS voice — against the promise at the
+// top of this product: it never puts words in your mouth.
+is(clean('my struggles with gut health and its impact on work'), null, 'first person in the log\u2019s line')
+is(clean('my life, a train wreck'), null, 'including the blunt kind')
+is(clean('the drive we took to Ancaster'), null, 'and the plural')
+is(
+  clean('struggles with gut health, and how it affects the work'),
+  'struggles with gut health, and how it affects the work',
+  'the same fact with nobody impersonated still passes',
+)
+// ⚠️ And it must not fire on a word that merely contains one.
+is(
+  clean('the ferry timetable, and mineral rights in Ancaster'),
+  'the ferry timetable, and mineral rights in Ancaster',
+  '\u201cmineral\u201d is not \u201cmine\u201d',
+)
+is(
+  clean('building the database, and losing progress on multiple projects'),
+  'building the database, and losing progress on multiple projects',
+  'and a real line with none of it is untouched',
+)
+
 // ── Nothing usable ──────────────────────────────────────────────────────
 is(clean('a talk'), null, 'too short to be a line')
 is(clean('12 34 56'), null, 'no letters in it at all')
@@ -281,6 +309,7 @@ is(/headline_at = CURRENT_TIMESTAMP/.test(SRC), true, 'the stamp goes on whether
 // drawn from his own life cannot be told apart from a reading of it.
 is(SRC.includes('EXAMPLE_TEXT.has'), true, 'an answer matching an example is still refused')
 is(SRC.includes('OPINION.test'), true, 'and an answer carrying a verdict is too')
+is(SRC.includes('FIRST_PERSON.test'), true, 'and one written in his voice')
 // ⚠️ The LIVE examples only. `RETIRED_EXAMPLES` sits between them and
 // holds exactly these words on purpose — they are what a stale echo is
 // matched against, and nothing is ever removed from that list.

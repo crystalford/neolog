@@ -170,6 +170,28 @@ const OPINION = new RegExp(
   ].join('|') + ')\\b', 'i',
 )
 
+/**
+ * First person, in a line the LOG wrote.
+ *
+ * ⚠️ 21 Sep — a good batch came back with "my struggles with gut health",
+ * "my life, a train wreck" and "my struggles with structure and
+ * productivity". Every one of them is a true reading of what he said, and
+ * every one of them is the log writing in HIS voice.
+ *
+ * That is the promise at the very top of this product: *"It never puts
+ * words in your mouth. Every line says who wrote it."* The row carries
+ * `author: 'log'` and the page says "the log's line" underneath — and a
+ * sentence beginning "my" contradicts both of them on the screen, which is
+ * where it matters. A reader does not check the attribution; they read the
+ * words.
+ *
+ * Refused rather than rewritten. Swapping "my" for "his" would be the log
+ * editing a sentence to look like something it is not, and the model can
+ * simply say "struggles with gut health" instead — which is the same fact
+ * with nobody impersonated.
+ */
+const FIRST_PERSON = /\b(i|i'm|i've|i'd|i'll|me|my|mine|myself|we|we're|our|ours|us)\b/i
+
 /** Everything the prompt says out loud, so an echo of it can be caught. */
 const EXAMPLE_TEXT = new Set(
   [...EXAMPLES.good, ...EXAMPLES.bad, ...RETIRED_EXAMPLES].map(e => e.toLowerCase()),
@@ -185,7 +207,9 @@ const SYSTEM = [
   '- Name the actual things: the projects, places, people and subjects the speaker names.',
   '- Describe only. Never say whether it is good, interesting, important, worth',
   '  watching, candid, honest or moving. No adjective about the RECORDING at all.',
-  '- Never address the speaker. Never use "you".',
+  '- Never address the speaker, and never speak as them. No "I", "me", "my", "we"',
+  '  and no "you". The line is written ABOUT the recording by someone else.',
+  '  Write "struggles with gut health", never "my struggles with gut health".',
   '- No filler tails: not "and its impact on society", not "discussed with personal',
   '  experiences", not "among other topics", not "and related matters".',
   '- Use only what is in the transcript. If it is too short or says nothing identifiable,',
@@ -479,6 +503,8 @@ export function clean(raw: string): string | null {
   if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
   // ⚠️ Nor a verdict on his own life. See `OPINION`.
   if (OPINION.test(s)) return null
+  // ⚠️ Nor a line the log wrote in his voice. See `FIRST_PERSON`.
+  if (FIRST_PERSON.test(s)) return null
   return s
 }
 
