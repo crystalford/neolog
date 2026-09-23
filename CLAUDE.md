@@ -3052,6 +3052,24 @@ first — the same distinction the deletion script failed to make.
 
 ---
 
+### ⚠️ A 404 from a probe during a deploy is not a missing route
+
+The backfill job came back **HTTP 404 with Next's own not-found page**, on
+`/api/v2/admin/headlines` — a path whose POST had worked a dozen times that
+hour, whose GET is exported exactly like six other admin routes, and which
+`next build` lists as a dynamic route. Half an hour went into looking for a
+bug in it.
+
+Both failing runs had fired **inside a `deploy.yml` window** — the deploy
+ran 02:54:09–02:55:48 and the probes at 02:54:15 and 02:55:19. A Worker
+deploy swaps the bundle and its static assets, and a request landing
+mid-swap gets a 404 that is indistinguishable from a route that does not
+exist.
+
+**Check whether a deploy is in flight before believing a probe.** Every push
+to `main` triggers one, so a probe fired right after a commit is the most
+likely time to hit this — which is exactly when a probe is most tempting.
+
 ## What the operator does after I push
 
 **The operator does NOT have a terminal.** They're on the Claude Code Windows app. There is no `git pull`, no `pnpm run bootstrap`, no local wrangler. Anything that needs to run on a real machine runs on **GitHub Actions** — specifically `.github/workflows/bootstrap-cloudflare.yml`.

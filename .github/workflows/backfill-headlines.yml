@@ -16,6 +16,14 @@ name: Say what each recording is about
 #
 # Read-only against R2 and against every word he said. It writes one column,
 # `vlogs.headline`, and nothing else.
+#
+# ⚠️ Do not run this while a deploy is in flight. The first two runs came
+# back HTTP 404 with Next's own not-found page, on a path whose POST had
+# worked a dozen times — and both had fired INSIDE a `deploy.yml` window
+# (deploy 02:54:09–02:55:48, runs at 02:54:15 and 02:55:19). A Worker deploy
+# swaps the bundle and its assets, and a request landing mid-swap gets a 404
+# that reads exactly like a missing route. It cost half an hour of looking
+# for a bug in a route that was fine.
 
 on:
   workflow_dispatch:
