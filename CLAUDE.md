@@ -468,6 +468,199 @@ a settle; a run is now about thirty-five seconds.
 
 `ops/shots/` is disposable. Delete it when the look is settled.
 
+### ⚠️ 21 Sep — a recording says what it is about, and the line is still the log's
+
+The operator, on the one thing a recording's entry should do:
+
+> *"the one thing I think it should do is summarize the vlog so that it
+> says uploaded a video about building neolog and the difficulties I've
+> been having with it… a nice solid headline describing what the video is
+> about."*
+
+**This is a model writing a sentence, which is the thing this file refuses
+hardest**, and it is here because he asked for it in those words.
+`src/lib/headline.ts` carries the argument in full. The short form: a
+recording's line on the feed has **always** been the log's — `vlogSentence()`
+composes *"Recorded 22 minutes of video."* from the file's own duration and
+the row already carries `author: 'log'`. This replaces a weak log-written
+sentence with a useful one, **in the same slot, with the same attribution**.
+Not one word of his is touched, and nothing becomes a second entry.
+
+What keeps it honest: only from `transcript_words`, never from the frame,
+the filename or nothing; a recording with no words keeps *"Recorded a
+video."*; one sentence, capped; and **⚠️ not `vlogs.title`** — that column
+is in `MODEL_WRITTEN_COLUMNS` and CI fails on a read of it, so reviving it
+would make the deleted engine's prose indistinguishable from the new.
+
+`headline_at` is stamped even when the model has nothing to say, so a
+recording already read is never asked again — the rule the hold-back check
+already follows for a picture it refused. Four drain from a home-page visit;
+Settings has the button for a backlog.
+
+**⚠️ Five things went wrong, and every one of them shipped to the feed
+before it was caught.** They are recorded together because the pattern is
+the point: *a prompt is not an enforcement, and fixing the function does
+nothing for the lines already in the column.*
+
+| what shipped | why |
+|---|---|
+| `doing a U.S` | the one-sentence cut fired on an abbreviation's own period |
+| `recording a video about halfway to fruit land` | the sentence stem, handed back in the present participle |
+| `building neolog, and the difficulties with the upload pipeline` | **the prompt's own example, verbatim** |
+| `driving to Ancaster, and whether to sell the house` | the other one |
+| `a couple of very interesting videos` | a verdict, which the prompt forbade in as many words |
+
+The two echoes are the worst of them. Both are real subjects of his — which
+is exactly why they were chosen as examples and exactly why that was wrong:
+**an echo of the instructions cannot be told apart from a reading of the
+transcript**, and there is no way to know afterwards which happened. A line
+copied out of a prompt is a line the log invented about his life (§0 rule 3).
+So `EXAMPLES` is about bees, a ferry timetable and a knee — subjects he has
+never recorded — `RETIRED_EXAMPLES` keeps the old ones forever so their
+echoes are still caught, and `clean()` refuses any answer that matches one.
+`OPINION` refuses a verdict the same way. **Nothing is left to the prompt
+that can be enforced in code.**
+
+And `recleanHeadlines` re-reads every stored line against the current rules,
+because four of the five above were already written down when the function
+was fixed. A line the rules now trim comes back trimmed; one the rules now
+refuse is cleared along with its stamp so the backlog asks properly. ⚠️ It
+re-cleans; it does not re-ask. *"The log does not like the look of this
+one"* is not a reason to go back and ask until it does.
+
+**⚠️ And a silence said nothing about itself.** Two batches reported
+*"written 5, nothing 5"* and *"written 3, nothing 7"* with no reason
+anywhere, which reads as *the model had nothing to say* when it can equally
+be a rejected line, a truncated answer or a failed call. `writeHeadline`
+returns an outcome — `too_short` · `model_said_nothing` · `rejected` (with
+what it actually said, so a rejection can be **read** rather than counted) ·
+`call_failed` · `written`. The first run of it found `maxTokens: 60` had
+been truncating most answers, and that four clips too short to have a line
+were being re-asked on every pass and sitting in `left` forever, so the
+backlog could never reach zero and the Settings loop had no way to finish.
+
+`scripts/test/headline.mjs` — 52 assertions, in CI. It also holds the two
+invariants the feature rests on: the line comes from `transcript_words` and
+never `transcript_text`, and it writes `headline` and never `title`.
+
+**⚠️ And the recording is titled by what it is, not by what the file is
+called.** The operator, on the deployed page: *"again should never be a
+filename should be a title of a video."* `/vlog/[id]`'s H1 was
+`DJI_20260627095001_0047_D.MP4` and `/vlogs` led every row the same way —
+four hundred recordings reading as four hundred serial numbers. The headline
+is the title on both now; the filename sits beside the duration, which is
+where a fact about the file belongs.
+
+### ⚠️ 21 Sep — a grid with named columns is a contract, and nothing could read it
+
+Three shipped in one morning and each looked like a different bug:
+
+| where | the rule | what it got |
+|---|---|---|
+| `/triage` | `.rules` is `repeat(3,1fr)` | one bare `<b>` — a grey slab with the sentence in a third of the width |
+| `/export` | `.out` is `1fr auto` | three option cards, with the action row **nested inside one of them** at 190px |
+| `/corrections` | `.r` is `88px 1fr 130px 96px` | the empty state as one `<span>` — a paragraph rendering **eighty-eight pixels wide, in the date column** |
+
+They are one bug. `tsc` sees valid JSX; `check-design.mjs` sees the class in
+the markup and it **is** there; `check-design-css.mjs` sees values matching
+the design and they **do** match; `check-css-vars.mjs` sees every variable
+resolve. `check-rendered-runtogether.mjs` sees only the ones where two
+labels collide — `/corrections` collided with nothing.
+
+**`scripts/check-grid-children.mjs`** reads the contract: 73 fixed-column
+grid rules against the children the markup gives each one. In CI. Each of
+the three proved by putting it back.
+
+⚠️ Three things it had to get right to be believed, all learned by getting
+them wrong first. **A bare text node is a grid item** — counting only
+elements reported every rail card header as one child in a two-column grid,
+fourteen of its first twenty-one findings. **Keyed by scope, not by class** —
+`.rules` is defined seven times, once per page, and a version keeping one
+contract per class name threw all seven away as ambiguous and walked past
+the bug it was written for. And **it silently passed**: on `</div>` it
+advanced one character, leaving `div>` to read as text and count as an item,
+so every container came back with about twice the children it had. Found by
+removing a real cell and watching the check stay green.
+
+Two real findings the moment it worked: `/screenshots`' `.rules` held two
+cells in a three-column grid, and `/ways-in` named three of
+`connections.html`'s **seven** automatic sources, one of them lumping three
+together — that page's own rule about doors that are not there, applied to
+itself. All seven are named now.
+
+### ⚠️ 21 Sep — a control with no affordance is not a control
+
+Five in one morning, all the same shape: **a container rule that reaches,
+and nothing inside it that does.**
+
+| where | what rendered |
+|---|---|
+| `/search` | the ask field — no border, no padding, no font size, on a near-empty page |
+| `/writing` | "Keep something you made" as a bare line of text |
+| `/settings` | "Keep it" and "Add it" as bare text; the fields beside them with no border |
+| `/messages` | "Bring it in", the same |
+| `/pages` | "Make the page" as a bold heading, and a field whose placeholder ran off the card edge |
+
+`.paste .bar` laid its children out and styled none of them; `.acts` styled
+its links and not its buttons; `.rc .i` had no rule for a field at all.
+**One button shape and one field shape for the whole product**, not one per
+surface.
+
+`check-rendered-runtogether.mjs` grew `FIND_INVISIBLE` for exactly this —
+an empty input has no text to collide with, so the run-together detector
+could never see it. Any border counts, including a lone underline, so
+`/search`'s example queries do not register; and a button with no border, no
+background **and** no padding is a word pretending to be a control.
+
+### ⚠️ 21 Sep — "empty" and "dim" were the same class name
+
+`.logpage .none` is the page's empty state — forty pixels of padding, meant
+to stand alone in a column. It was **also** used as a modifier:
+`className="c none"` on a value inside a row, meaning *dim this*.
+
+The padding lands inside the row either way. On `/everything` every door with
+no count rendered eighty pixels taller than the ones beside it, and `/vlogs`
+gave the same treatment to every recording with nothing read out of it —
+**which is all of them.** The recordings list read as enormously sparse for
+that one reason, and it had been put down to the design.
+
+`.dim` is the modifier now. `check-grid-children.mjs`'s second half holds
+the line: any class the stylesheet gives standalone block padding, written
+alongside another class. ⚠️ It opened with seven findings that were all
+`.sh` matching `shots`, `isheld` and `show` — the template-literal branch
+had no word boundary — and then one real-looking finding that was correct
+behaviour. Two exemptions, both principled: **a positioned overlay's padding
+is its own layout**, not something inside a row; and **a compound selector
+in the stylesheet is the stylesheet saying the pairing is intended**
+(`.lb.on`).
+
+### ⚠️ 21 Sep — two rail cards were counting the window
+
+**"Arrived on its own · 200 recordings"**, beside a log holding 421. It
+counted `items`, which is the 200-row feed window — a count of what is on
+screen presented as a count of the log, the same mistake the coverage bar
+below it made and was fixed for. `loadFeed` returns real `totals` now, one
+statement, three counts, in the batch that was already running.
+
+**"100% of these years has anything on it. 1 year is nearly empty."** Three
+things wrong in one sentence. The percentage is over a range derived from
+the data, so it is always near 100 and says nothing — `log.html`'s own *"39%
+of your life"* is over a lifetime, which the log does not know and will not
+guess. *"Nearly empty"* is a reading; the rule under it is real (under a
+tenth of the fullest year, the fold's own threshold) so the line states the
+rule. And *"this is where filling in the past starts"* is the log telling
+him to go and fill in his life — §0 rule 2. The years are clickable; that is
+the whole invitation.
+
+### ⚠️ 21 Sep — "the index" was still in nine places
+
+Out of the masthead on 20 Sep because he said *"what is 'the index'? why is
+it here? its blank, useless"* — and then, told what it was, *"i don't know
+what that is."* It stayed as the page's H1, its footer, five body links and
+a rail entry on seven pages. **The word was the problem**, so the page is
+called what it holds: **Names and places**.
+
+
 ### ⚠️ 21 Sep — the uploader was the last of the old product, and it was in the nav
 
 `CapturePanel` is the one surface that came through the 8 Sep deletion with
@@ -2068,7 +2261,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | **Log** | `/` | **Home — the log.** The composer on top (type, talk, drop files in; auto-grows from one line to a chapter; a `when` control for backdating with a precision — *that day / that month / that year* — so "2008 was a huge year" doesn't have to pretend to a day). Then the receipt: one line, one undo. Then search, the eight-way filter toolbar, the order toggle (*when it happened* / *when I logged it*), and the day-grouped feed. The rail carries the written-down bar (coverage by year — the door to thin years) and what arrived on its own. |
 | **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
-| **Index** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |
+| **Names and places** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |
 | **A page** | `/page/[id]` | One page: compact header, the log's one paragraph (marked as the log's; becomes yours when you edit it), **when it comes up** — a bar per year split *warm* (written from memory) and *cool* (said as it happened) — then the log filtered, **the same rows and day dividers as the feed**, via `src/components/LogRow.tsx`. Rail = corrections: rename, wrong kind, write/edit the paragraph, "not a page, just a thought". |
 | **Export** | `/export` | Pick a range, a page, or both. Markdown + a JSON manifest. Every line carries its provenance; nothing is added that isn't in the log — **and when the range holds more than one file can carry, both the page and the file say so.** |
 | **The public log** | `/public` | The same feed filtered to `visibility='public'`, rendered plainer. **A preview — it still needs signing in**, and it says so. Making it genuinely public is one Access bypass app, and that act is the operator's. |
@@ -2153,7 +2346,8 @@ loud when it is showing 500 of more.
 
 **Detail pages** (reached from nav-page cards or deep-linked):
 - `/vlogs` — the recordings themselves, reached from the avatar dropdown.
-- `/vlog/[id]` — one recording, whole: the video played from R2 untouched, the
+- `/vlog/[id]` — one recording, whole: **titled by what it is about** (21 Sep
+  — the H1 was the filename), the video played from R2 untouched, the
   word-timestamped transcript following the playhead (click a word to fix
   it), and provenance in words (which of the four tiers dated it, who
   transcribed it). Deleting buries; the file always stays. ⚠️ 20 Sep: this
@@ -2218,7 +2412,8 @@ preserves a bookmark to a product that no longer exists.
 | Async jobs | Cloudflare Workflows + Durable Object pipeline |
 | Transcription | Cloudflare Workers AI Whisper (`whisper-large-v3-turbo`) — word-level timestamps, for the transcript on a vlog's own page and for keyword search |
 | Looking at an uploaded image | Llama 4 Scout via `callChat` — the hold-back check and the words out of a screenshot. It reports what is visibly there and nothing else. |
-| Writing a search answer | `callReasoning()` in `src/lib/models.ts` — the one place a model writes prose, and every sentence's citations are checked in code before it is shown. |
+| Writing a search answer | `callReasoning()` in `src/lib/models.ts` — every sentence's citations are checked in code before it is shown. |
+| Saying what a recording is about | `src/lib/headline.ts` via `callChat` — one line, from the recording's own `transcript_words`, marked as the log's. Read that file's header before touching it. |
 | Video processing | Cloudflare Container Worker running FFmpeg (`workers/ffmpeg`) — transcode, thumbnail, audio extract |
 | Auth | Cloudflare Access (one-time PIN to operator email). No public bypass apps — nothing is served publicly yet, and adding one is the operator's act. |
 | Styling | The design package's own CSS, vendored under `design/` and scoped per page in `src/app/globals.css`. Tokens are CSS custom properties. |
@@ -2647,7 +2842,8 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
 | `feed.ts` | **The feed.** `loadFeed()` over `log_entries` + `vlogs` + `photos`, called by `GET /api/v2/log` and by the server-rendered home page. One feed, one query, two callers — §0.1 forbids a second authored feed, not a second caller. ⚠️ Read the open-window note in it before touching the row limit. |
 | `upload-queue.ts` | **A bulk drop, drained three at a time.** Registered-but-not-dispatched recordings (`uploaded` + `dispatched_at IS NULL`) handed to the pipeline as there is room, from the uploader, `/vlogs` and the home page's `waitUntil`. ⚠️ Passes `useStart: true` — without it Whisper never runs. |
-| `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check). |
+| `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check) and the headline. |
+| `headline.ts` | **One line saying what a recording is about**, from its own transcript, written into `vlogs.headline` and rendered by `feed.ts` in the slot `vlogSentence()` already owned. ⚠️ Read its header before changing anything: it is a model writing a sentence, and the argument for why that is allowed here — and the five ways it went wrong — are all in it. |
 | `transcribe.ts` | Whisper, with word-level timestamps — for the transcript on a vlog's own page (with click-to-fix) and for keyword search. ⚠️ 20 Sep: `src/lib/read-recording.ts` and `src/lib/split-note.ts`, which used to turn these timings into several auto-generated log entries, are deleted — see the 20 Sep entry above. Nothing here writes an entry. |
 | `r2.ts` | R2 ops; `R2Env` interface includes presigned-URL helpers. |
 | `d1.ts` | D1 query helpers (`getDb`, `findOne`, `findMany`, `run`, `batch`). |
@@ -2728,11 +2924,18 @@ first — the same distinction the deletion script failed to make.
 - Large files go direct to R2 via presigned URLs — never through API routes.
 
 **Models:**
-- **There are three places a model runs, and that is all of them.** The
+- **There are FOUR places a model runs, and that is all of them.** The
   hold-back check on an uploaded image (what is visibly on it); the words out
-  of a screenshot; and the answer on `/search` and `/month`, whose every
-  sentence has its citations checked in code before it is shown. A fourth
-  would need a reason written down next to it. ⚠️ 20 Sep: `splitNote` — the
+  of a screenshot; the answer on `/search` and `/month`, whose every sentence
+  has its citations checked in code before it is shown; and ⚠️ **21 Sep**,
+  the one line saying what a recording is about — the reason is written down
+  next to it, at length, in `src/lib/headline.ts`, and it is the operator
+  asking for it in his own words. A fifth would need the same.
+- ⚠️ **A prompt is not an enforcement.** The headline's prompt forbade
+  judging from its first version and a verdict reached the feed anyway; it
+  told the model not to repeat its examples and two examples reached the feed
+  verbatim. Anything that can be checked in code after the model answers is
+  checked in code. See the 21 Sep entry above for what that cost to learn. ⚠️ 20 Sep: `splitNote` — the
   fourth place, which used to ask a model only for verbatim anchors and cut a
   recording's transcript into several entries at them — is deleted. It was
   never asked for; see the 20 Sep entry above.
