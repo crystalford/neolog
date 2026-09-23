@@ -1,0 +1,125 @@
+name: Say what each recording is about
+
+# The backfill, run from a runner instead of a browser.
+#
+# `POST /api/v2/admin/headlines` writes a bounded batch and says how many are
+# left, so working through four hundred is the same call many times. Settings
+# has a button that loops in the browser; this is the same loop somewhere the
+# operator does not have to keep a tab open for.
+#
+# ⚠️ Read `src/lib/headline.ts` before changing anything here. A model
+# writing a sentence is the thing this product refuses hardest, and the
+# argument for why this one is allowed — it replaces a line the log already
+# wrote, in the same slot, with the same attribution — is at the top of that
+# file. Five different wrong lines reached the feed before the guards were
+# right; they are all in `clean()` now, not in the prompt.
+#
+# Read-only against R2 and against every word he said. It writes one column,
+# `vlogs.headline`, and nothing else.
+
+on:
+  workflow_dispatch:
+    inputs:
+      batches:
+        description: 'How many batches of 10 to run (0 = until nothing is left)'
+        default: '0'
+      reclean:
+        description: 'First, re-read every line already written against the current rules'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CF_ACCESS_CLIENT_ID:     ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      BASE_URL: https://neolog.ai
+    steps:
+      - name: Where it stands before
+        run: |
+          curl -s -S --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/api/v2/admin/headlines" | jq .
+
+      - name: Work through them
+        env:
+          BATCHES: ${{ inputs.batches }}
+          RECLEAN: ${{ inputs.reclean }}
+        run: |
+          set -o pipefail
+          cap=${BATCHES:-0}
+          # 0 means "until nothing is left". The ceiling is a runaway guard,
+          # not a limit anyone should hit: 420 recordings is 42 batches.
+          [ "$cap" -eq 0 ] && cap=80
+          reclean_once=$RECLEAN
+          written=0
+          i=0
+
+          while [ "$i" -lt "$cap" ]; do
+            i=$((i + 1))
+            body="{\"limit\":10}"
+            # ⚠️ Only on the first call. `reclean` re-reads every stored line
+            # against the current rules; doing it on every batch would be the
+            # same full-table pass forty times for nothing.
+            if [ "$reclean_once" = "true" ]; then
+              body="{\"limit\":10,\"reclean\":true}"
+              reclean_once=false
+            fi
+
+            out=$(curl -s -S --max-time 300 -X POST \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H "Content-Type: application/json" \
+              --data "$body" \
+              "$BASE_URL/api/v2/admin/headlines") || out=''
+
+            if [ -z "$out" ]; then
+              echo "batch $i: no response — stopping rather than hammering it"
+              break
+            fi
+
+            w=$(echo "$out" | jq -r '.written // 0')
+            n=$(echo "$out" | jq -r '.nothing // 0')
+            left=$(echo "$out" | jq -r '.left // 0')
+            written=$((written + w))
+
+            echo "── batch $i · wrote $w · $n had nothing · $left to go"
+            # Why, not just how many. A silence with no reason behind it is
+            # the shape of bug this feature has already paid for twice.
+            echo "$out" | jq -r '.why // {} | to_entries[] | "     \(.key): \(.value)"'
+            echo "$out" | jq -r '.refused // [] | .[] | "     refused: \(.)"'
+            # The lines themselves. A count cannot be checked; a sentence can.
+            echo "$out" | jq -r '.lines // [] | .[:3] | .[] | "     \(.headline)"'
+
+            if [ "$left" -eq 0 ]; then
+              echo ""
+              echo "Nothing left."
+              break
+            fi
+            # A recording that produced nothing is stamped and will not come
+            # back, so `left` always falls. If it does not, something is wrong
+            # and looping would only burn model calls.
+            if [ "$w" -eq 0 ] && [ "$n" -eq 0 ]; then
+              echo "batch $i: nothing written and nothing refused — stopping"
+              break
+            fi
+            sleep 2
+          done
+
+          echo ""
+          echo "$written written over $i batches."
+
+      - name: Where it stands after, and twenty of the lines
+        if: always()
+        run: |
+          curl -s -S --max-time 60 \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE_URL/api/v2/admin/headlines?sample=20" \
+            | jq -r '"\(.with_words) transcribed · \(.written) with a line · \(.nothing_to_say) the log had nothing to say about · \(.left) to go", "", (.lines[] | "  \(.headline)")'
