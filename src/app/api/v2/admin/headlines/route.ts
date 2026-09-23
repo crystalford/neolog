@@ -26,7 +26,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, findMany, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import { headlineBacklog, recleanHeadlines, type HeadlineEnv } from '@/lib/headline'
+import { headlineBacklog, recleanHeadlines, MIN_WORDS, type HeadlineEnv } from '@/lib/headline'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -52,16 +52,35 @@ export async function GET(req: NextRequest) {
   // wait for the migration rather than race it (src/lib/ready-db.ts).
   const db = await readyDb(getDb(env), 'admin/headlines')
 
-  const counts = await findOne<{ recordings: number; with_words: number; written: number; looked: number }>(
+  // ⚠️ `enough_words`, not "has any words at all", and `MIN_WORDS` is the
+  // same floor the backlog filters on.
+  //
+  // These were two different definitions and the difference was 61: the
+  // backlog skips a recording under 25 words because there is nothing for it
+  // to be about, while this counted every recording with a single word in
+  // it. So a finished backfill printed "Nothing left" and this endpoint said
+  // "61 to go" in the same second — and Settings, which reads this number,
+  // would have shown 61 forever beside a button that could never move it.
+  //
+  // That is the same bug the backlog itself had and was fixed for: a count
+  // that cannot reach zero. A recording too short to carry a line is not
+  // work left to do, and it is now said out loud as its own number rather
+  // than hidden inside a total.
+  const counts = await findOne<{
+    recordings: number; with_words: number; enough_words: number
+    written: number; looked: number
+  }>(
     db,
     `SELECT COUNT(*) AS recordings,
-            SUM(CASE WHEN EXISTS (SELECT 1 FROM transcript_words w WHERE w.vlog_id = v.id)
+            SUM(CASE WHEN (SELECT COUNT(*) FROM transcript_words w WHERE w.vlog_id = v.id) > 0
                      THEN 1 ELSE 0 END) AS with_words,
+            SUM(CASE WHEN (SELECT COUNT(*) FROM transcript_words w WHERE w.vlog_id = v.id) >= ?
+                     THEN 1 ELSE 0 END) AS enough_words,
             SUM(CASE WHEN v.headline IS NOT NULL THEN 1 ELSE 0 END) AS written,
             SUM(CASE WHEN v.headline_at IS NOT NULL THEN 1 ELSE 0 END) AS looked
        FROM vlogs v
       WHERE v.operator_id = ? AND v.deleted_at IS NULL`,
-    operator.id,
+    MIN_WORDS, operator.id,
   )
 
   // The lines themselves, so they can be read before the rest are written.
@@ -80,6 +99,7 @@ export async function GET(req: NextRequest) {
     : []
 
   const withWords = counts?.with_words ?? 0
+  const enough = counts?.enough_words ?? 0
   const looked = counts?.looked ?? 0
   return NextResponse.json({
     recordings: counts?.recordings ?? 0,
@@ -87,7 +107,10 @@ export async function GET(req: NextRequest) {
     written: counts?.written ?? 0,
     // Looked at and had nothing to say — stamped so it is not asked again.
     nothing_to_say: Math.max(0, looked - (counts?.written ?? 0)),
-    left: Math.max(0, withWords - looked),
+    // Under the word floor. Said as its own number because it is a fact
+    // about those recordings, not a job anyone can finish.
+    too_short: Math.max(0, withWords - enough),
+    left: Math.max(0, enough - looked),
     lines,
   })
 }

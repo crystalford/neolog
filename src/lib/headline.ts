@@ -88,7 +88,7 @@ const MAX_CHARS = 150
  * forever — so the count never fell to zero and the Settings loop had no
  * way to finish. A recording that cannot have a line is not work left to do.
  */
-const MIN_WORDS = 25
+export const MIN_WORDS = 25
 
 export interface HeadlineEnv {
   AI: { run: (m: unknown, a: unknown) => Promise<unknown> }

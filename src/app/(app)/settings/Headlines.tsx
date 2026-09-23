@@ -29,6 +29,8 @@ interface Counts {
   with_words: number
   written: number
   nothing_to_say: number
+  /** Under the word floor — never work left to do. See the route. */
+  too_short: number
   left: number
   lines: { id: string; headline: string }[]
 }
@@ -81,10 +83,16 @@ export function Headlines() {
 
   return (
     <div className="paste">
+      {/* ⚠️ Every recording is in exactly one of these, and they add up to
+          `with_words`. "To go" used to include the ones too short to ever
+          have a line, so it could never reach zero — a number beside a
+          button that could not move it. */}
       {c && (
         <p className="none" style={{ padding: '0 0 12px' }}>
-          {c.with_words} transcribed · {c.written} with a line · {c.left} to go
+          {c.with_words} transcribed · {c.written} with a line
           {c.nothing_to_say > 0 && <> · {c.nothing_to_say} the log had nothing to say about</>}
+          {c.too_short > 0 && <> · {c.too_short} too short to be about anything</>}
+          {c.left > 0 ? <> · {c.left} to go</> : <> · nothing left to do</>}
         </p>
       )}
       <div className="bar">
