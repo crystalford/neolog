@@ -42,6 +42,17 @@ const EXAMPLE_TEXT = new Set([
   'the brain-gut axis, and how it shows up in emotional regulation',
 ].map(e => e.toLowerCase()))
 
+const OPINION = new RegExp(
+  '\\b(' + [
+    'interesting', 'fascinating', 'compelling', 'insightful', 'profound',
+    'thought-provoking', 'powerful', 'remarkable', 'notable', 'noteworthy',
+    'important', 'significant', 'valuable', 'worthwhile', 'worth watching',
+    'great', 'excellent', 'brilliant', 'wonderful', 'beautiful', 'amazing',
+    'boring', 'dull', 'trivial', 'pointless', 'rambling',
+    'candid', 'honest', 'raw', 'moving', 'touching',
+  ].join('|') + ')\\b', 'i',
+)
+
 function sentenceBreak(s) {
   for (let i = 0; i < s.length; i++) {
     if (!'.!?'.includes(s[i])) continue
@@ -83,6 +94,7 @@ function clean(raw) {
   if (s.length < 8) return null
   if (!/[a-z]/i.test(s)) return null
   if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
+  if (OPINION.test(s)) return null
   return s
 }
 
@@ -207,6 +219,20 @@ is(
   'including the other one that reached a real recording',
 )
 
+// ── A verdict is not a description ──────────────────────────────────────
+// ⚠️ A real batch returned "a couple of very interesting videos". The
+// prompt forbids judging, and the prompt is not an enforcement: §0 rule 2
+// says the log never comments, and "interesting" is the log telling him
+// which of his recordings were worth making.
+is(clean('a couple of very interesting videos'), null, 'the line that shipped this guard')
+is(clean('a fascinating conversation about the house'), null, 'and any other verdict')
+is(clean('a raw, honest account of the week'), null, 'including the flattering kind')
+is(
+  clean('the drive to Ancaster, and the argument in the car'),
+  'the drive to Ancaster, and the argument in the car',
+  'a description with no verdict in it still passes',
+)
+
 // ── Nothing usable ──────────────────────────────────────────────────────
 is(clean('a talk'), null, 'too short to be a line')
 is(clean('12 34 56'), null, 'no letters in it at all')
@@ -254,6 +280,7 @@ is(/headline_at = CURRENT_TIMESTAMP/.test(SRC), true, 'the stamp goes on whether
 // ⚠️ The examples must stay about subjects he has never recorded. An example
 // drawn from his own life cannot be told apart from a reading of it.
 is(SRC.includes('EXAMPLE_TEXT.has'), true, 'an answer matching an example is still refused')
+is(SRC.includes('OPINION.test'), true, 'and an answer carrying a verdict is too')
 // ⚠️ The LIVE examples only. `RETIRED_EXAMPLES` sits between them and
 // holds exactly these words on purpose — they are what a stale echo is
 // matched against, and nothing is ever removed from that list.

@@ -202,7 +202,9 @@ export default function PagesIndex() {
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') void make() }}
-                  placeholder="a person, a place, a project, an idea"
+                  /* Short enough to be read in the 260px the rail gives it. The old
+                     one ran off the card edge at "a proje". */
+                  placeholder="a person, a place, a project"
                   aria-label="Name something"
                 />
               </div>

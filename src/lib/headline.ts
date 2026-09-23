@@ -141,6 +141,35 @@ const RETIRED_EXAMPLES = [
   'the brain-gut axis, and how it shows up in emotional regulation',
 ]
 
+/**
+ * Words that make a line an opinion rather than a description.
+ *
+ * ⚠️ 21 Sep — a batch came back with "a couple of very interesting videos".
+ * The prompt forbids judging in as many words, and the prompt is not an
+ * enforcement: §0 rule 2 says the log is quiet and never comments on an
+ * entry, and "interesting" is the log telling him which of his recordings
+ * were worth making.
+ *
+ * Refusing the whole line is the right direction to be wrong in. A
+ * recording with no line reads as "Recorded 22 minutes of video."; one with
+ * a line the log editorialised in reads as a verdict on his life, signed by
+ * the log, on the feed.
+ *
+ * ⚠️ This will occasionally refuse a true line — he may genuinely have said
+ * "the interesting thing about X". That is a cost worth paying: the log
+ * cannot tell his word from its own once it is in a sentence the log wrote.
+ */
+const OPINION = new RegExp(
+  '\\b(' + [
+    'interesting', 'fascinating', 'compelling', 'insightful', 'profound',
+    'thought-provoking', 'powerful', 'remarkable', 'notable', 'noteworthy',
+    'important', 'significant', 'valuable', 'worthwhile', 'worth watching',
+    'great', 'excellent', 'brilliant', 'wonderful', 'beautiful', 'amazing',
+    'boring', 'dull', 'trivial', 'pointless', 'rambling',
+    'candid', 'honest', 'raw', 'moving', 'touching',
+  ].join('|') + ')\\b', 'i',
+)
+
 /** Everything the prompt says out loud, so an echo of it can be caught. */
 const EXAMPLE_TEXT = new Set(
   [...EXAMPLES.good, ...EXAMPLES.bad, ...RETIRED_EXAMPLES].map(e => e.toLowerCase()),
@@ -154,7 +183,8 @@ const SYSTEM = [
   '- A phrase, not a sentence. Under 16 words. No full stop.',
   '- Begin with a lowercase letter, unless the first word is a name.',
   '- Name the actual things: the projects, places, people and subjects the speaker names.',
-  '- Describe only. Never say whether it is good, interesting, important or worth watching.',
+  '- Describe only. Never say whether it is good, interesting, important, worth',
+  '  watching, candid, honest or moving. No adjective about the RECORDING at all.',
   '- Never address the speaker. Never use "you".',
   '- No filler tails: not "and its impact on society", not "discussed with personal',
   '  experiences", not "among other topics", not "and related matters".',
@@ -447,6 +477,8 @@ export function clean(raw: string): string | null {
   if (!/[a-z]/i.test(s)) return null
   // ⚠️ And never an example out of its own instructions. See `EXAMPLES`.
   if (EXAMPLE_TEXT.has(s.toLowerCase())) return null
+  // ⚠️ Nor a verdict on his own life. See `OPINION`.
+  if (OPINION.test(s)) return null
   return s
 }
 

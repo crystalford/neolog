@@ -2391,6 +2391,31 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
 .logpage .acts { display:flex; gap:10px; flex-wrap:wrap; }
 .logpage .acts a { font-size:12.5px; color:var(--fg-3); }
 .logpage .acts a:hover { color:var(--fg); }
+/* ⚠️ 21 Sep — `.acts` styled its links and not its BUTTONS, so `/pages`'
+   "Make the page" — the one control that creates a page, the thing this
+   whole product says only he can do — rendered as a bare bold line the size
+   of a heading. And `.rc .i` had no rule for a field, so the box beside it
+   had no border and its placeholder ran off the card edge: "a person, a
+   place, a proje".
+
+   Fourth and fifth on the same morning as /search's ask field, /writing's
+   "Keep something you made" and /settings' "Keep it" and "Add it". One
+   button shape and one field shape for the whole product; a control with no
+   affordance is not a control. */
+.logpage .acts button {
+  font-size:12.5px; font-weight:500; padding:7px 12px; border-radius:7px;
+  border:1px solid var(--line-2); color:var(--fg-1); background:transparent;
+  white-space:nowrap;
+}
+.logpage .acts button:hover:not(:disabled) { color:var(--fg); border-color:var(--line-3); }
+.logpage .acts button:disabled { opacity:.42; cursor:default; }
+.logpage .rc .i input {
+  font:inherit; font-size:13px; color:var(--fg-1); background:var(--bg-2);
+  border:1px solid var(--line-1); border-radius:8px; padding:7px 10px;
+  outline:none; width:100%; max-width:100%; box-sizing:border-box;
+}
+.logpage .rc .i input:focus { border-color:var(--line-3); }
+.logpage .rc .i input::placeholder { color:var(--fg-4); }
 
 .logpage.pg-entry .acts { display:flex; flex-direction:column; gap:1px; background:var(--line); }
 .logpage.pg-entry .acts a { background:var(--bg-1); padding:9px 14px; font-size:12.5px; color:var(--fg-2); }
