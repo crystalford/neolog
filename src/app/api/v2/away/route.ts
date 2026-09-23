@@ -20,7 +20,8 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getDb, findMany } from '@/lib/d1'
+import { getDb } from '@/lib/d1'
+import { awaySummary } from '@/lib/rail'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
@@ -40,66 +41,13 @@ export async function GET(req: NextRequest) {
   }
   const db = await readyDb(getDb(env), 'away')
 
-  // The last thing he actually wrote — not the last thing that arrived.
-  const lastWritten = await findMany<{ at: string }>(
-    db,
-    `SELECT COALESCE(logged_at, created_at) AS at FROM log_entries
-      WHERE operator_id = ? AND deleted_at IS NULL AND author = 'operator'
-      ORDER BY COALESCE(logged_at, created_at) DESC LIMIT 1`,
-    operator.id,
-  )
-  if (!lastWritten.length) {
-    return NextResponse.json({ away: false }, { headers: { 'Cache-Control': 'no-store' } })
-  }
-
-  const since = lastWritten[0].at
-  const days = Math.floor((Date.now() - new Date(since).getTime()) / 86400000)
-  if (!isFinite(days) || days < MIN_GAP_DAYS) {
-    return NextResponse.json({ away: false }, { headers: { 'Cache-Control': 'no-store' } })
-  }
-
-  // What arrived on its own in the meantime, by kind. Counts describe; they
-  // are never a queue and never a number to bring down.
-  const [entries, vlogs, photos] = await Promise.all([
-    findMany<{ n: number; source_kind: string }>(
-      db,
-      `SELECT COUNT(*) AS n, source_kind FROM log_entries
-        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
-          AND author = 'log' AND COALESCE(logged_at, created_at) > ?
-        GROUP BY source_kind`,
-      operator.id, since,
-    ),
-    findMany<{ n: number }>(
-      db,
-      `SELECT COUNT(*) AS n FROM vlogs
-        WHERE operator_id = ? AND deleted_at IS NULL AND created_at > ?`,
-      operator.id, since,
-    ),
-    findMany<{ n: number }>(
-      db,
-      `SELECT COUNT(*) AS n FROM photos
-        WHERE operator_id = ? AND deleted_at IS NULL AND created_at > ?`,
-      operator.id, since,
-    ),
-  ])
-
-  const parts: { label: string; n: number }[] = []
-  const photoN = photos[0]?.n || 0
-  const vlogN = vlogs[0]?.n || 0
-  if (photoN) parts.push({ label: photoN === 1 ? 'photo' : 'photos', n: photoN })
-  if (vlogN) parts.push({ label: vlogN === 1 ? 'recording' : 'recordings', n: vlogN })
-  for (const e of entries) {
-    if (!e.n) continue
-    const label = e.source_kind === 'voice'
-      ? (e.n === 1 ? 'voice note' : 'voice notes')
-      : (e.n === 1 ? 'file' : 'files')
-    parts.push({ label, n: e.n })
-  }
-
-  const total = parts.reduce((n, p) => n + p.n, 0)
-
+  // ⚠️ 21 Sep — the body of this moved to `src/lib/rail.ts`, so the home
+  // page can read it server-side in the request that renders the page
+  // instead of fetching it on mount. One function, two callers — the shape
+  // `feed.ts` already uses, and for the same reason: a second copy of a
+  // query is a second thing that can disagree about what the log holds.
   return NextResponse.json(
-    { away: true, days, since, total, parts },
+    await awaySummary(db, operator.id),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }

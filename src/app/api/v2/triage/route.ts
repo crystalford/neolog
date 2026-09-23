@@ -21,6 +21,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany, run } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { presignGetUrl, type R2Env } from '@/lib/r2'
+import { triageCount } from '@/lib/rail'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import type { D1Database } from '@cloudflare/workers-types'
 
@@ -49,15 +50,11 @@ export async function GET(req: NextRequest) {
   // `/triage` itself still gets the rows; it is the page that shows them.
   // A caller that wants a number asks for a number.
   if (url.searchParams.get('count')) {
-    const n = await findMany<{ n: number }>(
-      db,
-      `SELECT COUNT(*) AS n FROM log_entries
-        WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
-          AND author = 'log' AND triaged_at IS NULL`,
-      operator.id,
-    )
+    // ⚠️ 21 Sep — the count moved to `src/lib/rail.ts` with the rest of
+    // the rail, so the home page reads it server-side in the request that
+    // renders the page rather than fetching it on mount.
     return NextResponse.json(
-      { total: n[0]?.n || 0 },
+      { total: await triageCount(db, operator.id) },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   }

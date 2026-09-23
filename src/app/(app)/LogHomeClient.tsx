@@ -51,6 +51,7 @@ import { LogDays } from '@/components/LogRow'
 import { LogLightbox, useShots, useRestorePlace } from '@/components/LogLightbox'
 import { OpenQuestions } from '@/components/OpenQuestions'
 import { FoldedPeriods, type FoldBucket } from '@/components/FoldedPeriods'
+import type { RailPayload } from '@/lib/rail'
 import {
   type LogEntry, type FeedFilter, type DatePrecision,
   stampFor, isFuzzy, dayKeyFor, dayHeadingFor, tagsFor, clockDuration,
@@ -117,6 +118,13 @@ export interface InitialFeed {
   totals: Totals | null
   fold: FoldBucket[]
   buried_by_day: Record<string, number>
+  /**
+   * The four rail cards, read in the request that rendered the page.
+   * ⚠️ Null when the server read fell back — the cards then fetch for
+   * themselves, exactly as they did before, which is the same safety net
+   * `initial` itself has.
+   */
+  rail: RailPayload | null
 }
 
 export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFromProp, relation: relationProp }: {
@@ -491,7 +499,7 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
               </div>
             </div>
 
-            <WhileYouWereGone />
+            <WhileYouWereGone initial={(initial?.rail?.away as Away | undefined) ?? null} />
 
             {/* ── The feed ─────────────────────────────────────────────── */}
             <div id="feed">
@@ -523,12 +531,12 @@ export default function LogHomeClient({ initial, initialFilter, ledFrom: ledFrom
 
           {/* ── The rail ───────────────────────────────────────────────── */}
           <aside className="rail">
-            <OpenQuestions onAnswered={() => { void loadFeed() }} />
+            <OpenQuestions initial={initial?.rail?.recall ?? null} onAnswered={() => { void loadFeed() }} />
             <WrittenDown coverage={coverage} onYear={y => setQ(String(y))} />
             <ArrivedOnItsOwn totals={totals} />
-            <WhatArrived />
-            <OnThisDay />
-            <SafeToClear />
+            <WhatArrived initial={initial?.rail?.triage ?? null} />
+            <OnThisDay initial={initial?.rail?.onthisday ?? null} />
+            <SafeToClear initial={initial?.rail?.clear ?? null} />
             {/* day-one.html: "The rail has nothing to show, so it says so in
                 one line rather than showing empty boxes." Every card above
                 hides itself when it is empty; this one would not, so on an
@@ -614,13 +622,23 @@ function ArrivedOnItsOwn({ totals }: {
 // band is to say that the days are not empty rather than to ask him to do
 // anything about them.
 
-function WhileYouWereGone() {
-  const [a, setA] = useState<{
-    away: boolean; days: number; total: number
-    parts: { label: string; n: number }[]
-  } | null>(null)
+type Away = {
+  away: boolean; days: number; total: number
+  parts: { label: string; n: number }[]
+}
 
+function WhileYouWereGone({ initial }: { initial: Away | null }) {
+  const [a, setA] = useState<Away | null>(initial)
+
+  // ⚠️ 21 Sep — only when the server did NOT read it. The page hands this
+  // down from the request that rendered it; fetching again on mount would
+  // be the round trip this change removed. `seeded` is a ref for the same
+  // reason `LogHomeClient`'s own is: a long-lived flag a re-render must not
+  // reset.
+  const seeded = useRef(!!initial)
   useEffect(() => {
+    if (seeded.current) return
+    seeded.current = true
     void (async () => {
       try {
         const res = await fetch('/api/v2/away', { cache: 'no-store' })
@@ -631,7 +649,7 @@ function WhileYouWereGone() {
 
   if (!a?.away) return null
 
-  const list = a.parts.map(p => `${p.n} ${p.label}`).join(', ')
+  const list = (a.parts || []).map(p => `${p.n} ${p.label}`).join(', ')
 
   return (
     <div className="gone">
@@ -653,9 +671,14 @@ function WhileYouWereGone() {
 // is an offer and never a queue: no unread badge, nothing blocked on it, and
 // the copy says outright that ignoring it is fine.
 
-function WhatArrived() {
-  const [n, setN] = useState(0)
+function WhatArrived({ initial }: { initial: number | null }) {
+  const [n, setN] = useState(initial ?? 0)
+  // ⚠️ Seeded from the server render — see `src/lib/rail.ts`. The fetch is
+  // the fallback for when the server read fell back, not the normal path.
+  const seeded = useRef(initial !== null)
   useEffect(() => {
+    if (seeded.current) return
+    seeded.current = true
     void (async () => {
       try {
         // The count, not sixty rows and sixty signed URLs — this card shows
@@ -689,17 +712,27 @@ function WhatArrived() {
 // One line in the rail: what was written on this date in another year, as it
 // was written. No "one year ago today", no count, no nudge.
 
-function OnThisDay() {
-  const [row, setRow] = useState<{ year: number; text: string; id: string } | null>(null)
+type OtdYears = { years: { year: number; entries: { id: string; text: string }[] }[] }
+
+/** The most recent OTHER year that had something. One, not a list. */
+function pickOtd(r: OtdYears | null) {
+  const y = (r?.years || []).find(v => v.year < new Date().getUTCFullYear() && v.entries.length)
+  return y ? { year: y.year, text: y.entries[0].text, id: y.entries[0].id } : null
+}
+
+function OnThisDay({ initial }: { initial: OtdYears | null }) {
+  const [row, setRow] = useState(() => pickOtd(initial))
+  // ⚠️ Seeded from the server render — see `src/lib/rail.ts`. The fetch is
+  // the fallback for when the server read fell back, not the normal path.
+  const seeded = useRef(!!initial)
   useEffect(() => {
+    if (seeded.current) return
+    seeded.current = true
     void (async () => {
       try {
         const res = await fetch('/api/v2/onthisday', { cache: 'no-store' })
         if (!res.ok) return
-        const r = await res.json() as { years: { year: number; entries: { id: string; text: string }[] }[] }
-        // The most recent other year that had something. One, not a list.
-        const y = (r.years || []).find(v => v.year < new Date().getUTCFullYear() && v.entries.length)
-        if (y) setRow({ year: y.year, text: y.entries[0].text, id: y.entries[0].id })
+        setRow(pickOtd(await res.json() as OtdYears))
       } catch { /* the card just doesn't show */ }
     })()
   }, [])
@@ -718,9 +751,16 @@ function OnThisDay() {
 // The loop the log exists to close. Only appears when the log can honestly
 // say something is safe to delete — it never nags, and it never guesses.
 
-function SafeToClear() {
-  const [s, setS] = useState<{ clearable: number; clearable_bytes: number } | null>(null)
+type Clearable = { clearable: number; clearable_bytes: number }
+
+function SafeToClear({ initial }: { initial: Clearable | null }) {
+  const [s, setS] = useState<Clearable | null>(initial)
+  // ⚠️ Seeded from the server render — see `src/lib/rail.ts`. The fetch is
+  // the fallback for when the server read fell back, not the normal path.
+  const seeded = useRef(!!initial)
   useEffect(() => {
+    if (seeded.current) return
+    seeded.current = true
     void (async () => {
       try {
         const res = await fetch('/api/v2/clear', { cache: 'no-store' })

@@ -399,6 +399,28 @@ cleanly with the original bug put back. The guard was removed and replaced
 with a real keyword list. **A check that cannot catch the bug it was written
 for is worse than none**; the only way to know is to put the bug back.
 
+⚠️ **21 Sep — the RAIL did not move, and the complaint was half true for
+a day.** `/` rendered its feed server-side and then fired **four** more
+requests on mount for the column beside it, each with its own auth, its own
+`readyDb` and its own queries, after the page had already painted.
+`src/lib/rail.ts` reads all four in the request that renders the page and
+hands them down as `initial.rail`; each card keeps its fetch as the fallback
+for a server read that fell back, exactly as the feed does.
+
+⚠️ **One function, four routes, not a fifth endpoint.** A single
+`/api/v2/rail` would be a fifth place the same queries live AND still a
+round trip after the page. `feed.ts` already set the shape: one function,
+called by the page and by the route. `/away`, `/onthisday` and
+`/triage?count=1` now call into `rail.ts`, so the pages that are about those
+things keep working unchanged.
+
+⚠️ **Every card still fails alone, and that is load-bearing.** `loadRail`
+wraps each read separately rather than the lot in one try. `/api/v2/onthisday`
+returned 500 on every request for weeks and nothing broke, because the card
+caught its own error and hid itself — the bug was bad, the hiding was right.
+A rail that takes the page down with it is a worse failure than a rail with
+one card missing, and the feed is what the page is for.
+
 **`/api/v2/triage` was signing sixty R2 URLs to produce one integer.** The
 rail card reads `total` and nothing else, and the endpoint was fetching
 sixty full rows and presigning every one of them, on every home page load
@@ -2863,6 +2885,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | File | Purpose |
 |---|---|
 | `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
+| `rail.ts` | **The four cards beside the log**, read in the request that renders `/` rather than fetched on mount. `awaySummary` · `onThisDay` · `triageCount`, plus `clearSummary` and `openQuestions` from their own libs. ⚠️ Each read fails alone — a card that hides itself is the design; a rail that takes the feed down is not. |
 | `feed.ts` | **The feed.** `loadFeed()` over `log_entries` + `vlogs` + `photos`, called by `GET /api/v2/log` and by the server-rendered home page. One feed, one query, two callers — §0.1 forbids a second authored feed, not a second caller. ⚠️ Read the open-window note in it before touching the row limit. |
 | `upload-queue.ts` | **A bulk drop, drained three at a time.** Registered-but-not-dispatched recordings (`uploaded` + `dispatched_at IS NULL`) handed to the pipeline as there is room, from the uploader, `/vlogs` and the home page's `waitUntil`. ⚠️ Passes `useStart: true` — without it Whisper never runs. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check) and the headline. |

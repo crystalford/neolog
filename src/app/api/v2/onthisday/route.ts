@@ -19,10 +19,11 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import { getDb, findMany } from '@/lib/d1'
+import { getDb } from '@/lib/d1'
 import { readyDb } from '@/lib/ready-db'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
-import { presignGetUrl, type R2Env } from '@/lib/r2'
+import { type R2Env } from '@/lib/r2'
+import { onThisDay, type RailEnv } from '@/lib/rail'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env extends R2Env { DB: D1Database; NEOLOG_DEV_OPERATOR_EMAIL?: string }
@@ -43,79 +44,12 @@ export async function GET(req: NextRequest) {
   if (!/^\d{2}-\d{2}$/.test(on)) {
     return NextResponse.json({ error: 'on must be MM-DD' }, { status: 400 })
   }
-  const thisYear = new Date().getUTCFullYear()
-
-  const rows = await findMany<{
-    id: string; text: string; detail: string | null
-    happened_at: string; date_precision: string; author: string
-    visibility: string; source_kind: string
-    r: string | null; mime: string | null
-  }>(
-    db,
-    `SELECT id, text, detail,
-            COALESCE(happened_at, occurred_at, created_at) AS happened_at,
-            -- 20 Sep: this read a column named r, which does not exist, so
-            -- every request threw "no such column: r". The rail card caught
-            -- it and hid itself, and On This Day had silently never worked.
-            -- The column is r2_key, aliased back to r because the rows are
-            -- read below as r.r. check-sql-columns.mjs could not see it: it
-            -- validates alias-qualified references, and this query has no
-            -- table alias, so every bare name in it was skipped.
-            date_precision, author, visibility, source_kind, r2_key AS r, mime
-       FROM log_entries
-      WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
-        AND substr(COALESCE(happened_at, occurred_at, created_at), 6, 5) = ?
-        -- An approximate date is not a date. Showing a "this day" entry whose
-        -- day the log guessed would be the log saying something it does not
-        -- know, on the one surface whose whole discipline is not saying.
-        AND date_precision IN ('exact', 'day')
-      ORDER BY COALESCE(happened_at, occurred_at) DESC
-      LIMIT 60`,
-    operator.id, on,
-  )
-
-  // Group by year. Years with nothing are worth naming — a gap in the log is
-  // not proof nothing happened.
-  const byYear = new Map<number, typeof rows>()
-  for (const r of rows) {
-    const y = new Date(r.happened_at).getUTCFullYear()
-    if (isNaN(y)) continue
-    byYear.set(y, [...(byYear.get(y) || []), r])
-  }
-
-  const firstRow = await findMany<{ y: string }>(
-    db,
-    `SELECT MIN(substr(COALESCE(happened_at, occurred_at, created_at), 1, 4)) AS y
-       FROM log_entries
-      WHERE operator_id = ? AND deleted_at IS NULL`,
-    operator.id,
-  )
-  const firstYear = parseInt(firstRow[0]?.y || String(thisYear), 10)
-
-  // `onthisday.html`'s `.ph` — the pictures from that day, beside the line
-  // rather than described in it. Only the rows that survived the grouping
-  // are signed, the lesson the feed learned; and a HELD row is never signed
-  // at all, because the log has not looked at it and every failure path
-  // holds back (SPEC §0.2).
-  const years = await Promise.all(
-    Array.from(byYear.keys()).sort((a, b) => b - a).map(async y => ({
-      year: y,
-      entries: await Promise.all(byYear.get(y)!.map(async r => {
-        let media_url: string | null = null
-        if (r.r && (r.mime || '').startsWith('image/') && r.visibility !== 'held') {
-          try { media_url = await presignGetUrl(env, r.r, 24 * 3600) } catch { media_url = null }
-        }
-        return { ...r, media_url }
-      })),
-    })),
-  )
-
-  // How many years in the log's own span have nothing on this date.
-  const span = Math.max(0, thisYear - firstYear + 1)
-  const empty = Math.max(0, span - years.length)
-
+  // ⚠️ 21 Sep — the body moved to `src/lib/rail.ts`. See the note there and
+  // on `/api/v2/away`: the home page reads all four rail cards server-side
+  // now, and one function with two callers is how this repo keeps a query
+  // from being written twice.
   return NextResponse.json(
-    { on, years, empty_years: empty, first_year: firstYear },
+    await onThisDay(db, env as unknown as RailEnv, operator.id, on),
     { headers: { 'Cache-Control': 'no-store' } },
   )
 }

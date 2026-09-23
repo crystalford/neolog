@@ -38,6 +38,7 @@ import { requireOperatorFromHeaders } from '@/lib/access'
 import { lookAtHeldBacklog } from '@/lib/log-intake'
 import { drainUploadQueue } from '@/lib/upload-queue'
 import { headlineBacklog } from '@/lib/headline'
+import { loadRail } from '@/lib/rail'
 import type { FeedFilter } from '@/lib/log-entry'
 import type { D1Database } from '@cloudflare/workers-types'
 import LogHomeClient, { type InitialFeed } from './LogHomeClient'
@@ -79,6 +80,13 @@ export default async function LogHome({ searchParams }: {
       buried: payload.buried,
       coverage: payload.coverage,
       totals: payload.totals,
+      // ⚠️ 21 Sep — the four rail cards, read in THIS request rather than
+      // fetched on mount. `/` has rendered its feed server-side since
+      // 20 Sep; the rail did not move, so the operator's complaint —
+      // "the content loads after the site" — stayed half true for the
+      // column beside it. `src/lib/rail.ts` says why each card still fails
+      // alone.
+      rail: await loadRail(db, env as unknown as FeedEnv, operator.id),
       fold: payload.fold,
       buried_by_day: payload.buried_by_day,
     }

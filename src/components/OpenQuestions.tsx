@@ -22,7 +22,7 @@
  *     can trust.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 interface Question {
   id: string
@@ -33,8 +33,11 @@ interface Question {
   target_id: string | null
 }
 
-export function OpenQuestions({ onAnswered }: { onAnswered?: () => void }) {
-  const [questions, setQuestions] = useState<Question[]>([])
+export function OpenQuestions({ initial, onAnswered }: {
+  initial?: Question[] | null
+  onAnswered?: () => void
+}) {
+  const [questions, setQuestions] = useState<Question[]>(initial ?? [])
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -44,7 +47,15 @@ export function OpenQuestions({ onAnswered }: { onAnswered?: () => void }) {
       if (res.ok) setQuestions(((await res.json()) as { questions: Question[] }).questions || [])
     } catch { /* the card just doesn't show */ }
   }, [])
-  useEffect(() => { void load() }, [load])
+  // ⚠️ 21 Sep — the home page reads this in the request that renders it
+  // (`src/lib/rail.ts`), so the mount fetch is the fallback for a server
+  // read that fell back, not the normal path. Every other surface that
+  // renders this passes nothing and keeps the old behaviour.
+  const seeded = useRef(!!initial)
+  useEffect(() => {
+    if (seeded.current) { seeded.current = false; return }
+    void load()
+  }, [load])
 
   const answer = useCallback(async (id: string, body: Record<string, unknown>) => {
     setBusy(true)
