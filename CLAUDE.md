@@ -369,12 +369,35 @@ that 500s is the log being gone.
 **`/api/v2/onthisday` had been returning 500 on every request, forever.**
 It selected a column `r`; the column is `r2_key`. The rail card catches its
 own errors and hides itself, so *On This Day* silently never worked and
-nothing anywhere said so. ⚠️ `check-sql-columns.mjs` cannot see this class
-of bug: it validates **alias-qualified** references, and a query with no
-table alias has every bare name skipped. That is the same blind spot
-`check-dropped-tables.mjs` already learned about from the other side, and
-there may be more of them — the checker should resolve bare names against
-the single `FROM` table.
+nothing anywhere said so. ⚠️ `check-sql-columns.mjs` could not see this
+class of bug: it validated **alias-qualified** references, and a query with
+no table alias had every bare name skipped.
+
+⚠️ **21 Sep — it resolves bare names now, and there WAS another one.**
+`/api/v2/log/screenshots` selected `r` and filtered `AND r IS NOT NULL`, so
+every request to it threw `no such column: r` and **`/screenshots` had never
+once worked**. Found the day after `/onthisday`, by the same shape of bug,
+on a page nobody had loaded.
+
+A bare name is resolved only when exactly ONE table is in scope — the one
+case where it is unambiguous; a second table and the checker would rather
+say nothing than guess. Four things had to be stripped first, each found by
+the noise it produced: **SQL comments** (this repo's queries carry long
+explanations, and two of the first findings were the words "name" and
+"because" out of one — the lesson `check-dropped-tables.mjs` and
+`check-container-server.mjs` both learned); **`${…}` interpolations**, which
+are JavaScript, not SQL, and accounted for twenty-four findings; **`AS x`
+output labels**, since `COUNT(*) AS n` names a result and `n` came back
+nineteen times; and **a single-table query against a dropped table**, whose
+CREATE is still in the append-only `MIGRATIONS` array so its columns are
+still "known" while the table is gone.
+
+⚠️ **And one guard was exactly backwards.** A first version skipped any name
+that is a column of no table in the schema, reasoning that such a name is
+probably a keyword — which is precisely what `r` is, so the check passed
+cleanly with the original bug put back. The guard was removed and replaced
+with a real keyword list. **A check that cannot catch the bug it was written
+for is worse than none**; the only way to know is to put the bug back.
 
 **`/api/v2/triage` was signing sixty R2 URLs to produce one integer.** The
 rail card reads `total` and nothing else, and the endpoint was fetching

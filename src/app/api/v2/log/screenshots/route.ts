@@ -53,11 +53,22 @@ export async function GET(req: NextRequest) {
             COALESCE(date_precision, 'exact') AS date_precision,
             COALESCE(kind, 'seen') AS kind,
             COALESCE(visibility, 'public') AS visibility,
-            r, mime
+            -- 21 Sep: this read a column named r, which does not exist, so
+            -- EVERY request to this route threw "no such column: r" and
+            -- /screenshots had never once worked. The column is r2_key,
+            -- aliased back to r because the rows are read below as r.r.
+            -- Identical to the bug found on /api/v2/onthisday the day
+            -- before, and found the same way: by teaching
+            -- check-sql-columns.mjs to resolve a BARE name against the one
+            -- table in scope. It validated alias-qualified references only,
+            -- and a query with no table alias had every bare name skipped.
+            -- (And no backticks in here: this is inside a template literal,
+            -- which is how the /onthisday fix broke the build.)
+            r2_key AS r, mime
        FROM log_entries
       WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         AND transcript IS NOT NULL AND transcript <> ''
-        AND r IS NOT NULL
+        AND r2_key IS NOT NULL
         AND mime LIKE 'image/%'
       ORDER BY COALESCE(happened_at, occurred_at, created_at) DESC
       LIMIT 300`,

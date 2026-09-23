@@ -89,12 +89,62 @@ let checked = 0
 // same way the app does, and on 8 Sep every remaining reference to a dropped
 // table was in `workers/` — the app was clean and the checker said so,
 // because it had only ever looked at `src/`.
+/**
+ * Every column name in the schema, whatever table it is on.
+ *
+ * ⚠️ The guard that makes bare-name checking usable. A bare word in a query
+ * is usually a keyword, a function, a CTE label or an alias — reporting all
+ * of those would bury the real findings, which is the failure this repo has
+ * written down three times. A word that IS a column somewhere and is NOT a
+ * column of the one table in scope is the narrow, high-signal case: it
+ * reads as a column, it is spelled like a column, and it is on the wrong
+ * table or misspelled.
+ */
+const ANY_COLUMN = new Set([...tables.values()].flatMap(c => [...c]))
+
+/** Tables this product dropped on purpose — see `src/lib/dropped-tables.ts`. */
+const DROPPED = new Set(
+  (readFileSync(join(ROOT, 'src/lib/dropped-tables.ts'), 'utf8')
+    .match(/export const DROPPED_TABLES = \[([\s\S]*?)\]/)?.[1] || '')
+    .match(/'([a-z_][a-z0-9_]*)'/g)?.map(t => t.slice(1, -1)) || [],
+)
+
+/** SQL's own vocabulary, so it is never read as a column name. */
+const SQL_WORDS = new Set(`
+select from where and or not null is as on in by order group limit offset
+insert into values update set delete distinct join left right inner outer
+union all case when then else end desc asc count sum avg min max coalesce
+substr strftime length lower upper trim replace instr json_extract ifnull
+nullif abs round cast integer text real blob exists between like glob having
+returning conflict do nothing replace_ current_timestamp date datetime time
+julianday printf group_concat random abs total cte with recursive
+ignore collate nocase rtrim ltrim iif unique index table view trigger
+primary key foreign references default check constraint autoincrement
+alter add column drop create if not temp temporary begin commit rollback
+pragma vacuum analyze explain natural cross using full first last nulls
+
+`.trim().split(/\s+/))
+
 const ROOTS = [join(ROOT, 'src'), join(ROOT, 'workers')]
 for (const file of ROOTS.flatMap(r => { try { return walk(r) } catch { return [] } })) {
   const src = readFileSync(file, 'utf8')
   // Every backtick template that looks like SQL.
   for (const m of src.matchAll(/`([^`]*)`/g)) {
+    // ⚠️ SQL comments stripped first. This repo's queries carry long
+    // explanations inside them — `/api/v2/onthisday`'s says why it aliases
+    // `r2_key AS r` — and a bare-name pass reads every word of that prose
+    // as a possible column. Two of the first four findings were the words
+    // "name" and "because" out of a comment. The same lesson
+    // `check-dropped-tables.mjs` and `check-container-server.mjs` both
+    // learned, in the same order.
     const sql = m[1]
+      .replace(/--[^\n]*/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      // ⚠️ And every `${…}` interpolation. Those are JavaScript, not SQL:
+      // `${rangeSql}`, `${ph}`, `${IN_FLIGHT_STATUSES.join(…)}`. A bare-name
+      // pass read each one as a column and reported twenty-four of them.
+      // What they interpolate is a fragment this checker cannot see anyway.
+      .replace(/\$\{[^}]*\}/g, ' ')
     if (!SQL_START.test(sql)) continue
 
     // alias -> table, from FROM/JOIN/UPDATE clauses
@@ -109,6 +159,62 @@ for (const file of ROOTS.flatMap(r => { try { return walk(r) } catch { return []
       }
     }
     if (!aliases.size) continue
+
+    // ── Bare names, when there is exactly one table to resolve against ──
+    //
+    // ⚠️ 20 Sep — `/api/v2/onthisday` had been returning 500 on EVERY
+    // request, forever. It selected a column `r`; the column is `r2_key`.
+    // The rail card catches its own errors and hides itself, so On This Day
+    // silently never worked and nothing anywhere said so.
+    //
+    // This checker could not see it: it validated ALIAS-QUALIFIED
+    // references, and a query with no alias has every bare name skipped.
+    // That is the same blind spot `check-dropped-tables.mjs` learned about
+    // from the other side.
+    //
+    // A single-table query is the one case where a bare name is
+    // unambiguous, so that is the only case this resolves. The moment a
+    // second table is in scope the name could belong to either and the
+    // checker would rather say nothing than guess.
+    if (aliases.size === 1) {
+      const table = [...aliases.values()][0]
+      // ⚠️ A dropped table's CREATE is still in MIGRATIONS — the array is
+      // append-only — so its columns are still "known" while the table is
+      // gone. A later ALTER against one is an obsolete migration the runner
+      // already records and stops asking about (`isDroppedTableError`), not
+      // a wrong column name.
+      if (DROPPED.has(table)) continue
+      const cols = tables.get(table)
+      // Only the SELECT list and the WHERE/SET clauses — not the whole
+      // string, which carries keywords, function names and bound values.
+      // ⚠️ An OUTPUT label is not a column. `COUNT(*) AS n` names the
+      // result, and the first run of this reported `n` nineteen times out
+      // of twenty-six findings — exactly the "cries wolf" failure that
+      // teaches the next reader to skim. Every `AS x` in the query is
+      // collected and skipped.
+      const labels = new Set(
+        [...sql.matchAll(/\bAS\s+[`"]?(\w+)[`"]?/gi)].map(a => a[1].toLowerCase()),
+      )
+      const fields = sql
+        // A qualified name is handled below; strip it so its column half
+        // does not read as a bare one.
+        .replace(/\b[a-zA-Z]\w*\.\w+\b/g, ' ')
+        // String literals are values, not column names.
+        .replace(/'[^']*'/g, ' ')
+      for (const r of fields.matchAll(/\b([a-z_][a-z0-9_]*)\b/gi)) {
+        const name = r[1].toLowerCase()
+        if (SQL_WORDS.has(name)) continue
+        if (labels.has(name)) continue
+        if (tables.has(name)) continue
+        if (!cols || cols.has(name)) continue
+        checked++
+        const line = src.slice(0, m.index + sql.indexOf(r[0])).split('\n').length
+        problems.push(
+          `${file.replace(ROOT + '/', '')}:${line}  ${r[0]}  —  ` +
+          `${table} has no column "${name}" (un-aliased query)`,
+        )
+      }
+    }
 
     // qualified references: alias.column
     for (const r of sql.matchAll(/\b([a-zA-Z]\w*)\.(\w+)\b/g)) {
