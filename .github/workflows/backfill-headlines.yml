@@ -53,11 +53,15 @@ jobs:
             "$BASE_URL/api/v2/admin/headlines") || code=000
           echo "HTTP $code"
           if jq . /tmp/before.txt 2>/dev/null; then :; else
-            echo "not JSON — the first 600 bytes of what came back:"
-            head -c 600 /tmp/before.txt
+            echo "not JSON — the first 200 bytes of what came back:"
+            head -c 200 /tmp/before.txt
             echo ""
-            exit 1
           fi
+          # ⚠️ Never fatal. This step only READS a count; the work is the next
+          # one. A status query that fails should not stop four hundred
+          # recordings being read — the same reason every rail card catches
+          # its own error rather than taking the page down.
+          exit 0
 
       - name: Work through them
         env:
