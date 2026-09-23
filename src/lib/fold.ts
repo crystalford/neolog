@@ -177,6 +177,32 @@ export async function buildFold(
 
   const openFrom = new Date(now.getTime() - OPEN_DAYS * 86400000)
 
+  // ⚠️ 21 Sep — ALL THREE TABLES, not just `log_entries`.
+  //
+  // This counted entries alone while the feed draws from `log_entries`,
+  // `vlogs` and `photos`. It went unnoticed because the fold and the rows
+  // overlapped: an entry older than the window came back BOTH as an open row
+  // and inside the folded line counting it, so the recordings were on screen
+  // regardless — from the row half, which had no window at all.
+  //
+  // The moment the window was applied (20 Sep) the log emptied: four hundred
+  // recordings, all months old, hidden by the window and standing for by
+  // nothing, because the fold had never counted one of them. `/api/v2/log`
+  // went from 563 KB to 145 bytes. It was reverted within minutes and the
+  // reasoning left in `feed.ts` at the place the window would go.
+  //
+  // So the fold covers what the feed covers now. `vlogs` and `photos` carry
+  // the two times under different names, which is why the column expression
+  // is rewritten per table — the same rewrite `feed.ts` does for its own
+  // range clause, and `loadFeed`'s coverage query already does exactly this
+  // three-way UNION for the year bars.
+  const vlogCol = dateCol
+    .replace('COALESCE(happened_at, occurred_at, created_at)', 'COALESCE(recorded_at, created_at)')
+    .replace('COALESCE(logged_at, created_at)', 'created_at')
+  const photoCol = dateCol
+    .replace('COALESCE(happened_at, occurred_at, created_at)', 'COALESCE(taken_at, created_at)')
+    .replace('COALESCE(logged_at, created_at)', 'created_at')
+
   // One pass over the whole log, by day. Cheap, and everything below is
   // arithmetic on the result rather than more queries.
   const days = await findMany<{ d: string; n: number }>(
@@ -185,7 +211,22 @@ export async function buildFold(
        FROM log_entries
       WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         AND ${dateCol} < ?
-      GROUP BY d ORDER BY d DESC`,
+      GROUP BY d
+     UNION ALL
+     SELECT substr(${vlogCol}, 1, 10) AS d, COUNT(*) AS n
+       FROM vlogs
+      WHERE operator_id = ? AND deleted_at IS NULL
+        AND ${vlogCol} < ?
+      GROUP BY d
+     UNION ALL
+     SELECT substr(${photoCol}, 1, 10) AS d, COUNT(*) AS n
+       FROM photos
+      WHERE operator_id = ? AND deleted_at IS NULL
+        AND ${photoCol} < ?
+      GROUP BY d
+     ORDER BY d DESC`,
+    operatorId, openFrom.toISOString(),
+    operatorId, openFrom.toISOString(),
     operatorId, openFrom.toISOString(),
   )
   if (!days.length) return []
@@ -250,6 +291,13 @@ export async function buildFold(
   // ── One real line per period ───────────────────────────────────────────
   // The longest thing HE said in it. Not a summary of the period — a
   // sentence out of it, so the line you remember is the one you can click.
+  //
+  // ⚠️ `log_entries` and `author = 'operator'` ONLY, and deliberately so,
+  // even now that the counts above cover three tables. A recording has no
+  // sentence of his in it; the log's line about one ("Recorded 22 minutes of
+  // video") is the log's, and putting it here would make a folded period
+  // read as though he had written it. A period whose only content is
+  // recordings gets its count and no line, which is the honest answer.
   //
   // ONE query, not one per bucket. This runs on every load of the home page,
   // and with entries going back to 2001 there are around fifty buckets — so
