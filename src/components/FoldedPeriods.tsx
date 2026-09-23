@@ -32,6 +32,36 @@ export interface FoldBucket {
   spans: number
   line: string | null
   line_entry_id: string | null
+  kinds?: { entries: number; recordings: number; photos: number }
+}
+
+/**
+ * What a folded period is made of, when there is no line out of it.
+ *
+ * ⚠️ 21 Sep — this row used to read "Nothing written in words — files and
+ * photos only" whenever the period held no typed entry. The fold counted
+ * only `log_entries` then, so that was true by construction. It counts
+ * recordings now, and this operator's log is four hundred of them: every
+ * folded month would have said "files and photos only" over a hundred and
+ * ten recordings, and once the open window cut those rows it would have
+ * been the ONLY thing on the home page.
+ *
+ * A count with the noun it counts. Nothing is described and nothing is
+ * summarised — the words come from which of three numbers is non-zero.
+ */
+function madeOf(k: FoldBucket['kinds']): string {
+  if (!k) return 'Nothing written in words.'
+  const parts: string[] = []
+  if (k.recordings) parts.push(`${k.recordings} recording${k.recordings === 1 ? '' : 's'}`)
+  if (k.photos) parts.push(`${k.photos} photo${k.photos === 1 ? '' : 's'}`)
+  if (k.entries) parts.push(`${k.entries} written down`)
+  if (!parts.length) return 'Nothing written in words.'
+  const list = parts.length === 1
+    ? parts[0]
+    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+  // A period made only of recordings or files has no sentence of his in it,
+  // and saying so is the point — not an absence, a description.
+  return k.entries ? list : `${list}, none written down`
 }
 
 const BAND: Record<FoldBucket['grain'], string> = {
@@ -100,7 +130,7 @@ export function FoldedPeriods({ fold, order, onImage }: {
                 >
                   <span className="fl">{b.label}</span>
                   <span className="fs">
-                    {b.line || <em>Nothing written in words — files and photos only.</em>}
+                    {b.line || <em>{madeOf(b.kinds)}</em>}
                   </span>
                   <span className="fc">
                     {/* A band says how many years it stands for as well as

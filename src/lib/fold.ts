@@ -51,6 +51,20 @@ export interface FoldBucket {
   /** The longest thing said in that period, verbatim. Never a synthesis. */
   line: string | null
   line_entry_id: string | null
+  /**
+   * What the count is made of.
+   *
+   * ⚠️ 21 Sep — the fold used to count `log_entries` alone, so a period with
+   * no line could only be files and photos and the row said so in words. Now
+   * it counts recordings too, and this operator's log is four hundred of
+   * them: every folded period would have read "Nothing written in words —
+   * files and photos only" over a count of a hundred and ten recordings.
+   *
+   * A folded line standing for a hundred recordings has to say so. This is
+   * three counts, not a description — the row composes the words, and it can
+   * only ever name what is actually there.
+   */
+  kinds?: { entries: number; recordings: number; photos: number }
 }
 
 const MONTHS = [
@@ -205,21 +219,21 @@ export async function buildFold(
 
   // One pass over the whole log, by day. Cheap, and everything below is
   // arithmetic on the result rather than more queries.
-  const days = await findMany<{ d: string; n: number }>(
+  const days = await findMany<{ d: string; n: number; k: string }>(
     db,
-    `SELECT substr(${dateCol}, 1, 10) AS d, COUNT(*) AS n
+    `SELECT substr(${dateCol}, 1, 10) AS d, COUNT(*) AS n, 'entries' AS k
        FROM log_entries
       WHERE operator_id = ? AND deleted_at IS NULL AND buried_at IS NULL
         AND ${dateCol} < ?
       GROUP BY d
      UNION ALL
-     SELECT substr(${vlogCol}, 1, 10) AS d, COUNT(*) AS n
+     SELECT substr(${vlogCol}, 1, 10) AS d, COUNT(*) AS n, 'recordings' AS k
        FROM vlogs
       WHERE operator_id = ? AND deleted_at IS NULL
         AND ${vlogCol} < ?
       GROUP BY d
      UNION ALL
-     SELECT substr(${photoCol}, 1, 10) AS d, COUNT(*) AS n
+     SELECT substr(${photoCol}, 1, 10) AS d, COUNT(*) AS n, 'photos' AS k
        FROM photos
       WHERE operator_id = ? AND deleted_at IS NULL
         AND ${photoCol} < ?
@@ -232,7 +246,42 @@ export async function buildFold(
   if (!days.length) return []
 
   const counts = new Map<string, number>()
-  for (const r of days) if (r.d) counts.set(r.d, (counts.get(r.d) || 0) + r.n)
+  // And the same totals split by where they came from, so a folded line can
+  // say what it stands for rather than what it is not.
+  const kindsByDay = new Map<string, { entries: number; recordings: number; photos: number }>()
+  for (const r of days) {
+    if (!r.d) continue
+    counts.set(r.d, (counts.get(r.d) || 0) + r.n)
+    const k = kindsByDay.get(r.d) || { entries: 0, recordings: 0, photos: 0 }
+    if (r.k === 'recordings') k.recordings += r.n
+    else if (r.k === 'photos') k.photos += r.n
+    else k.entries += r.n
+    kindsByDay.set(r.d, k)
+  }
+
+  /** What a span is made of, summed off the per-day split. */
+  const kindsIn = (from: Date, to: Date) => {
+    const k = { entries: 0, recordings: 0, photos: 0 }
+    for (let d = new Date(from); d <= to; d = new Date(d.getTime() + 86400000)) {
+      const got = kindsByDay.get(iso(d))
+      if (!got) continue
+      k.entries += got.entries
+      k.recordings += got.recordings
+      k.photos += got.photos
+    }
+    return k
+  }
+  const kindsInYears = (fromYear: number, toYear: number) => {
+    const k = { entries: 0, recordings: 0, photos: 0 }
+    for (const [d, got] of kindsByDay) {
+      const y = parseInt(d.slice(0, 4), 10)
+      if (isNaN(y) || y < fromYear || y > toYear) continue
+      k.entries += got.entries
+      k.recordings += got.recordings
+      k.photos += got.photos
+    }
+    return k
+  }
 
   const buckets: FoldBucket[] = []
   const oldest = new Date(`${days[days.length - 1].d}T00:00:00Z`)
@@ -253,6 +302,7 @@ export async function buildFold(
       buckets.push({
         grain: 'week', from: iso(from), to: iso(to),
         label: labelRange(from, to), count: n, spans: 1, line: null, line_entry_id: null,
+        kinds: kindsIn(from, to),
       })
     }
     cursor = new Date(from.getTime() - 86400000)
@@ -273,6 +323,7 @@ export async function buildFold(
         grain: 'month', from: iso(from), to: iso(capped),
         label: `${MONTHS[from.getUTCMonth()]} ${from.getUTCFullYear()}`,
         count: n, spans: 1, line: null, line_entry_id: null,
+        kinds: kindsIn(from, capped),
       })
     }
     m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - 1, 1))
@@ -286,7 +337,18 @@ export async function buildFold(
     if (y >= monthsBack.getUTCFullYear()) continue
     byYear.set(y, (byYear.get(y) || 0) + n)
   }
-  for (const b of bandYears(byYear)) buckets.push(b)
+  // ⚠️ `bandYears` is pure and takes only year counts — it is tested on its
+  // own and stays that way. What it cannot know is what a year is MADE of,
+  // so the split is attached here, where the per-day breakdown is in scope.
+  for (const b of bandYears(byYear)) {
+    buckets.push({
+      ...b,
+      kinds: kindsInYears(
+        parseInt(b.from.slice(0, 4), 10),
+        parseInt(b.to.slice(0, 4), 10),
+      ),
+    })
+  }
 
   // ── One real line per period ───────────────────────────────────────────
   // The longest thing HE said in it. Not a summary of the period — a

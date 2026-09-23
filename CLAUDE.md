@@ -447,11 +447,46 @@ tables' rows were being cut.**
 
 Caught by re-running the probe against the deploy, not by any check: `tsc`
 is happy, every column exists, every value is legal, and the page renders
-perfectly — empty. The duplication is back, because showing the recordings
-twice is a great deal better than not showing them at all, and the window
-waits on the fold covering what the feed covers. The reasoning sits in
-`feed.ts` at the place the window would go, so the next attempt starts from
-it rather than rediscovering it.
+perfectly — empty.
+
+**⚠️ 21 Sep — done, as two separate deploys.** `buildFold`'s day query is a
+three-way UNION over `log_entries`, `vlogs` and `photos` now, the same shape
+`loadFeed`'s coverage query already used for the year bars, with the column
+expression rewritten per table because `vlogs` and `photos` carry the two
+times under different names. **That shipped and deployed on its own**, and
+the fold's live counts were read against the corpus before the window went
+anywhere near the row queries — the last attempt shipped both at once and
+there was no way to tell which half was wrong.
+
+The window is `AND ${dateCol} >= ?` on all three row queries, gated on the
+same `foldable` flag that decides whether a fold exists at all. ⚠️ That gate
+is the rule, not a convenience: a filtered or searched feed has no fold under
+it, so a window there would hide rows with nothing standing for them — the
+same failure, one condition along.
+
+⚠️ **The sample line stays `log_entries` + `author = 'operator'`.** A
+recording has no sentence of his in it, and the log's line about one —
+*"Recorded 22 minutes of video"* — is the log's. Putting it in a folded
+period would make the period read as though he had written it.
+
+⚠️ **So a folded period says what it HOLDS, not what it lacks.** The row
+used to read *"Nothing written in words — files and photos only"* whenever
+a period had no typed entry, which was true by construction while the fold
+counted `log_entries` alone. It counts recordings now, and this log is four
+hundred of them: every folded month would have said *"files and photos
+only"* over a hundred and ten recordings — and once the window cut those
+rows, that sentence was the only thing left on the home page. `FoldBucket`
+carries `kinds` (three counts, split off the same UNION) and the row
+composes *"110 recordings, none written down"*. Nothing is described and
+nothing is summarised; the words come from which of three numbers is
+non-zero. ⚠️ `bandYears` stays pure and takes year counts only — it is
+tested on its own — so the split is attached where it is consumed, which is
+the one place the per-day breakdown is in scope.
+
+**Measured before shipping the window**: the fold's live counts came back
+**420** across nine buckets, against **199 of the 200** open rows falling
+outside the window. Every row the window hides is one the fold already
+stands for. That is the number the 20 Sep attempt never had.
 
 ### ⚠️ 21 Sep — a selector that reaches nothing, eight times, and nothing could see it
 
