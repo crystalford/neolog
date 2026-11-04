@@ -19,7 +19,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
-import { CapturePanel } from '@/components/CapturePanel'
 
 interface VlogRow {
   id: string
@@ -51,7 +50,6 @@ export default function Recordings() {
   const [vlogs, setVlogs] = useState<VlogRow[]>([])
   const [loading, setLoading] = useState(true)
   const [q, setQ] = useState('')
-  const [open, setOpen] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -138,15 +136,16 @@ export default function Recordings() {
           </div>
         )}
 
+        {/* ⚠️ 4 Nov — a LINK to `/upload`, not a panel that unfolds here.
+            It used to be `CapturePanel` behind this button, and that is how
+            the operator ended up on the composer's drop-then-post flow
+            instead: *"we broke or buried the simple bulk uploader."* An
+            uploader you have to know to unfold is an uploader you do not
+            find. It has its own page now, and this is a door to it rather
+            than a second copy of it. */}
         <div className="paste">
           <div className="bar">
-            {/* ⚠️ 20 Sep — "Add a recording" read as one file at a time, so
-                the operator went looking for a bulk uploader that had been
-                sitting behind this button all along. It takes as many as you
-                drop, with progress on each. The label says so now. */}
-            <button className="p" onClick={() => setOpen(v => !v)}>
-              {open ? 'Not now' : 'Put recordings in'}
-            </button>
+            <Link href="/upload"><button className="p">Put recordings in</button></Link>
             <input
               value={q}
               onChange={e => setQ(e.target.value)}
@@ -158,7 +157,6 @@ export default function Recordings() {
               }}
             />
           </div>
-          {open && <div style={{ marginTop: 14 }}><CapturePanel onUploaded={() => { void load() }} /></div>}
         </div>
 
         {loading && <div className="none">Reading the log.</div>}

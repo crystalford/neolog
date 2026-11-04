@@ -4378,3 +4378,84 @@ input, textarea { font-family: inherit; outline: none; border: none; background:
   .logpage.pg-connections .ends .nx { text-align:left!important; }
 }
 
+
+/* ── Putting recordings in (/upload) ──────────────────────────────────────
+   ⚠️ 4 Nov. Not a page in the design package — `app.html` is declined (a
+   native app) and `connections.html` draws doors, not a progress list. So
+   this is written in the package's own vocabulary rather than transcribed
+   from a page: the four binding rules from `plain.css` hold (nothing under
+   10.5px, no uppercase letterspaced labels, no accent stripe on a card
+   edge, the 708 column), and every value is a token.
+
+   The operator asked for "more like youtube than X" — which in layout terms
+   means a row per file with its own bar and its own state, not a feed item
+   you compose and post. */
+
+.logpage.pg-upload .lede { font-size:14.5px; color:var(--fg-2); line-height:1.6; max-width:62ch; margin-top:10px; }
+
+/* The drop zone. A dashed edge because it is a target rather than a card —
+   and a target the whole point of which is that dropping on it IS the
+   action, with nothing to press afterwards. */
+.logpage.pg-upload .drop {
+  margin-top:26px; padding:38px 24px; border:1px dashed var(--line-2);
+  border-radius:12px; background:var(--bg-1); cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+  text-align:center; transition:border-color .12s, background .12s;
+}
+.logpage.pg-upload .drop:hover,
+.logpage.pg-upload .drop:focus-visible { border-color:var(--line-3); background:var(--bg-2); outline:none; }
+.logpage.pg-upload .drop.over { border-color:var(--sig); background:var(--bg-2); }
+.logpage.pg-upload .drop b { font-size:15px; font-weight:450; color:var(--fg); }
+.logpage.pg-upload .drop span { font-size:13px; color:var(--fg-3); }
+
+/* One bar for the whole drop. Thirty rows is not a sense of how far along
+   thirty files are. */
+.logpage.pg-upload .allbar {
+  height:3px; border-radius:2px; background:var(--line); overflow:hidden; margin:4px 0 18px;
+}
+.logpage.pg-upload .allbar i { display:block; height:100%; background:var(--sig); transition:width .3s ease; }
+
+/* A row per file: name, bar, state, action — and the reason underneath when
+   there is one. */
+.logpage.pg-upload .ups { border:1px solid var(--line-1); border-radius:12px; overflow:hidden; }
+.logpage.pg-upload .up {
+  display:grid; grid-template-columns:minmax(0,1fr) 150px 64px 78px;
+  gap:16px; align-items:center; padding:13px 18px;
+  border-bottom:1px solid var(--line);
+}
+.logpage.pg-upload .up:last-child { border-bottom:0; }
+.logpage.pg-upload .up .nm { min-width:0; font-size:13.5px; color:var(--fg-1); }
+.logpage.pg-upload .up .nm a { color:var(--fg); border-bottom:1px solid var(--line-2); }
+.logpage.pg-upload .up .nm em {
+  display:block; font-style:normal; font-size:12px; color:var(--fg-4); margin-top:3px;
+}
+.logpage.pg-upload .up .pr { height:3px; border-radius:2px; background:var(--line); overflow:hidden; }
+.logpage.pg-upload .up .pr i { display:block; height:100%; background:var(--sig); transition:width .25s ease; }
+.logpage.pg-upload .up .st { font-family:var(--mono); font-size:11.5px; color:var(--fg-3); text-align:right; }
+.logpage.pg-upload .up .ac { text-align:right; }
+.logpage.pg-upload .up .ac button {
+  font-size:12px; color:var(--fg-3); border:1px solid var(--line-2);
+  border-radius:6px; padding:5px 9px; background:transparent; white-space:nowrap;
+}
+.logpage.pg-upload .up .ac button:hover { color:var(--fg); border-color:var(--line-3); }
+
+/* ⚠️ The reason, in words, spanning the row. "upload failed" with nothing
+   after it is what he had, and it is why a dead connection and a refused
+   file looked the same. */
+.logpage.pg-upload .up .er {
+  grid-column:1 / -1; font-size:12.5px; color:var(--t-ochre);
+  line-height:1.5; margin-top:2px;
+}
+
+.logpage.pg-upload .up.s-done .pr i { background:var(--t-teal); }
+.logpage.pg-upload .up.s-done .st { color:var(--t-teal); }
+.logpage.pg-upload .up.s-failed .pr i { background:var(--t-ochre); }
+.logpage.pg-upload .up.s-failed .st { color:var(--t-ochre); }
+.logpage.pg-upload .up.s-paused .st { color:var(--fg-4); }
+
+@media (max-width: 720px) {
+  /* The bar is the first thing to go: on a phone the name and the state are
+     what he is reading, and 150px of track is most of the row. */
+  .logpage.pg-upload .up { grid-template-columns:minmax(0,1fr) 58px 72px; }
+  .logpage.pg-upload .up .pr { display:none; }
+}

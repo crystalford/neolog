@@ -29,8 +29,9 @@ interface Env extends R2Env {
 export async function POST(req: NextRequest) {
   const env = getCloudflareContext().env as unknown as Env
 
+  let operator
   try {
-    await requireOperator(req, env)
+    operator = await requireOperator(req, env)
   } catch (e) {
     if (e instanceof UnauthenticatedError) {
       return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 })
@@ -43,6 +44,16 @@ export async function POST(req: NextRequest) {
     | null
   if (!body || !body.uploadId || !body.key || !Array.isArray(body.parts) || body.parts.length === 0) {
     return NextResponse.json({ error: 'uploadId, key, parts[] required' }, { status: 400 })
+  }
+
+  // ⚠️ 4 Nov — his own prefix, and nothing else. `key` arrives from the
+  // browser and this route had taken it on trust, so a crafted body could
+  // seal a multipart upload against any object in the bucket. `/initiate`
+  // builds every key as `{operator_id}/uploads/{ulid}/{name}`; anything that
+  // does not start that way was not minted here. The same guard is on
+  // `/parts`, which signs rather than seals and would be worse.
+  if (!body.key.startsWith(`${operator.id}/uploads/`)) {
+    return NextResponse.json({ error: 'not your upload' }, { status: 403 })
   }
 
   // Sort parts and basic validation

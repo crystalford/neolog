@@ -772,6 +772,93 @@ the nav is a claim that it belongs to this product. Nothing had rendered
 that component since the design package was vendored, and it took one
 screenshot to see it. **Look at a page before you put it in front of him.**
 
+### ⚠️ 4 Nov — the uploader, rebuilt: one surface, resumable, no post step
+
+The operator, after a batch of thirty failed part-way:
+
+> *"I hate the new upload via timeline / post thing… when we pivoted back to
+> the more social media feed style, we broke or buried the simple bulk
+> uploader… this should be more like youtube than X… some of the bigger
+> files failed… the post version is just annoying because I have to drag
+> them all and then post or whatever instead of just uploading them like any
+> normal site would have."*
+
+Both halves were true, and they were **two different bugs in two different
+uploaders.**
+
+**The composer did a single PUT of the whole file.** `useIntake`'s attach
+presigned one URL and did `fetch(url, { method:'PUT', body: file })`. For a
+1.2 GB recording that is one request that has to survive twenty minutes with
+no progress, no retry and no resume — and when it died the entry said
+`upload failed` and nothing else. **That is the path he was on**, because it
+was the one in front of him.
+
+**`CapturePanel` did it properly and still had a clock on it.** Real
+multipart with per-part retry — but `/initiate` presigned EVERY part up
+front with a one-hour TTL, so the clock on part 25 started before part 1 had
+moved a byte. On a slow upstream the later parts expire mid-flight and come
+back 403 after twenty minutes of successful uploading. And one failed part
+failed the whole file, from zero, with a gigabyte already sent.
+
+⚠️ **Two uploaders is the actual root cause.** CLAUDE.md already records the
+same shape for `transcribe.ts` and `whisper.ts` — *"two implementations of
+one call is the bug; the fix is deleting the second one."* `CapturePanel`
+was 865 lines reachable only by unfolding a button on `/vlogs`, so the one
+he found was the one that could not do the job. **It is deleted.** There is
+one uploader.
+
+**`/upload` is it, and choosing a file starts it.** No compose box, no post
+step, no caption field — §0 rule 6, never ask a question at the moment of
+input. A row per file with its own bar, its own state and, when something
+goes wrong, **the reason in words on the row.**
+
+`src/lib/bulk-upload.ts` is the engine, and three things make it reliable:
+
+- **Parts are presigned a window at a time** (`POST /api/v2/upload/parts`),
+  eight ahead of where the browser is, so a URL is never old when it is
+  spent. The TTL stops being a number to tune.
+- **A part that fails is retried; a FILE that fails is resumable.** Every
+  accepted part's number and ETag go in a ledger in `localStorage` keyed by
+  the file's name, size and mtime. Re-add the same file after a reload, a
+  crash or a closed laptop and only the missing parts are sent. R2 keeps an
+  incomplete multipart upload for **seven days**, which is what the ledger's
+  own expiry is set to.
+- **The file is never read whole.** Only `Blob.slice()`, one part at a time.
+
+⚠️ **R2 requires every part except the last to be the SAME size**, and
+rejects a mixed-size upload at complete — after everything has been sent. So
+the size is computed once from the file's own length, stored in the ledger,
+and reused on resume rather than recomputed.
+
+⚠️ **The Workers R2 binding has no ListParts.** `resumeMultipartUpload`
+gives `.complete()` and `.abort()` and nothing that asks R2 what it already
+holds, so the ledger is ours rather than R2's. That is fine — the ETags
+`complete` needs are exactly what we recorded — and when the two disagree
+the complete is rejected, the ledger is dropped, and the row says the file
+is starting over and why.
+
+**Two security holes closed on the way.** `/parts` signs a PUT for whatever
+`key` the browser sends, and `/complete` sealed one — neither checked the
+key was the operator's own. Both require the `{operator_id}/uploads/`
+prefix now. The signing one would have been worse.
+
+**The composer keeps the single PUT, with a ceiling.** For a note, a photo
+or a voice clip it is right: one round trip, nothing to resume. Past 200 MB
+it refuses and **names the surface that can do it** — a failure that does
+not say where to go is the one he had.
+
+**What went with `CapturePanel`, and why:** browser-side audio chunking
+(`browser-audio.ts` and `/api/v2/upload/audio-chunk-presign`) — the
+container's `/extract-audio` does this in the pipeline, and the browser
+branch only ever fired for audio-only uploads; and slideshow mode
+(`/api/v2/upload/slideshow-frame-presign`), which is in no design page and
+on no surface this file records. Browser thumbnail capture went too: the
+three-tier ffmpeg cascade is the documented standard and runs in 2–5
+seconds. The duplicate check did NOT go — it is wired into the new uploader
+and runs **before a byte moves**, which is exactly the bulk case where
+re-dropping a folder would otherwise cost the bandwidth twice.
+
+
 ### ⚠️ 20 Sep — the bulk uploader was never missing, it was unreachable
 
 The operator: *"where is the upload video like there used to be a bulk
@@ -2339,6 +2426,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | Label | Route | What it is |
 |---|---|---|
 | **Log** | `/` | **Home — the log.** The composer on top (type, talk, drop files in; auto-grows from one line to a chapter; a `when` control for backdating with a precision — *that day / that month / that year* — so "2008 was a huge year" doesn't have to pretend to a day). Then the receipt: one line, one undo. Then search, the eight-way filter toolbar, the order toggle (*when it happened* / *when I logged it*), and the day-grouped feed. The rail carries the written-down bar (coverage by year — the door to thin years) and what arrived on its own. |
+| **Put recordings in** | `/upload` | **The uploader.** Choosing files starts them — no post step, no caption field, nothing to press afterwards. A row per file with its own bar and, when something goes wrong, the reason in words on the row. Multipart with lazily presigned parts and a resumable ledger (`src/lib/bulk-upload.ts`); re-add a file that stopped and only the missing parts go. Reached from `/vlogs`. |
 | **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
 | **Names and places** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |
@@ -2425,7 +2513,7 @@ over a decade and over one year are different facts. Opening one says out
 loud when it is showing 500 of more.
 
 **Detail pages** (reached from nav-page cards or deep-linked):
-- `/vlogs` — the recordings themselves, reached from the avatar dropdown.
+- `/vlogs` — the recordings themselves, in the masthead. The door to `/upload`.
 - `/vlog/[id]` — one recording, whole: **titled by what it is about** (21 Sep
   — the H1 was the filename), the video played from R2 untouched, the
   word-timestamped transcript following the playhead (click a word to fix
@@ -2922,6 +3010,7 @@ If you're looking to add or change a generator/pipeline step, start here. **Do n
 | `models.ts` | `callReasoning()` — the one place a model writes prose, used by `/search` and `/month`, where every sentence's citations are checked in code before it is shown. ⚠️ Not a door for new generators: there are three places a model runs and a fourth needs a reason written next to it. |
 | `rail.ts` | **The four cards beside the log**, read in the request that renders `/` rather than fetched on mount. `awaySummary` · `onThisDay` · `triageCount`, plus `clearSummary` and `openQuestions` from their own libs. ⚠️ Each read fails alone — a card that hides itself is the design; a rail that takes the feed down is not. |
 | `feed.ts` | **The feed.** `loadFeed()` over `log_entries` + `vlogs` + `photos`, called by `GET /api/v2/log` and by the server-rendered home page. One feed, one query, two callers — §0.1 forbids a second authored feed, not a second caller. ⚠️ Read the open-window note in it before touching the row limit. |
+| `bulk-upload.ts` | **Putting a big file in.** Multipart against R2 with parts presigned a window ahead, per-part retry, and a ledger in `localStorage` so a file that stops resumes rather than restarting. ⚠️ Read its header before changing it — R2 needs uniform part sizes and the Workers binding has no ListParts, and both of those shape the design. |
 | `upload-queue.ts` | **A bulk drop, drained three at a time.** Registered-but-not-dispatched recordings (`uploaded` + `dispatched_at IS NULL`) handed to the pipeline as there is room, from the uploader, `/vlogs` and the home page's `waitUntil`. ⚠️ Passes `useStart: true` — without it Whisper never runs. |
 | `llm.ts` | `callChat()` — the vision call shape (`src/lib/vision.ts`, the hold-back check) and the headline. |
 | `headline.ts` | **One line saying what a recording is about**, from its own transcript, written into `vlogs.headline` and rendered by `feed.ts` in the slot `vlogSentence()` already owned. ⚠️ Read its header before changing anything: it is a model writing a sentence, and the argument for why that is allowed here — and the five ways it went wrong — are all in it. |

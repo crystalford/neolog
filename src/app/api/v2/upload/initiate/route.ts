@@ -1,39 +1,36 @@
 /**
  * POST /api/v2/upload/initiate
  *
- * Begins an R2 multipart upload for a new vlog. Returns presigned PUT URLs
- * for each part — the browser uploads chunks directly to R2 without proxying
- * through the Worker.
+ * Opens an R2 multipart upload and says where it lives. That is all it does.
  *
- * Body: { fileName, fileSize, mimeType }
- * Returns: { uploadId, key, partUrls, totalParts, partSize }
+ * ⚠️ 4 Nov — it used to presign EVERY part here and hand back the lot. For a
+ * 1.2 GB recording that is twenty-five URLs whose one-hour clock starts
+ * before the first byte moves, so on a slow upstream the later parts come
+ * back 403 after twenty minutes of successful uploading. Parts are presigned
+ * a window at a time now, by `/api/v2/upload/parts`, just before they are
+ * spent.
  *
- * Subsequent flow:
- *   1. Browser PUTs each chunk to its presigned URL
- *   2. Browser collects ETag from each part response
- *   3. Browser POSTs { uploadId, key, parts: [...] } to /api/v2/upload/complete
- *   4. Browser POSTs vlog metadata to /api/v2/vlogs to register the row in D1
+ * Body: { filename, contentType, size, partSize }
+ * Returns: { uploadId, key, partSize, totalParts }
+ *
+ * Then: the browser PUTs each part to a URL from `/parts`, POSTs the ETags
+ * to `/complete`, and registers the row with `POST /api/v2/vlogs`.
  */
 
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
-import {
-  createMultipartUpload,
-  presignMultipartPartUrl,
-  type R2Env,
-} from '@/lib/r2'
+import { createMultipartUpload, type R2Env } from '@/lib/r2'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { ulid } from '@/lib/ulid'
 import type { D1Database } from '@cloudflare/workers-types'
 
-const PART_SIZE = 50 * 1024 * 1024 // 50 MB per part — matches browser-side PART_SIZE
-const MAX_PARTS = 200             // 10 GB ceiling per upload
-const VALID_MIMES = new Set([
-  'video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo', 'video/x-matroska',
-  'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/webm', 'audio/ogg', 'audio/x-m4a',
-])
+/** R2's own floor. A smaller part is rejected at complete, not at upload. */
+const MIN_PART = 5 * 1024 * 1024
+const MAX_PART = 512 * 1024 * 1024
+/** R2 allows 10,000; this is the point past which something is wrong. */
+const MAX_PARTS = 2000
 
 interface Env extends R2Env {
   DB: D1Database
@@ -41,7 +38,6 @@ interface Env extends R2Env {
 }
 
 function safeFilename(name: string): string {
-  // Strip directory components, replace whitespace + non-printable, cap length
   const base = name.split(/[\\/]/).pop() || 'upload'
   return base.replace(/[^\w.\-]+/g, '_').slice(0, 120) || 'upload'
 }
@@ -60,39 +56,53 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null) as
-    | { fileName?: string; fileSize?: number; mimeType?: string }
+    | { filename?: string; contentType?: string; size?: number; partSize?: number }
     | null
-  if (!body || !body.fileName || !body.fileSize || !body.mimeType) {
-    return NextResponse.json({ error: 'fileName, fileSize, mimeType required' }, { status: 400 })
-  }
-  if (!VALID_MIMES.has(body.mimeType)) {
-    return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 })
+  if (!body?.filename || !body?.size || !body?.partSize) {
+    return NextResponse.json(
+      { error: 'filename, size and partSize are required' },
+      { status: 400 },
+    )
   }
 
-  const totalParts = Math.ceil(body.fileSize / PART_SIZE)
+  // ⚠️ A kind, not a list of codecs. The old allowlist named nine exact mime
+  // types and a recording the browser labelled anything else — or labelled
+  // nothing at all, which happens on a drag from some file managers — was
+  // refused at the door with "Unsupported file type". A recording is a
+  // recording.
+  const contentType = body.contentType || 'application/octet-stream'
+  const kind = contentType.split('/')[0]
+  if (kind !== 'video' && kind !== 'audio' && contentType !== 'application/octet-stream') {
+    return NextResponse.json(
+      { error: `This takes video and audio. That one is ${contentType}.` },
+      { status: 400 },
+    )
+  }
+
+  if (body.partSize < MIN_PART || body.partSize > MAX_PART) {
+    return NextResponse.json(
+      { error: `partSize must be between ${MIN_PART} and ${MAX_PART} bytes` },
+      { status: 400 },
+    )
+  }
+  const totalParts = Math.max(1, Math.ceil(body.size / body.partSize))
   if (totalParts > MAX_PARTS) {
-    return NextResponse.json({ error: `File too large (>${MAX_PARTS * PART_SIZE} bytes)` }, { status: 400 })
+    return NextResponse.json(
+      { error: 'That file is larger than this takes in one piece.' },
+      { status: 400 },
+    )
   }
 
-  // R2 key: operator-prefixed for clean isolation per operator.
-  // Pattern: {operator_id}/uploads/{ulid}/{safe-filename}
-  const uploadUlid = ulid()
-  const key = `${operator.id}/uploads/${uploadUlid}/${safeFilename(body.fileName)}`
-
+  // {operator_id}/uploads/{ulid}/{safe-filename}
+  const key = `${operator.id}/uploads/${ulid()}/${safeFilename(body.filename)}`
   const uploadId = await createMultipartUpload(env, key, {
-    httpMetadata: { contentType: body.mimeType },
+    httpMetadata: { contentType },
   })
-
-  const partUrls: string[] = []
-  for (let part = 1; part <= totalParts; part++) {
-    partUrls.push(await presignMultipartPartUrl(env, key, uploadId, part, 3600))
-  }
 
   return NextResponse.json({
     uploadId,
     key,
-    partUrls,
+    partSize: body.partSize,
     totalParts,
-    partSize: PART_SIZE,
   })
 }

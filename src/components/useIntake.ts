@@ -68,6 +68,21 @@ export function useIntake(onDone?: () => void) {
    * — EXIF for an image, media metadata for audio and video — because the
    * operator is never asked to date a file.
    */
+/**
+ * Past this, the composer sends him to `/upload` instead of trying.
+ *
+ * ⚠️ 200 MB, not a number about R2 — a single PUT can carry 5 GB and the
+ * question is not whether R2 accepts it. It is whether ONE request with no
+ * progress, no retry and no resume is an honest way to move a file. At a
+ * couple of hundred megabytes it still is; at a gigabyte it is a coin flip
+ * the operator already lost.
+ */
+const BIG_FILE = 200 * 1024 * 1024
+
+function humanSize(n: number): string {
+  return n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`
+}
+
   const attach = useCallback(async (files: FileList | File[], durationHint?: number) => {
     const list = Array.from(files)
     if (!list.length) return
@@ -132,6 +147,30 @@ export function useIntake(onDone?: () => void) {
         // With no EXIF and no media clock the server places the file by
         // inference and marks it approximate, which is the honest answer.
 
+        // ⚠️ 4 Nov — A SINGLE PUT, AND A CEILING ON IT.
+        //
+        // This is one request carrying the whole file. For a note, a photo
+        // or a voice clip that is right: it is one round trip, there is
+        // nothing to resume, and multipart would be ceremony.
+        //
+        // For a 1.2 GB recording it is a request that has to survive twenty
+        // minutes with no progress, no retry and no resume — and when it
+        // died the entry said `upload failed` and nothing else. That is what
+        // the operator hit: *"some of the bigger files failed."*
+        //
+        // Anything past the ceiling belongs on `/upload`, which does
+        // multipart with a resumable ledger (`src/lib/bulk-upload.ts`). The
+        // composer says so rather than trying and failing slowly — the
+        // refusal names the surface that can do it, because a failure that
+        // does not say where to go is the one he had.
+        if (item.file.size > BIG_FILE) {
+          throw new Error(
+            `${humanSize(item.file.size)} is too big to drop in here. `
+            + `Put it in on the uploads page — it goes in a piece at a time `
+            + `and picks up where it left off if anything stops it.`,
+          )
+        }
+
         const presign = await fetch('/api/v2/log/presign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -145,7 +184,7 @@ export function useIntake(onDone?: () => void) {
           body: item.file,
           headers: item.file.type ? { 'Content-Type': item.file.type } : undefined,
         })
-        if (!put.ok) throw new Error('upload failed')
+        if (!put.ok) throw new Error(`the upload did not go through (${put.status})`)
 
         setPending(p => p.map(x => x.key === item.key
           ? { ...x, uploading: false, r2_key: key, happened_at, date_source, duration_seconds, checksum }
