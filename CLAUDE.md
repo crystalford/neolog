@@ -847,6 +847,63 @@ or a voice clip it is right: one round trip, nothing to resume. Past 200 MB
 it refuses and **names the surface that can do it** — a failure that does
 not say where to go is the one he had.
 
+**⚠️ The same day, debugging it properly turned up two bugs I had just put
+in and four more ways it could still fail.** Recorded because the pattern —
+*the thing you just built is the thing you have not yet read adversarially* —
+is the point:
+
+- **A failed `complete` discarded the ledger on EVERY status.** A dropped
+  request at the final step threw away a gigabyte sitting in R2 intact and
+  re-uploaded it from part one. Only a **4xx** means the ledger disagrees
+  with R2; everything else is weather, and `callJson` retries a 5xx four
+  times before it is even seen.
+- **A sealed upload could be sealed twice.** If `complete` succeeded and the
+  REGISTRATION then failed, the retry called `complete` again against an
+  uploadId R2 had finished — R2 refuses, the refusal read as "our ledger is
+  wrong", and the whole file started over. `Ledger.completed` is written the
+  moment it is sealed, so a retry goes straight to the row it could not
+  write.
+- **Two minutes offline was fatal.** Five retries with backoff is about a
+  minute of trying, so a dropped link burned every attempt and marked the
+  file failed. `waitForOnline` HOLDS instead of spending retries. ⚠️
+  `navigator.onLine` is a hint, not a fact — it reports true behind a router
+  with no internet — so it is only ever used to decide whether to wait.
+- **`/parts` and `/complete` had no retry at all**, so one 500 killed a file
+  at 90%.
+- **A moved `lastModified` silently lost the resume.** Copying, syncing or
+  restoring a folder rewrites it, the exact ledger key misses, and 1.2 GB
+  starts from zero looking exactly like the resume not working. A miss falls
+  back to name and size — the same pair the duplicate check already trusts
+  to call two files the same recording.
+- **A failed file waited for him.** It auto-retries three times first; the
+  parts are kept, so a retry resumes and costs almost nothing.
+
+**⚠️ And the re-dropped folder is the real workflow, not an edge case.** The
+operator: *"some of the files I will be uploading have already been
+uploaded… because some failed I have to just drag the whole folder again as
+I'm not sure which ones failed."* So `POST /api/v2/vlogs/duplicate-check`
+answers for the **whole drop in one call, before a byte moves**. A per-file
+check is gated behind `FILE_CONCURRENCY`, so the thirtieth file would not be
+asked about until twenty-eight ahead of it had finished — he would watch a
+queue work through files it was going to skip. Three things make it
+seamless: the batch check up front; a **409 at registration treated as
+success**, because the recording is in either way; and a skipped file left
+out of the overall byte maths, since counting its bytes as sent would put
+the bar at ninety percent for a folder where nothing moved.
+
+⚠️ **Two races, both from `patch()` being a queued React update.** `pump()`
+reads `jobsRef`, which is only assigned during a render — so a file marked
+already-in would still look queued and upload anyway. Skips go in a **ref**,
+true the instant it is set. And the duplicate check is **awaited before**
+the queue starts rather than run beside it, with its own five-second ceiling
+so it can never hold the drop at the gate.
+
+`scripts/test/bulk-upload.mjs` — 43 assertions, in CI. It holds the three
+things that cannot be allowed to drift: the part size is a pure function of
+the file's length (R2 rejects a mixed-size upload at complete, so a resume
+that computes differently loses everything), only a 4xx drops the ledger,
+and the source still never calls `arrayBuffer`.
+
 **What went with `CapturePanel`, and why:** browser-side audio chunking
 (`browser-audio.ts` and `/api/v2/upload/audio-chunk-presign`) — the
 container's `/extract-audio` does this in the pipeline, and the browser

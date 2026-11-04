@@ -39,9 +39,22 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Shell from '@/components/Shell'
 import {
-  uploadOne, humanBytes, humanLeft, FILE_CONCURRENCY,
+  uploadOne, alreadyIn, sweepLedgers, unfinished,
+  humanBytes, humanLeft, FILE_CONCURRENCY,
   type UploadJob,
 } from '@/lib/bulk-upload'
+
+/**
+ * How many times a stopped file picks itself back up before it waits for him.
+ *
+ * ⚠️ The point of the whole page. A blip at 3am that stops one file out of
+ * thirty should not mean he comes back to a stalled queue — the parts
+ * already accepted are kept, so a retry costs almost nothing and resumes
+ * from where it was. After this many it stops trying and says so, because a
+ * file failing the same way four times is not weather.
+ */
+const AUTO_RETRIES = 3
+const AUTO_RETRY_DELAY_MS = 8000
 
 let seq = 0
 
@@ -56,8 +69,24 @@ export default function UploadPage() {
   // action's Stop button, which set the state and changed nothing.
   const running = useRef(new Set<string>())
   const aborts = useRef(new Map<string, AbortController>())
+  const tries = useRef(new Map<string, number>())
+  /**
+   * ⚠️ A REF, not state. `patch()` queues a React update; `pump()` reads
+   * `jobsRef` which is only assigned during a render. So between marking a
+   * file as already-in and starting the queue, `pump` would still see it as
+   * queued and upload a recording the log already holds. The ref is true the
+   * instant it is set, which is the only thing `pump` can rely on.
+   */
+  const skippedIds = useRef(new Set<string>())
   const jobsRef = useRef<UploadJob[]>([])
   jobsRef.current = jobs
+
+  // Ledgers R2 has already forgotten, and the ones it has not.
+  const [waiting, setWaiting] = useState<{ name: string; parts: number }[]>([])
+  useEffect(() => {
+    sweepLedgers()
+    setWaiting(unfinished().map(u => ({ name: u.name, parts: u.parts })))
+  }, [])
 
   const patch = useCallback((id: string, p: Partial<UploadJob>) => {
     setJobs(prev => prev.map(j => (j.id === id ? { ...j, ...p } : j)))
@@ -66,7 +95,9 @@ export default function UploadPage() {
   /** Start whatever is queued, up to the file cap. */
   const pump = useCallback(() => {
     const queued = jobsRef.current.filter(
-      j => j.status === 'queued' && !running.current.has(j.id),
+      j => j.status === 'queued'
+        && !running.current.has(j.id)
+        && !skippedIds.current.has(j.id),
     )
     for (const job of queued) {
       if (running.current.size >= FILE_CONCURRENCY) return
@@ -83,10 +114,24 @@ export default function UploadPage() {
           patch(job.id, { status: 'done', sent: job.size, vlogId, error: null })
         } catch (err: any) {
           const msg = err?.message || String(err)
-          patch(job.id, {
-            status: msg === 'paused' ? 'paused' : 'failed',
-            error: msg === 'paused' ? null : msg,
-          })
+          if (msg === 'paused') {
+            patch(job.id, { status: 'paused', error: null })
+          } else {
+            // ⚠️ It tries again by itself before it asks him. See
+            // `AUTO_RETRIES` — everything already accepted is in the ledger,
+            // so a retry resumes rather than restarting.
+            const n = (tries.current.get(job.id) || 0) + 1
+            tries.current.set(job.id, n)
+            if (n <= AUTO_RETRIES) {
+              patch(job.id, {
+                status: 'queued',
+                error: `${msg} — trying again (${n} of ${AUTO_RETRIES})`,
+              })
+              setTimeout(() => pump(), AUTO_RETRY_DELAY_MS)
+            } else {
+              patch(job.id, { status: 'failed', error: msg })
+            }
+          }
         } finally {
           running.current.delete(job.id)
           aborts.current.delete(job.id)
@@ -110,15 +155,38 @@ export default function UploadPage() {
       rate: null,
       error: null,
       resumed: false,
+      skipped: false,
       vlogId: null,
       key: null,
     }))
     setJobs(prev => [...prev, ...fresh])
-    // ⚠️ Started here, not on a button. This is the whole point of the page.
-    setTimeout(() => pump(), 0)
-  }, [pump])
+
+    // ⚠️ Which of these the log already holds, asked ONCE for the whole
+    // drop and before anything moves. Re-dragging a folder because some of
+    // it failed is the real workflow, and the files already in should say
+    // so immediately rather than waiting their turn in a queue.
+    // ⚠️ Awaited, then pumped — not pumped in parallel. Starting the queue
+    // first would upload the first two files of a re-dropped folder before
+    // being told the log already has them. `alreadyIn` carries its own five
+    // second ceiling so this can never hold the drop at the gate.
+    void (async () => {
+      const known = await alreadyIn(list)
+      known.forEach((hit, i) => {
+        if (!hit) return
+        skippedIds.current.add(fresh[i].id)
+        patch(fresh[i].id, {
+          status: 'done',
+          sent: fresh[i].size,
+          vlogId: hit.id,
+          skipped: true,
+        })
+      })
+      pump()
+    })()
+  }, [pump, patch])
 
   const retry = useCallback((id: string) => {
+    tries.current.set(id, 0)
     patch(id, { status: 'queued', error: null, rate: null })
     setTimeout(() => pump(), 0)
   }, [patch, pump])
@@ -129,7 +197,10 @@ export default function UploadPage() {
 
   const retryAll = useCallback(() => {
     for (const j of jobsRef.current) {
-      if (j.status === 'failed') patch(j.id, { status: 'queued', error: null })
+      if (j.status === 'failed') {
+        tries.current.set(j.id, 0)
+        patch(j.id, { status: 'queued', error: null })
+      }
     }
     setTimeout(() => pump(), 0)
   }, [patch, pump])
@@ -146,10 +217,15 @@ export default function UploadPage() {
   }, [])
 
   const done = jobs.filter(j => j.status === 'done').length
+  const skipped = jobs.filter(j => j.skipped).length
   const failed = jobs.filter(j => j.status === 'failed').length
   const active = jobs.filter(j => j.status !== 'done' && j.status !== 'failed')
-  const totalBytes = jobs.reduce((n, j) => n + j.size, 0)
-  const sentBytes = jobs.reduce((n, j) => n + j.sent, 0)
+  // ⚠️ A skipped file is not progress. Counting its bytes as "sent" would
+  // put the overall bar at ninety percent for a folder where almost nothing
+  // moved, which is a number that reads as a lie the moment he looks at it.
+  const moving = jobs.filter(j => !j.skipped)
+  const totalBytes = moving.reduce((n, j) => n + j.size, 0)
+  const sentBytes = moving.reduce((n, j) => n + j.sent, 0)
   const overallRate = jobs
     .filter(j => j.status === 'uploading' && j.rate)
     .reduce((n, j) => n + (j.rate || 0), 0)
@@ -170,6 +246,26 @@ export default function UploadPage() {
             what it is about once it has been read.
           </p>
         </div>
+
+        {/* ⚠️ What was part-way through last time. The browser cannot hold a
+            `File` across a reload, so this cannot pick them up by itself —
+            it can only say they are there. That is the difference between
+            "it failed" and "add it again and it carries on", and it is the
+            whole reason the ledger is worth keeping. */}
+        {waiting.length > 0 && jobs.length === 0 && (
+          <div className="resume">
+            <b>
+              {waiting.length} {waiting.length === 1 ? 'recording was' : 'recordings were'} part-way
+              through.
+            </b>
+            <span>
+              Add {waiting.length === 1 ? 'it' : 'them'} again and only the
+              missing pieces go — nothing already sent is uploaded twice.
+            </span>
+            <em>{waiting.slice(0, 6).map(w => w.name).join(' · ')}
+              {waiting.length > 6 && ` · and ${waiting.length - 6} more`}</em>
+          </div>
+        )}
 
         {/* The drop zone. Clicking it opens the picker, which is how a
             phone gets files in — there is nothing to drag there. */}
@@ -206,6 +302,7 @@ export default function UploadPage() {
             <div className="sh">
               <span>
                 {done} of {jobs.length} in
+                {skipped > 0 && <> · {skipped} already there</>}
                 {failed > 0 && <> · {failed} stopped</>}
               </span>
               <b>
@@ -246,6 +343,7 @@ export default function UploadPage() {
                         : j.name}
                       <em>
                         {humanBytes(j.size)}
+                        {j.skipped && <> · the log already had this one, nothing was sent</>}
                         {j.resumed && j.status !== 'done' && <> · picked up where it stopped</>}
                         {j.status === 'uploading' && left && <> · {left}</>}
                       </em>
@@ -260,7 +358,7 @@ export default function UploadPage() {
                       {j.status === 'preparing' && 'starting'}
                       {j.status === 'uploading' && `${Math.floor(pct)}%`}
                       {j.status === 'finishing' && 'finishing'}
-                      {j.status === 'done' && 'in'}
+                      {j.status === 'done' && (j.skipped ? 'already in' : 'in')}
                       {j.status === 'paused' && 'paused'}
                       {j.status === 'failed' && 'stopped'}
                     </span>

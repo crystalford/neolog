@@ -74,6 +74,8 @@ export interface UploadJob {
   error: string | null
   /** True when the ledger had parts in it — the row says "resumed". */
   resumed: boolean
+  /** Already in the log, so nothing was sent. The row says so. */
+  skipped: boolean
   /** Set once the recording row exists. */
   vlogId: string | null
   key: string | null
@@ -95,14 +97,92 @@ const TARGET_PARTS = 200
 /** How many part URLs to presign at once. */
 const PRESIGN_WINDOW = 8
 
-/** Parts in flight for one file. A browser gives about six per origin. */
-const PART_CONCURRENCY = 4
+/**
+ * Parts in flight for one file.
+ *
+ * ⚠️ Three, not four, because `FILE_CONCURRENCY` is two and a browser
+ * opens about six connections per origin. At four the eighth request sits in
+ * the browser's own queue doing nothing, which buys no throughput and makes
+ * the per-file rate reading lie — a part that has not started looks like a
+ * part that is going slowly.
+ */
+const PART_CONCURRENCY = 3
 
 /** Files uploading at once. The rest queue. */
 export const FILE_CONCURRENCY = 2
 
 const PART_RETRIES = 5
 const PART_TIMEOUT_MS = 10 * 60 * 1000
+
+/**
+ * Wait for the connection to come back rather than spending retries on it.
+ *
+ * ⚠️ Without this, two minutes offline is fatal. Five retries with
+ * exponential backoff is about a minute of trying, so a dropped wifi link, a
+ * train tunnel or a laptop waking up burns every attempt and marks the file
+ * failed — and then it sits there until he notices and presses something.
+ * That is the "I tried it and it failed" he is describing, produced by a
+ * blip he never saw.
+ *
+ * ⚠️ `navigator.onLine` is a hint and not a fact: it reports true for a
+ * router with no internet behind it. So it is only ever used to decide
+ * whether to WAIT — never to decide that a request would have succeeded.
+ * When it says offline we hold; when it says online we still retry normally.
+ */
+async function waitForOnline(signal: AbortSignal): Promise<void> {
+  if (typeof navigator === 'undefined' || navigator.onLine !== false) return
+  await new Promise<void>(resolve => {
+    const done = () => {
+      window.removeEventListener('online', done)
+      signal.removeEventListener('abort', done)
+      clearInterval(poll)
+      resolve()
+    }
+    // The event is the fast path; the poll is because `online` does not
+    // always fire on every platform when a sleeping machine wakes up.
+    const poll = setInterval(() => { if (navigator.onLine) done() }, 3000)
+    window.addEventListener('online', done)
+    signal.addEventListener('abort', done)
+  })
+}
+
+/**
+ * A JSON call to our own Worker, retried.
+ *
+ * ⚠️ `/parts` and `/complete` had no retry at all, so one 500 or one
+ * dropped request killed a file that was 90% uploaded. A 4xx is kept as a
+ * real answer — it means the request was wrong and repeating it will not
+ * help — and everything else is treated as weather.
+ */
+async function callJson(
+  url: string,
+  body: unknown,
+  signal: AbortSignal,
+  attempts = 4,
+): Promise<Response> {
+  let last = ''
+  for (let i = 1; i <= attempts; i++) {
+    if (signal.aborted) throw new Error('paused')
+    await waitForOnline(signal)
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+        signal,
+      })
+      // A refusal is an answer. Only a server fault is worth repeating.
+      if (res.status < 500) return res
+      last = `HTTP ${res.status}`
+    } catch (err: any) {
+      if (signal.aborted) throw new Error('paused')
+      last = err?.message || String(err)
+    }
+    if (i < attempts) await new Promise(r => setTimeout(r, Math.min(20_000, 2 ** i * 700)))
+  }
+  throw new Error(last || 'no answer from the server')
+}
 
 /**
  * Uniform, and derived only from the size — so resuming the same file
@@ -124,6 +204,19 @@ interface Ledger {
   /** Only parts R2 accepted, with the ETag it gave back. */
   parts: { partNumber: number; etag: string }[]
   startedAt: number
+  /**
+   * The multipart upload has been sealed and the object exists in R2.
+   *
+   * ⚠️ Without this, a file whose bytes all landed and whose REGISTRATION
+   * then failed — a 500 from D1, a dropped request — would on retry call
+   * `complete` a second time against an uploadId R2 has already finished.
+   * R2 refuses that, the refusal reads as "our ledger is wrong", and 1.2 GB
+   * that is safely in storage gets uploaded again from part one.
+   *
+   * Set the moment `complete` returns, so a retry goes straight to
+   * registering the row it could not register the first time.
+   */
+  completed?: boolean
 }
 
 /**
@@ -133,26 +226,113 @@ interface Ledger {
  * to recognise it. Name, size and mtime together are enough: a different
  * recording will not collide on all three.
  */
+const LEDGER_PREFIX = 'neolog.upload.'
+
 function ledgerKey(file: File): string {
-  return `neolog.upload.${file.name}:${file.size}:${file.lastModified}`
+  return `${LEDGER_PREFIX}${file.name}:${file.size}:${file.lastModified}`
+}
+
+/**
+ * ⚠️ The same file, when its modified time has moved.
+ *
+ * `lastModified` is not as stable as it looks: copying a folder, syncing it,
+ * restoring it from a backup or pulling it off a different device can all
+ * rewrite it, and some pickers report the time the file was READ. When it
+ * moves, the exact key misses and a 1.2 GB upload silently starts from zero
+ * — which looks exactly like the resume not working.
+ *
+ * So a miss falls back to name and size, which is the same pair the
+ * duplicate check uses to decide two files are the same recording. If that
+ * pair is good enough to skip an upload entirely it is good enough to
+ * resume one.
+ */
+function ledgerKeyLoose(file: File): string {
+  return `${LEDGER_PREFIX}${file.name}:${file.size}:`
 }
 
 /** R2 drops an incomplete multipart upload after seven days. */
 const LEDGER_TTL_MS = 7 * 24 * 3600 * 1000
 
 function readLedger(file: File): Ledger | null {
-  try {
-    const raw = localStorage.getItem(ledgerKey(file))
+  const fresh = (raw: string | null, key: string): Ledger | null => {
     if (!raw) return null
-    const l = JSON.parse(raw) as Ledger
-    if (!l?.uploadId || !l?.key || !l?.partSize) return null
-    // Past R2's own window the uploadId is gone and the parts with it.
-    if (Date.now() - (l.startedAt || 0) > LEDGER_TTL_MS) {
-      localStorage.removeItem(ledgerKey(file))
-      return null
+    try {
+      const l = JSON.parse(raw) as Ledger
+      if (!l?.uploadId || !l?.key || !l?.partSize) return null
+      // Past R2's own window the uploadId is gone and the parts with it.
+      if (Date.now() - (l.startedAt || 0) > LEDGER_TTL_MS) {
+        localStorage.removeItem(key)
+        return null
+      }
+      return l
+    } catch { return null }
+  }
+
+  try {
+    const exact = ledgerKey(file)
+    const hit = fresh(localStorage.getItem(exact), exact)
+    if (hit) return hit
+
+    // ⚠️ Then the same name and size under a different mtime. See
+    // `ledgerKeyLoose`.
+    const prefix = ledgerKeyLoose(file)
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith(prefix)) continue
+      const l = fresh(localStorage.getItem(k), k)
+      if (l) return l
     }
-    return l
-  } catch { return null }
+  } catch { /* private mode, or storage is full */ }
+  return null
+}
+
+/**
+ * Forget the ledgers R2 has already forgotten.
+ *
+ * ⚠️ A ledger is only ever expired when the SAME file is offered again, so
+ * one for a file he never re-adds sits there indefinitely. Harmless on its
+ * own, and a browser that refuses a write because the quota is full is not —
+ * that is how the ledger stops being written mid-upload and the resume this
+ * whole design rests on quietly stops happening.
+ */
+export function sweepLedgers(): void {
+  try {
+    const dead: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k?.startsWith(LEDGER_PREFIX)) continue
+      try {
+        const l = JSON.parse(localStorage.getItem(k) || '{}') as Ledger
+        if (Date.now() - (l.startedAt || 0) > LEDGER_TTL_MS) dead.push(k)
+      } catch { dead.push(k) }
+    }
+    for (const k of dead) localStorage.removeItem(k)
+  } catch { /* nothing to sweep if storage is unreadable */ }
+}
+
+/**
+ * Files that were part-way through and never finished.
+ *
+ * ⚠️ The browser cannot hold a `File` across a reload, so this cannot
+ * resume them — only SAY they exist. That is most of the value: the
+ * difference between "it failed" and "it is waiting for you to add it
+ * again" is whether anything says so.
+ */
+export function unfinished(): { name: string; parts: number; at: number }[] {
+  const out: { name: string; parts: number; at: number }[] = []
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k?.startsWith(LEDGER_PREFIX)) continue
+      try {
+        const l = JSON.parse(localStorage.getItem(k) || '{}') as Ledger
+        if (!l?.uploadId || Date.now() - (l.startedAt || 0) > LEDGER_TTL_MS) continue
+        const name = k.slice(LEDGER_PREFIX.length).split(':')[0]
+        out.push({ name, parts: l.parts?.length || 0, at: l.startedAt || 0 })
+      } catch { /* a ledger we cannot read is one we cannot report */ }
+    }
+  } catch { /* storage unreadable */ }
+  return out.sort((a, b) => b.at - a.at)
 }
 
 function writeLedger(file: File, l: Ledger): void {
@@ -162,7 +342,19 @@ function writeLedger(file: File, l: Ledger): void {
 }
 
 function dropLedger(file: File): void {
-  try { localStorage.removeItem(ledgerKey(file)) } catch {}
+  // ⚠️ Both forms. A ledger found by the loose key and removed only by the
+  // exact one would be re-found on the next drop and resume an upload that
+  // has already been registered.
+  try {
+    localStorage.removeItem(ledgerKey(file))
+    const prefix = ledgerKeyLoose(file)
+    const dead: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k?.startsWith(prefix)) dead.push(k)
+    }
+    for (const k of dead) localStorage.removeItem(k)
+  } catch {}
 }
 
 // ── One part ──────────────────────────────────────────────────────────────
@@ -175,6 +367,8 @@ async function putPart(
   let last = ''
   for (let attempt = 1; attempt <= PART_RETRIES; attempt++) {
     if (signal.aborted) throw new Error('paused')
+    // ⚠️ Held, not spent. See `waitForOnline`.
+    await waitForOnline(signal)
     const ctrl = new AbortController()
     const onAbort = () => ctrl.abort()
     signal.addEventListener('abort', onAbort)
@@ -203,6 +397,50 @@ async function putPart(
   throw new Error(last || 'part failed')
 }
 
+/**
+ * Which of these the log already holds — asked once, for the whole drop.
+ *
+ * ⚠️ 4 Nov. The operator: *"some of the files I will be uploading have
+ * already been uploaded… because some failed I have to just drag the whole
+ * folder again as I'm not sure which ones failed."* That is the real
+ * workflow and it is the one to optimise: a folder goes in, the ones already
+ * there say so, and only the rest move bytes.
+ *
+ * Asked BEFORE anything uploads, and asked for all of them at once. A
+ * per-file check inside each upload is gated behind `FILE_CONCURRENCY`, so
+ * the thirtieth file is not asked about until twenty-eight ahead of it have
+ * finished — he would watch a queue work through files it was going to skip.
+ *
+ * ⚠️ A failure here is not a reason to stop. The worst case is a file that
+ * uploads and is then refused at registration with a 409, which `uploadOne`
+ * already treats as the recording being in. Slower, never wrong.
+ */
+export async function alreadyIn(
+  files: File[],
+): Promise<(({ id: string; status: string }) | null)[]> {
+  if (!files.length) return []
+  try {
+    // ⚠️ On a clock. This runs BEFORE anything uploads, so a slow or dead
+    // answer would hold the whole drop at the gate — a stall that looks
+    // exactly like the uploader not working. Five seconds, then start
+    // anyway: a duplicate that gets through is caught by the 409 at
+    // registration, which `uploadOne` treats as the recording being in.
+    const res = await fetch('/api/v2/vlogs/duplicate-check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({ files: files.map(f => ({ name: f.name, size: f.size })) }),
+    })
+    if (!res.ok) return files.map(() => null)
+    const j = await res.json() as { known?: (({ id: string; status: string }) | null)[] }
+    const known = j.known || []
+    return files.map((_, i) => known[i] ?? null)
+  } catch {
+    return files.map(() => null)
+  }
+}
+
 // ── One file ──────────────────────────────────────────────────────────────
 
 export interface UploadCallbacks {
@@ -222,30 +460,6 @@ export async function uploadOne(
   cb: UploadCallbacks,
 ): Promise<{ vlogId: string; key: string }> {
   const { onChange, signal } = cb
-
-  // ── Is it already in? ──────────────────────────────────────────────────
-  //
-  // ⚠️ Before a byte moves. A bulk drop is the case where this matters: he
-  // re-drops a folder, and without this the log takes thirty recordings it
-  // already holds and he pays for the bandwidth twice. Same
-  // `(filename, size)` heuristic `POST /api/v2/vlogs` uses for its own 409,
-  // asked up front rather than after the upload.
-  //
-  // A failure here is not a reason to stop — the worst case is an upload
-  // that the register step then refuses, which is where it would have ended
-  // up anyway.
-  try {
-    const q = new URLSearchParams({ filename: file.name, size: String(file.size) })
-    const res = await fetch(`/api/v2/vlogs/duplicate-check?${q}`, { credentials: 'include' })
-    if (res.ok) {
-      const j = await res.json() as { exists?: boolean; existing_id?: string }
-      if (j.exists && j.existing_id) {
-        dropLedger(file)
-        onChange({ status: 'done', sent: file.size, vlogId: j.existing_id, resumed: false })
-        return { vlogId: j.existing_id, key: '' }
-      }
-    }
-  } catch { /* ask again at register time */ }
 
   // ── Where we are, if we have been here before ──────────────────────────
   let ledger = readLedger(file)
@@ -384,46 +598,72 @@ export async function uploadOne(
     .map(([partNumber, etag]) => ({ partNumber, etag }))
     .sort((a, b) => a.partNumber - b.partNumber)
 
-  const fin = await fetch('/api/v2/upload/complete', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ uploadId: ledger.uploadId, key: ledger.key, parts }),
-  })
-  if (!fin.ok) {
-    // ⚠️ A rejected complete means our ledger disagrees with what R2 holds —
-    // a part it never got, or an upload it has since dropped. The ledger is
-    // the thing that is wrong, so it goes, and the next attempt is a clean
-    // one rather than the same disagreement again.
-    dropLedger(file)
-    const body = await fin.text().catch(() => '')
-    throw new Error(
-      `the upload could not be sealed (${fin.status}). What was sent has been `
-      + `discarded and this file will start over. ${body}`.trim(),
+  if (!ledger.completed) {
+    const fin = await callJson(
+      '/api/v2/upload/complete',
+      { uploadId: ledger.uploadId, key: ledger.key, parts },
+      signal,
     )
+    if (!fin.ok) {
+      const body = await fin.text().catch(() => '')
+      // ⚠️ A 4xx means OUR LEDGER disagrees with what R2 holds — a part
+      // it never got, or an upload it has since dropped. That is the one
+      // case where starting over is right, so the ledger goes.
+      //
+      // ⚠️ Anything else is weather. `callJson` has already retried a 5xx
+      // four times; discarding the ledger here would throw away a gigabyte
+      // that is sitting in R2 intact because a request did not land. The
+      // first version of this did exactly that for every failure, which is
+      // the worst bug I put in this file.
+      if (fin.status >= 400 && fin.status < 500) {
+        dropLedger(file)
+        throw new Error(
+          `the upload could not be sealed (${fin.status}). What was sent has `
+          + `been discarded and this file will start over. ${body}`.trim(),
+        )
+      }
+      throw new Error(
+        `the upload could not be sealed just now (${fin.status}). Everything `
+        + `already sent is kept — try again and it picks up from here. ${body}`.trim(),
+      )
+    }
+    // Written before anything else can fail. See `Ledger.completed`.
+    ledger.completed = true
+    writeLedger(file, ledger)
   }
 
   // ── Register it as a recording ─────────────────────────────────────────
-  const reg = await fetch('/api/v2/vlogs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      r2_key: ledger.key,
-      original_filename: file.name,
-      file_size_bytes: file.size,
-      mime_type: file.type || 'video/mp4',
-      // ⚠️ Queued, not dispatched. A bulk drop that dispatches every file at
-      // once is what wedged the September corpus run; `drainUploadQueue`
-      // hands them over three at a time.
-      queue: true,
-    }),
-  })
+  const reg = await callJson('/api/v2/vlogs', {
+    r2_key: ledger.key,
+    original_filename: file.name,
+    file_size_bytes: file.size,
+    mime_type: file.type || 'video/mp4',
+    // ⚠️ Queued, not dispatched. A bulk drop that dispatches every file at
+    // once is what wedged the September corpus run; `drainUploadQueue`
+    // hands them over three at a time.
+    queue: true,
+  }, signal)
+
+  // ⚠️ 409 is not a failure here. `POST /api/v2/vlogs` answers it when a row
+  // with the same name and size already exists — which is exactly what a
+  // re-drop of a folder produces when the batch check raced, or when the
+  // registration landed and its RESPONSE did not. The recording is in
+  // either way, and treating that as an error would show a red row for a
+  // file the log holds.
+  if (reg.status === 409) {
+    const body = await reg.json().catch(() => ({})) as { existing_id?: string; id?: string }
+    const existing = body.existing_id || body.id
+    if (existing) {
+      dropLedger(file)
+      return { vlogId: existing, key: ledger.key }
+    }
+  }
+
   if (!reg.ok) {
     const body = await reg.text().catch(() => '')
     throw new Error(
       `the file is in storage but the log could not record it (${reg.status}). `
-      + `Nothing is lost — try again. ${body}`.trim(),
+      + `Nothing is lost — try again and it goes straight to this step. ${body}`.trim(),
     )
   }
   const { id } = await reg.json() as { id: string }

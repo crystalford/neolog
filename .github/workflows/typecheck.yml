@@ -218,6 +218,15 @@ jobs:
       - name: What a model returns, and what is let through
         run: node scripts/test/headline.mjs
 
+      # ⚠️ The decisions that decide whether a 1.2 GB upload survives, and
+      # every one has been wrong once: the part size (R2 requires it UNIFORM
+      # and rejects a mismatch at complete, after everything has been sent),
+      # whether a failed complete means start-over or try-again (the first
+      # version had it backwards and would have discarded a gigabyte sitting
+      # intact in R2), and the ledger key that lets a file resume.
+      - name: What decides whether a big upload survives
+        run: node scripts/test/bulk-upload.mjs
+
       # ⚠️ A grid with named columns is a contract about how many children it
       # takes, and nothing here could read that contract. Three shipped in
       # one morning and each looked like a different bug: /triage's card as a
