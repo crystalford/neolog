@@ -104,8 +104,47 @@ async function readJsonBody(req) {
  * files. Streaming via pipeline() keeps peak memory at a small constant
  * regardless of file size.
  */
+/**
+ * The biggest input this container will put ON DISK.
+ *
+ * ⚠️ 4 Nov — this is a real ceiling, not a preference. `standard-1` has a
+ * single-digit-gigabyte disk shared between the image, the input and the
+ * output, and the documented worst failure in this file is ENOSPC: it does
+ * not fail the one oversized job, it fails every job on that container for
+ * as long as it stays warm. So an input bigger than this is NOT downloaded —
+ * `/extract-audio` hands ffmpeg the URL and lets it read over HTTP instead.
+ *
+ * Asked about a 10 GB recording, the honest answer before this was that it
+ * would upload perfectly, register, queue, and then fail `audio_extract`
+ * with `Input too large` until the healer gave up on it.
+ */
+const DISK_INPUT_LIMIT = 4 * 1024 * 1024 * 1024
+
+/**
+ * How many bytes are behind a presigned URL, or null if it will not say.
+ *
+ * ⚠️ A ranged GET, not a HEAD. A presigned URL signs its METHOD, so a HEAD
+ * against a URL minted for GET comes back 403 — whereas `Range` is not part
+ * of the signature and R2 answers 206 with the full length in
+ * `content-range`.
+ */
+async function inputSize(url) {
+  try {
+    const r = await fetch(url, { headers: { Range: 'bytes=0-0' } })
+    if (!r.ok && r.status !== 206) return null
+    // Don't leave the connection open holding a body nobody reads.
+    try { await r.body?.cancel() } catch {}
+    const m = /\/(\d+)\s*$/.exec(r.headers.get('content-range') || '')
+    if (m) return parseInt(m[1], 10)
+    const n = parseInt(r.headers.get('content-length') || '', 10)
+    return Number.isFinite(n) && n > 0 ? n : null
+  } catch {
+    return null
+  }
+}
+
 async function downloadToTmp(url, label, opts = {}) {
-  const maxBytes = opts.maxBytes ?? 4 * 1024 * 1024 * 1024
+  const maxBytes = opts.maxBytes ?? DISK_INPUT_LIMIT
   const rangeBytes = opts.rangeBytes ?? null
   const tmp = mkdtempSync(join(tmpdir(), `neolog-ffmpeg-${label}-`))
   try {
@@ -117,7 +156,11 @@ async function downloadToTmp(url, label, opts = {}) {
     }
     const len = parseInt(resp.headers.get('content-length') || '0', 10)
     if (!rangeBytes && len && len > maxBytes) {
-      throw new Error(`Input too large: ${len} > ${maxBytes} (use rangeBytes for partial fetch)`)
+      throw new Error(
+        `Input too large for this container's disk: ${len} bytes > ${maxBytes}. `
+        + `This endpoint needs the whole file locally; /extract-audio reads an `
+        + `input this size over HTTP instead.`,
+      )
     }
     if (!resp.body) throw new Error(`Fetch ${label} returned empty body`)
     const nodeReadable = Readable.fromWeb(resp.body)
@@ -151,6 +194,21 @@ async function downloadToTmp(url, label, opts = {}) {
  * process that will never finish, not to cut short one that is slow.
  */
 const FFMPEG_TIMEOUT_MS = 20 * 60 * 1000
+
+/**
+ * The ceiling for a run that reads its input over HTTP.
+ *
+ * ⚠️ 4 Nov. A recording too big for the disk is read straight off R2 by
+ * ffmpeg (see `DISK_INPUT_LIMIT`), so the run has to pull the whole file
+ * across as it goes rather than starting with it already local. Ten gigabytes
+ * at a plausible R2-to-container rate is most of twenty minutes on its own,
+ * which would make the kill switch — a guard against a WEDGED process — the
+ * thing that fails a working job.
+ *
+ * Used only on that path. Everything with a local input keeps the 20 minutes.
+ */
+const FFMPEG_HTTP_TIMEOUT_MS = 45 * 60 * 1000
+
 const FFPROBE_TIMEOUT_MS = 60 * 1000
 
 // ⚠️ 19 Sep — sweepStaleTmpDirs() below used to run ONCE, at container boot.
@@ -173,7 +231,13 @@ const FFPROBE_TIMEOUT_MS = 60 * 1000
 // longest any single ffmpeg invocation is allowed to run before this
 // server's own kill switch ends it, so a margin past that can only mean the
 // dir's owner already died some other way.
-const STALE_TMP_AGE_MS = FFMPEG_TIMEOUT_MS + 10 * 60 * 1000
+//
+// ⚠️ 4 Nov — derived from the LONGEST ceiling, not the usual one. An
+// HTTP-input run may take 45 minutes (FFMPEG_HTTP_TIMEOUT_MS), and a sweep
+// pegged to the 20-minute figure would delete that run's output directory
+// while it was still writing into it — the precise hazard the paragraph above
+// says age is supposed to prevent.
+const STALE_TMP_AGE_MS = Math.max(FFMPEG_TIMEOUT_MS, FFMPEG_HTTP_TIMEOUT_MS) + 10 * 60 * 1000
 
 function sweepStaleTmpDirs() {
   try {
@@ -477,7 +541,30 @@ async function extractAudio(body, res) {
   const { input_url, heartbeat_url, heartbeat_token, vlog_id, operator_id } = body
   if (!input_url) return jsonError(res, 400, 'input_url required')
 
-  const { dir, file: inputFile } = await downloadToTmp(input_url, 'audio-in')
+  // ⚠️ 4 Nov — a recording too big for the disk is read over HTTP rather
+  // than refused. See `DISK_INPUT_LIMIT`. ffmpeg's http reader does its own
+  // range requests, so this costs no disk at all; what it costs is re-reading
+  // the file for every strategy the cascade tries, which is why the cascade
+  // is shortened below.
+  const bytes = await inputSize(input_url)
+  const overDisk = bytes !== null && bytes > DISK_INPUT_LIMIT
+
+  let dir
+  let inputFile
+  if (overDisk) {
+    dir = mkdtempSync(join(tmpdir(), 'neolog-ffmpeg-audio-http-'))
+    inputFile = input_url
+  } else {
+    const got = await downloadToTmp(input_url, 'audio-in')
+    dir = got.dir
+    inputFile = got.file
+  }
+
+  // ⚠️ Only for an HTTP input. ffmpeg rejects these as unknown options on a
+  // local file, so they cannot be set unconditionally.
+  const inputOpts = overDisk
+    ? ['-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '30']
+    : []
 
   const beat = makeHeartbeat({
     url: heartbeat_url,
@@ -547,7 +634,7 @@ async function extractAudio(body, res) {
   //   5. stream copy  — no re-encode at all; just demux the audio.
   //
   // Whisper accepts all of these.
-  const strategies = [
+  const allStrategies = [
     { name: 'libmp3lame', ext: 'mp3', mime: 'audio/mpeg',
       audio_args: ['-c:a', 'libmp3lame', '-b:a', '128k'] },
     { name: 'mp3_native', ext: 'mp3', mime: 'audio/mpeg',
@@ -560,7 +647,26 @@ async function extractAudio(body, res) {
       audio_args: ['-c:a', 'copy'] },
   ]
 
-  await beat('starting', 'ffmpeg', { state: 'starting' })
+  // ⚠️ Every strategy re-reads the input from the start. With the file on
+  // local disk that is free; over HTTP it is another pass across the whole
+  // recording, and five passes over ten gigabytes finishes nothing inside any
+  // ceiling worth having. So the cascade is cut to the one that works and the
+  // one that cannot fail to encode if the decode worked at all — and the
+  // error below says how many were tried, so a shortened cascade is never
+  // reported as a full one.
+  const strategies = overDisk
+    ? allStrategies.filter(s => s.name === 'libmp3lame' || s.name === 'pcm_wav')
+    : allStrategies
+
+  // ⚠️ Says which path it took. A run that read over HTTP and a run that read
+  // off disk fail differently, and `pipeline_events` is the only place anyone
+  // can find out which happened.
+  await beat('starting', 'ffmpeg', {
+    state: 'starting',
+    input: overDisk ? 'http' : 'disk',
+    input_bytes: bytes,
+    strategies: strategies.length,
+  })
 
   let lastErr = null
   let lastStrategy = null
@@ -579,12 +685,14 @@ async function extractAudio(body, res) {
           // affect output quality for clean input.
           '-err_detect', 'ignore_err',
           '-fflags', '+genpts+ignidx+igndts',
+          ...inputOpts,
           '-i', inputFile,
           '-vn',
           ...s.audio_args,
           outFile,
         ],
         beat,
+        overDisk ? FFMPEG_HTTP_TIMEOUT_MS : FFMPEG_TIMEOUT_MS,
       )
       await beat('ok', 'ffmpeg', { state: 'ok', strategy: s.name, attempt: i + 1 })
       streamFile(res, outFile, s.mime)

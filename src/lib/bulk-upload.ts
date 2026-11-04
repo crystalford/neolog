@@ -94,6 +94,22 @@ const MIN_PART = 8 * 1024 * 1024
  */
 const TARGET_PARTS = 200
 
+/**
+ * And a ceiling on how big one part may get.
+ *
+ * ⚠️ Without this, `TARGET_PARTS` alone decides the size, so the part grows
+ * with the file forever: a 10 GB recording lands on 48 MiB parts and a 100 GB
+ * one on 512 MiB. **A part is the unit of retry** — the amount a single
+ * failure re-sends and the amount that must cross the wire without stopping —
+ * so letting it grow without bound makes the biggest files the most fragile,
+ * which is exactly backwards.
+ *
+ * Past 12.8 GB the COUNT grows instead. R2 allows 10,000 parts, so 64 MiB
+ * covers 640 GB, and `/initiate`'s own 2,000-part ceiling stops it at 128 GB
+ * long before R2 cares.
+ */
+const MAX_PART = 64 * 1024 * 1024
+
 /** How many part URLs to presign at once. */
 const PRESIGN_WINDOW = 8
 
@@ -112,7 +128,29 @@ const PART_CONCURRENCY = 3
 export const FILE_CONCURRENCY = 2
 
 const PART_RETRIES = 5
-const PART_TIMEOUT_MS = 10 * 60 * 1000
+
+/**
+ * ⚠️ A part is abandoned for STOPPING, never for taking a while.
+ *
+ * The first version of this gave every part a flat ten-minute ceiling, which
+ * is a size-independent guard on a size-dependent transfer and it breaks
+ * precisely where it matters most. At the 8 MiB floor ten minutes is 14 kB/s
+ * — unreachably slow, so the guard never fires. At 48 MiB (a 10 GB
+ * recording) the same ten minutes demands 80 kB/s per part, and with three
+ * parts in flight that is a quarter of a megabyte a second before anything
+ * can finish. Under that, every part times out, every retry times out the
+ * same way, and the file fails after fifty minutes of trying having moved
+ * nothing — **a slow connection did not upload slowly, it failed.**
+ *
+ * So the question asked is "has this stopped", which is the same question at
+ * every size. `xhr.upload.onprogress` gives real bytes-on-the-wire, so a part
+ * is killed only after ninety seconds of no movement at all — and a part that
+ * crawls runs as long as it needs to.
+ */
+const PART_STALL_MS = 90 * 1000
+
+/** And how long it may take to move its first byte. */
+const PART_OPEN_MS = 60 * 1000
 
 /**
  * Wait for the connection to come back rather than spending retries on it.
@@ -191,6 +229,7 @@ async function callJson(
 export function partSizeFor(bytes: number): number {
   const wanted = Math.ceil(bytes / TARGET_PARTS)
   if (wanted <= MIN_PART) return MIN_PART
+  if (wanted >= MAX_PART) return MAX_PART
   // Round up to a whole MiB so the number is a readable one in a ledger.
   return Math.ceil(wanted / (1024 * 1024)) * 1024 * 1024
 }
@@ -359,29 +398,112 @@ function dropLedger(file: File): void {
 
 // ── One part ──────────────────────────────────────────────────────────────
 
+/**
+ * One attempt at one part.
+ *
+ * ⚠️ `XMLHttpRequest`, not `fetch`, and the reason is `upload.onprogress`.
+ * `fetch` cannot report how much of a request body has gone out — it resolves
+ * when the response comes back and says nothing in between — so with `fetch`
+ * the only guard available is a total duration, which is the guard that
+ * breaks on big parts (see `PART_STALL_MS`). XHR reports bytes as they leave,
+ * which answers the right question and, in the same stroke, lets the bar move
+ * continuously instead of jumping 48 MiB at a time.
+ *
+ * ⚠️ `onBytes` is given the ABSOLUTE count for this attempt, and 0 when the
+ * attempt is abandoned — a retry re-sends from the start, so a caller adding
+ * deltas would count those bytes twice and run the bar past the end of the
+ * file.
+ *
+ * The blob from `file.slice()` carries no type, so neither XHR nor `fetch`
+ * sets a `Content-Type`. That matters: a header the presigned URL did not
+ * sign comes back 403.
+ */
+function sendPart(
+  url: string,
+  blob: Blob,
+  signal: AbortSignal,
+  onBytes: (loaded: number) => void,
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    let lastMoved = Date.now()
+    let loaded = 0
+    let watchdog: ReturnType<typeof setInterval> | null = null
+
+    const stop = () => {
+      if (watchdog !== null) { clearInterval(watchdog); watchdog = null }
+      signal.removeEventListener('abort', onAbort)
+    }
+    function onAbort() {
+      stop()
+      try { xhr.abort() } catch {}
+      onBytes(0)
+      reject(new Error('paused'))
+    }
+    const fail = (why: string) => {
+      stop()
+      try { xhr.abort() } catch {}
+      onBytes(0)
+      reject(new Error(why))
+    }
+
+    signal.addEventListener('abort', onAbort)
+    watchdog = setInterval(() => {
+      const idle = Date.now() - lastMoved
+      if (idle > (loaded > 0 ? PART_STALL_MS : PART_OPEN_MS)) {
+        fail(loaded > 0 ? 'stopped moving' : 'no answer')
+      }
+    }, 5000)
+
+    xhr.upload.onprogress = e => {
+      lastMoved = Date.now()
+      if (e.loaded > loaded) {
+        loaded = Math.min(e.loaded, blob.size)
+        onBytes(loaded)
+      }
+    }
+    xhr.onload = () => {
+      stop()
+      if (xhr.status < 200 || xhr.status >= 300) {
+        onBytes(0)
+        reject(new Error(`HTTP ${xhr.status}`))
+        return
+      }
+      const etag = (xhr.getResponseHeader('ETag') || '').replace(/"/g, '')
+      if (!etag) {
+        onBytes(0)
+        reject(new Error('no ETag'))
+        return
+      }
+      onBytes(blob.size)
+      resolve(etag)
+    }
+    xhr.onerror = () => {
+      stop()
+      onBytes(0)
+      reject(new Error('the connection dropped'))
+    }
+    xhr.open('PUT', url, true)
+    xhr.send(blob)
+  })
+}
+
 async function putPart(
   url: string,
   blob: Blob,
   signal: AbortSignal,
+  onBytes: (loaded: number) => void,
 ): Promise<string> {
   let last = ''
   for (let attempt = 1; attempt <= PART_RETRIES; attempt++) {
     if (signal.aborted) throw new Error('paused')
     // ⚠️ Held, not spent. See `waitForOnline`.
     await waitForOnline(signal)
-    const ctrl = new AbortController()
-    const onAbort = () => ctrl.abort()
-    signal.addEventListener('abort', onAbort)
-    const timer = setTimeout(() => ctrl.abort(), PART_TIMEOUT_MS)
     try {
-      const res = await fetch(url, { method: 'PUT', body: blob, signal: ctrl.signal })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const etag = res.headers.get('ETag')?.replace(/"/g, '') || ''
-      if (!etag) throw new Error('no ETag')
-      return etag
+      return await sendPart(url, blob, signal, onBytes)
     } catch (err: any) {
       if (signal.aborted) throw new Error('paused')
-      last = err?.name === 'AbortError' ? 'timed out' : (err?.message || String(err))
+      last = err?.message || String(err)
       // ⚠️ A 403 here is almost always an expired URL, and the window is
       // re-presigned by the caller on the next pass rather than retried
       // against the same dead URL.
@@ -389,9 +511,6 @@ async function putPart(
       if (attempt < PART_RETRIES) {
         await new Promise(r => setTimeout(r, Math.min(30_000, 2 ** attempt * 500)))
       }
-    } finally {
-      clearTimeout(timer)
-      signal.removeEventListener('abort', onAbort)
     }
   }
   throw new Error(last || 'part failed')
@@ -527,10 +646,53 @@ export async function uploadOne(
     for (const u of j.urls) urls.set(u.partNumber, u.url)
   }
 
-  let sent = done.size * partSize
+  /**
+   * What R2 has accepted, and what is in the air.
+   *
+   * ⚠️ Kept apart on purpose. An abandoned part's bytes have to come back OFF
+   * the total — it will be re-sent from zero — and a single running figure
+   * cannot do that without going backwards past parts that are safely in.
+   * `committed` only ever grows; `inflight` is whatever the attempts in
+   * progress currently claim.
+   */
+  let committed = Math.min(file.size, done.size * partSize)
+  const inflight = new Map<number, number>()
   let cursor = 0
   let failure: string | null = null
-  const recent: { at: number; bytes: number }[] = []
+
+  /**
+   * The rate, from bytes seen leaving rather than from parts completed.
+   *
+   * ⚠️ The old reading was one sample per finished part, so on a 10 GB file
+   * it said nothing for the first few minutes and then jumped — and
+   * `humanLeft` read off it, which is how a working upload says "no idea how
+   * long" for the whole of its first part.
+   */
+  let rate: number | null = null
+  let windowBytes = 0
+  let windowAt = Date.now()
+  const observe = (delta: number) => {
+    if (delta <= 0) return
+    windowBytes += delta
+    const span = (Date.now() - windowAt) / 1000
+    if (span >= 3) {
+      rate = windowBytes / span
+      windowBytes = 0
+      windowAt = Date.now()
+    }
+  }
+
+  // ⚠️ Throttled. `onprogress` fires many times a second per part and every
+  // call here is a React state update.
+  let lastPatch = 0
+  const announce = (force: boolean) => {
+    const now = Date.now()
+    if (!force && now - lastPatch < 400) return
+    lastPatch = now
+    let live = 0
+    for (const v of inflight.values()) live += v
+    onChange({ sent: Math.min(file.size, committed + live), rate })
+  }
 
   const worker = async (): Promise<void> => {
     for (;;) {
@@ -546,40 +708,49 @@ export async function uploadOne(
 
         const start = (n - 1) * partSize
         const blob = file.slice(start, Math.min(start + partSize, file.size))
+
+        // Absolute for this attempt, so an abandoned one resets to zero.
+        let prev = 0
+        const onBytes = (loaded: number) => {
+          if (loaded >= prev) observe(loaded - prev)
+          prev = loaded
+          inflight.set(n, loaded)
+          announce(false)
+        }
+
         let etag: string
         try {
-          etag = await putPart(url, blob, signal)
-        } catch (err: any) {
-          // A dead URL is re-minted once and the part tried again, because
-          // the bytes are fine and only the signature went stale.
-          if (String(err?.message) !== 'url expired') throw err
-          urls.delete(n)
-          await presign([n])
-          const fresh = urls.get(n)
-          if (!fresh) throw new Error(`no URL for part ${n}`)
-          etag = await putPart(fresh, blob, signal)
+          try {
+            etag = await putPart(url, blob, signal, onBytes)
+          } catch (err: any) {
+            // A dead URL is re-minted once and the part tried again, because
+            // the bytes are fine and only the signature went stale.
+            if (String(err?.message) !== 'url expired') throw err
+            urls.delete(n)
+            await presign([n])
+            const fresh = urls.get(n)
+            if (!fresh) throw new Error(`no URL for part ${n}`)
+            prev = 0
+            etag = await putPart(fresh, blob, signal, onBytes)
+          }
+        } finally {
+          // Whether it landed or not, this part is no longer in the air.
+          inflight.delete(n)
         }
 
         done.set(n, etag)
-        sent = Math.min(file.size, sent + blob.size)
+        committed = Math.min(file.size, committed + blob.size)
 
         // The ledger is written after EVERY part, not at the end. The whole
         // point is surviving the thing that stops the upload.
         ledger!.parts = [...done].map(([partNumber, e]) => ({ partNumber, etag: e }))
         writeLedger(file, ledger!)
 
-        const now = Date.now()
-        recent.push({ at: now, bytes: blob.size })
-        while (recent.length > 6) recent.shift()
-        const span = (now - recent[0].at) / 1000
-        const rate = span > 0.5
-          ? recent.reduce((a, r) => a + r.bytes, 0) / span
-          : null
-
-        onChange({ sent, rate })
+        announce(true)
       } catch (err: any) {
         if (signal.aborted) return
         failure = err?.message || String(err)
+        announce(true)
         return
       }
     }

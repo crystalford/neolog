@@ -898,11 +898,101 @@ true the instant it is set. And the duplicate check is **awaited before**
 the queue starts rather than run beside it, with its own five-second ceiling
 so it can never hold the drop at the gate.
 
-`scripts/test/bulk-upload.mjs` — 43 assertions, in CI. It holds the three
+`scripts/test/bulk-upload.mjs` — 60 assertions, in CI. It holds the three
 things that cannot be allowed to drift: the part size is a pure function of
 the file's length (R2 rejects a mixed-size upload at complete, so a resume
 that computes differently loses everything), only a 4xx drops the ledger,
 and the source still never calls `arrayBuffer`.
+
+### ⚠️ 4 Nov — "what about like a 10 gigabyte upload", and the two walls it found
+
+The operator, after the hardening pass above. Working it through found one
+bug in the uploader and one **outside** it, a step later, which is the worse
+of the two.
+
+**The arithmetic is fine.** `partSizeFor(10e9)` gives 48 MiB parts and 199 of
+them — inside R2's 10,000, inside `/initiate`'s 2,000, inside its 512 MiB
+per-part cap, and nowhere near R2's 5 TiB object ceiling. The ledger is 199
+`{partNumber, etag}` entries, about eleven kilobytes. None of that was the
+problem.
+
+⚠️ **The per-part timeout was a flat ten minutes, and that is a
+size-independent guard on a size-dependent transfer.** At the 8 MiB floor ten
+minutes is 14 kB/s — unreachably slow, so it never fires. At 48 MiB the same
+ten minutes demands **80 kB/s per part**, and with three parts in flight a
+quarter of a megabyte a second before anything can finish. Under that, every
+part times out, every retry times out identically, and the file fails after
+fifty minutes having moved nothing — **a slow connection did not upload
+slowly, it failed.** Exactly the shape of "some of the bigger files failed",
+produced by a guard meant to help.
+
+So the question asked is *has this stopped*, which is the same question at
+every size: ninety seconds of no movement, measured from real bytes leaving.
+⚠️ **That needs `XMLHttpRequest`, not `fetch`** — `fetch` cannot report how
+much of a request body has gone out, so the only guard available through it
+is a duration. The same change makes the bar move continuously instead of
+jumping 48 MiB at a time, and the rate is sampled from bytes on the wire
+rather than one sample per finished part (which is why a 10 GB upload used to
+say nothing about how long it had left for its first several minutes).
+
+⚠️ **`committed` and `inflight` are kept apart.** An abandoned part's bytes
+have to come back OFF the total, and one running figure cannot do that
+without going backwards past parts that are safely in.
+
+**And a part now stops growing at 64 MiB.** `TARGET_PARTS` alone decided the
+size, so the part grew with the file forever — 512 MiB at 100 GB. **A part is
+the unit of retry**: what one failure re-sends and what must cross the wire
+without stopping. Letting it grow without bound makes the biggest files the
+most fragile, which is backwards. Past 12.8 GB the count grows instead; 10 GB
+is unchanged at 48 MiB.
+
+⚠️ **The second wall is the container, and it is the one that mattered.** A
+10 GB recording would have uploaded perfectly, registered, queued — and then
+failed `audio_extract` with `Input too large: 10000000000 > 4294967296` until
+the healer gave up on it. `downloadToTmp` writes the whole input to the
+container's disk and refuses past 4 GB, which is **correct**: `standard-1`
+has a single-digit-gigabyte disk shared between image, input and output, and
+this file's documented worst failure is ENOSPC — which does not fail the one
+oversized job, it fails every job on that container for as long as it stays
+warm. Raising the number would have converted a clean refusal into that.
+
+So an input past `DISK_INPUT_LIMIT` is **not downloaded**: `/extract-audio`
+hands ffmpeg the presigned URL and ffmpeg range-reads it off R2. Zero disk,
+no size cap — the same trade `/extract-thumb` already makes, and additive, so
+every recording that works today takes the identical path it took before.
+Three things it needed:
+
+- ⚠️ **a ranged GET to learn the size, not a HEAD.** A presigned URL signs
+  its method, so a HEAD against one minted for GET comes back 403. `Range:
+  bytes=0-0` is not signed and R2 answers 206 with the full length in
+  `content-range`.
+- ⚠️ **a shorter cascade.** Every strategy re-reads the input from the
+  start; free off local disk, another full pass over ten gigabytes over HTTP.
+  Five passes finishes nothing inside any ceiling worth having, so the HTTP
+  path tries `libmp3lame` and then `pcm_wav` — the one that works and the one
+  that cannot fail to encode if the decode worked at all. The error says how
+  many were tried, so a shortened cascade is never reported as a full one.
+- ⚠️ **a longer kill switch, and `STALE_TMP_AGE_MS` moved with it.** The
+  20-minute ceiling is a guard against a *wedged* process; ten gigabytes
+  pulled across as the job runs is most of that on its own, so the HTTP path
+  gets 45 minutes. The temp sweep is now derived from the **longest** ceiling
+  — pegged to the 20-minute figure it would have deleted that run's output
+  directory while it was still writing into it, which is the precise hazard
+  age is there to prevent.
+
+`-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 30` go in only on
+that path; ffmpeg rejects them as unknown options on a local file.
+
+**What is still true of a 10 GB file, said plainly:** `/transcode-h264` will
+refuse it, because that step genuinely needs the file on disk. That step is
+browser-playback only and already soft in the DO's alarm, so the recording
+still transcribes, still gets a thumbnail (streamed), and still reads onto the
+log — it just plays from the original. And a 10 GB upload runs for hours on a
+home upstream: the resumable ledger and R2's seven-day window both cover a
+closed laptop, but **nothing here has been exercised end to end at that size**
+— there is no egress to the deployed site from a Claude Code session, so the
+arithmetic and the unit tests are what stand behind this, not a real 10 GB
+file.
 
 **What went with `CapturePanel`, and why:** browser-side audio chunking
 (`browser-audio.ts` and `/api/v2/upload/audio-chunk-presign`) — the
