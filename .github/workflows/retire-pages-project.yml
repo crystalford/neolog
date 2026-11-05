@@ -135,33 +135,71 @@ jobs:
           say "  (a 302 to Cloudflare Access is the expected healthy answer —"
           say "  the site is behind Access and nothing here is signed in)"
 
-      - name: Unlink the git connection
+      - name: Unlink — stop the automatic builds
         if: ${{ inputs.action == 'unlink' }}
         run: |
           set -uo pipefail
           say() { printf '%s\n' "$*"; printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
-          # Clearing `source` is what stops Pages cloning this repo on every
-          # push. The project and its history survive.
+
+          # ⚠️ `PATCH {"source": null}` is ACCEPTED AND IGNORED by the Pages
+          # API — it returns success: true and the project still reports a
+          # source. That is why the verify below exists and is not optional:
+          # the first version of this step would have reported a clean unlink
+          # while Pages carried on building on every push.
+          #
+          # The field that actually governs it is
+          # `source.config.deployments_enabled`. The connection stays (so this
+          # is reversible from the dashboard in one click) and Cloudflare stops
+          # cloning the repo, which is the whole goal: no build, no red check.
+          CUR=$(curl -sS \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          if [ "$(echo "$CUR" | jq -r '.success')" != "true" ]; then
+            say "### Could not read \`$PROJECT\`"
+            echo "$CUR" | head -c 1200 | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          # Send back the project's OWN source object with the switches off,
+          # rather than a hand-built one — a PATCH that drops a field Pages
+          # relies on is how a "safe" cleanup breaks the thing it touched.
+          BODY=$(echo "$CUR" | jq -c '{source: (.result.source
+            | .config.deployments_enabled = false
+            | .config.production_deployments_enabled = false
+            | .config.preview_deployment_setting = "none")}')
+
           RES=$(curl -sS -X PATCH \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
-            --data '{"source": null}')
+            --data "$BODY")
+
+          # ⚠️ Verified by RE-READING, not by trusting the PATCH's own answer.
+          sleep 2
+          AFTER=$(curl -sS \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          ON=$(echo "$AFTER" | jq -r '.result.source.config.deployments_enabled // "absent"')
+          PRE=$(echo "$AFTER" | jq -r '.result.source.config.preview_deployment_setting // "absent"')
+
           say ""
-          if [ "$(echo "$RES" | jq -r '.success')" = "true" ]; then
-            STILL=$(echo "$RES" | jq -r 'if .result.source then "still connected" else "disconnected" end')
-            say "### Unlink: \`$STILL\`"
-            if [ "$STILL" != "disconnected" ]; then
-              say "⚠️ The API accepted it and the project still reports a source."
-              say "Use \`delete\`, or disconnect in the dashboard."
-              exit 1
-            fi
+          say "### Unlink"
+          say ""
+          say "- \`deployments_enabled\` is now **$ON**"
+          say "- \`preview_deployment_setting\` is now **$PRE**"
+
+          if [ "$ON" = "false" ]; then
+            say ""
+            say "Automatic builds are off. The next push should produce no"
+            say "Cloudflare Pages check at all. The project, its history and"
+            say "\`${PROJECT}.pages.dev\` are untouched, and this is reversible"
+            say "from the dashboard."
           else
-            say "### Unlink failed"
-            say '```'
-            echo "$RES" | head -c 1500 | tee -a "$GITHUB_STEP_SUMMARY"
-            say '```'
-            echo "::error::Could not clear the git source. Try action: delete."
+            say ""
+            say "⚠️ Did not stick — the field reads \`$ON\` after the write."
+            say "The PATCH response was:"
+            echo "$RES" | head -c 1200 | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::error::deployments_enabled did not change; Pages will keep building."
             exit 1
           fi
 
