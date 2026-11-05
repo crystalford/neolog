@@ -113,6 +113,18 @@ jobs:
           # ⚠️ Say out loud whether the named project still claims a hostname.
           # Deleting one that does would take the domain with it, and that is
           # the failure `domain-cutover.yml` was written after.
+          # ⚠️ Print the named project's whole `source.config`. Two writes
+          # have now been built against guessed field names — `source: null`
+          # (accepted and ignored) and `deployments_enabled` (not a field) —
+          # and both looked plausible. The account is the only authority on
+          # what these are called.
+          say ""
+          say "### \`$PROJECT\` source.config, verbatim"
+          say '```json'
+          echo "$LIST" | jq --arg p "$PROJECT" '.result[] | select(.name == $p) | .source.config' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          say '```'
+
           CLAIMED=$(echo "$LIST" | jq -r --arg p "$PROJECT" \
             '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
           if [ -n "$CLAIMED" ]; then
@@ -179,14 +191,23 @@ jobs:
           AFTER=$(curl -sS \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
             -H "Authorization: Bearer ${CF_API_TOKEN}")
-          ON=$(echo "$AFTER" | jq -r '.result.source.config.deployments_enabled // "absent"')
+          # ⚠️ `deployments_enabled` is NOT a field Pages returns — asserting
+          # on it reported "absent" and failed a write that had partly
+          # worked. The one that governs a build on push to the production
+          # branch is `production_deployments_enabled`.
+          ON=$(echo "$AFTER" | jq -r '.result.source.config.production_deployments_enabled // "absent"')
           PRE=$(echo "$AFTER" | jq -r '.result.source.config.preview_deployment_setting // "absent"')
 
           say ""
           say "### Unlink"
           say ""
-          say "- \`deployments_enabled\` is now **$ON**"
+          say "- \`production_deployments_enabled\` is now **$ON**"
           say "- \`preview_deployment_setting\` is now **$PRE**"
+          say ""
+          say "Full \`source.config\` after the write:"
+          say '```json'
+          echo "$AFTER" | jq '.result.source.config' | tee -a "$GITHUB_STEP_SUMMARY"
+          say '```'
 
           if [ "$ON" = "false" ]; then
             say ""
