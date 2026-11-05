@@ -48,7 +48,7 @@ import type {
 
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
-import { TRANSCODE_MAX_BYTES } from '../../../src/lib/pipeline-status'
+import { PROXY_LONG_EDGE, PROXY_REQUEST_MS } from '../../../src/lib/pipeline-status'
 
 export interface Env {
   DB: D1Database
@@ -878,21 +878,18 @@ export class VlogPipelineDO {
       await this.recordEvent(vlog.id, 'transcode', 'skipped', 'already_transcoded', {})
       return
     }
-    // ⚠️ Not attempted rather than attempted and failed. See
-    // `TRANSCODE_MAX_BYTES` — at this size it cannot succeed, and the attempt
-    // costs a held gate slot and ten minutes of a woken container per
-    // restart, per file.
-    if (vlog.file_size_bytes !== null && vlog.file_size_bytes > TRANSCODE_MAX_BYTES) {
-      await this.recordEvent(vlog.id, 'transcode', 'skipped', 'too_large', {
-        bytes: vlog.file_size_bytes,
-        limit: TRANSCODE_MAX_BYTES,
-        reason: 'the container cannot hold a file this size on disk, and a full-resolution encode would not finish',
-        consequence: 'the original is played directly, which some browsers cannot decode',
-      })
-      return
-    }
-
-    const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
+    // ⚠️ 5 Nov — there is no size gate here any more, and that is the point.
+    // `/transcode-proxy` reads the master over HTTP and writes a downscaled
+    // copy, so the master's size never touches disk and a 10 GB recording
+    // costs the same as a 100 MB one. `TRANSCODE_MAX_BYTES` is now only the
+    // ceiling on the OLD full-resolution endpoint, which nothing in the
+    // pipeline calls.
+    //
+    // ⚠️ The URL has to outlive the encode, not the request. ffmpeg
+    // range-reads this for the whole run, so a one-hour signature on a job
+    // that may take most of an hour would expire mid-read and look exactly
+    // like a corrupt master.
+    const inputUrl = await presignR2Get(this.env, vlog.r2_key, 6 * 3600)
 
     const gateStub = this.env.FFMPEG_GATE.get(
       this.env.FFMPEG_GATE.idFromName('ffmpeg-gate-v2')
@@ -917,37 +914,61 @@ export class VlogPipelineDO {
       await this.recordEvent(vlog.id, 'transcode', 'running', 'invoke_ffmpeg',
         { source_key: vlog.r2_key })
 
+      // ⚠️ A downscale, not a re-encode of the master. A 4K recording comes
+      // back as a few hundred megabytes that plays anywhere, and the master
+      // is never streamed to a browser at all.
       const ctl = new AbortController()
-      const timer = setTimeout(() => ctl.abort(), 10 * 60 * 1000) // 10 min cap
+      const timer = setTimeout(() => ctl.abort(), PROXY_REQUEST_MS)
       let resp: Response
       try {
-        resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/transcode-h264', {
+        resp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/transcode-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ input_url: inputUrl }),
+          body: JSON.stringify({ input_url: inputUrl, long_edge: PROXY_LONG_EDGE }),
           signal: ctl.signal,
         } as RequestInit)
       } catch (err: any) {
         clearTimeout(timer)
-        throw new Error(`ffmpeg /transcode-h264 fetch failed: ${err?.message || err}`)
+        throw new Error(`ffmpeg /transcode-proxy fetch failed: ${err?.message || err}`)
       }
       clearTimeout(timer)
       if (!resp.ok) {
         const errBody = (await resp.text()).slice(0, 500)
-        throw new Error(`ffmpeg /transcode-h264 ${resp.status}: ${errBody}`)
+        throw new Error(`ffmpeg /transcode-proxy ${resp.status}: ${errBody}`)
       }
 
-      const mp4 = new Uint8Array(await resp.arrayBuffer())
-      if (mp4.byteLength < 1024) {
-        throw new Error(`transcode produced suspiciously small output: ${mp4.byteLength}B`)
-      }
+      // ⚠️ STREAMED into R2, never `arrayBuffer()`. A Worker has ~128 MB of
+      // memory, so buffering the proxy here would cap the feature on OUTPUT
+      // size — the ceiling this file carried for months without saying so,
+      // and the reason a long recording could not have a playable copy even
+      // when the encode itself would have been fine.
+      const declared = Number(resp.headers.get('content-length') || '0')
+      if (!resp.body) throw new Error('the proxy came back with no body')
       const key = `${vlog.operator_id}/transcoded/${vlog.id}.mp4`
-      await this.env.VIDEOS.put(key, mp4, { httpMetadata: { contentType: 'video/mp4' } })
+      const put = await this.env.VIDEOS.put(key, resp.body, {
+        httpMetadata: { contentType: 'video/mp4' },
+      })
+      const stored = put?.size ?? 0
+      if (stored < 1024) {
+        throw new Error(`the proxy came out too small to be a video: ${stored}B`)
+      }
+      // ⚠️ A stream that ends early still stores, and what it stores looks
+      // like a valid object. So the length is checked against what the
+      // container said it was sending, and a short write is a failure rather
+      // than a playable-looking file that stops half way. The row is left
+      // alone, so the retry overwrites this key — nothing is deleted, which
+      // is the standing rule for every object in this bucket.
+      if (declared > 0 && stored !== declared) {
+        throw new Error(
+          `the proxy was cut short: stored ${stored} of ${declared} bytes. `
+          + `Nothing is lost — the recording itself is untouched and this retries.`,
+        )
+      }
       await this.env.DB.prepare(
         `UPDATE vlogs SET transcoded_r2_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
       ).bind(key, vlog.id).run()
       await this.recordEvent(vlog.id, 'transcode', 'running', 'upload_r2',
-        { r2_key: key, bytes: mp4.byteLength })
+        { r2_key: key, bytes: stored, long_edge: PROXY_LONG_EDGE, source_bytes: vlog.file_size_bytes })
     } finally {
       if (gateToken !== null) {
         try {

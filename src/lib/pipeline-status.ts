@@ -61,50 +61,83 @@ export function statusList(statuses: readonly string[]): string {
 }
 
 /**
- * Past this many bytes the browser-playback transcode is SKIPPED, not tried.
+ * ⚠️ 5 Nov — THE SHAPE CHANGED, and this comment is the shape.
  *
- * ⚠️ 5 Nov — the operator: *"i have files over 10 gigs"*. Three files call
- * `/transcode-h264` — the DO's `stepTranscode`, the legacy workflow's
- * `transcode-h264` step and `/api/v2/admin/transcode-one` behind Settings'
- * *won't play* — so the number lives here rather than in three places. That
- * is this file's whole reason for existing: five copies of one pipeline fact,
- * two of them short, invisible to every check the repo has.
+ * The operator: *"youtube i could probably upload any size file and have it
+ * dependable and awesome as a video storage and upload tool. let's make it as
+ * close to that as possible."* He was right, and the day before I had written
+ * down four reasons a big recording could not have a playable copy as though
+ * they were facts about the world. Three of the four were facts about one
+ * wrong decision: **that the playable copy should be the master re-encoded at
+ * its own resolution.**
  *
- * Four things make the transcode impossible at that size, and all four
- * predate this constant:
+ * **Nothing plays the master.** That is what every video site does and it is
+ * what this does now. `/transcode-proxy` reads the original over HTTP — so its
+ * size never touches the container's disk — and writes a copy capped at
+ * `PROXY_LONG_EDGE` on its long side. A 4K master becomes a few hundred
+ * megabytes that plays in any browser, the master is never streamed to anyone,
+ * and **the size of the input stops being a question**: a 10 GB recording
+ * costs the same disk as a 100 MB one, which is none.
  *
- *  - the container writes its input to local disk, and `downloadToTmp`
- *    refuses past 4 GB because `standard-1`'s disk is smaller than that plus
- *    an output;
- *  - ⚠️ TWO of the three callers read the finished MP4 into a WORKER with
- *    `arrayBuffer()` before putting it in R2 — the DO's `stepTranscode` and
- *    `/api/v2/admin/transcode-one` — and a Worker has ~128 MB of memory, so
- *    for those two the OUTPUT has always had to be small. That is a SEPARATE
- *    ceiling on a different quantity, it is written down nowhere else, and
- *    this constant does not fix it. The legacy workflow streams
- *    `ffmpegResp.body` straight into R2 and does not have it, which is the
- *    shape the other two should take if that ceiling is ever worth lifting;
- *  - it is a full-resolution `libx264 -crf 23` encode, and 4K on a half-vCPU
- *    instance is hours against a ten-minute abort and a twenty-minute kill;
- *  - a container bills for every second it is awake, so an attempt that
- *    cannot succeed costs a held gate slot and ten woken minutes — per
- *    restart, per file.
+ * So the three ceilings that were load-bearing yesterday are gone:
  *
- * ⚠️ Skipping is not free either, and the cost is stated rather than hidden:
- * `transcoded_r2_key` stays null, so `/vlog/[id]` plays the ORIGINAL, and
- * Chrome on Windows may not decode an HEVC one. The transcript, the
- * thumbnail and the headline are unaffected — this step has always been soft
- * for exactly that reason.
+ *  - the 4 GB disk limit — the input is not on disk;
+ *  - the Worker's ~128 MB — the proxy is STREAMED into R2 rather than
+ *    buffered with `arrayBuffer()`, so nothing caps the output either;
+ *  - the full-resolution encode — it is a downscale, which is a fraction of
+ *    the work.
+ *
+ * What remains is encode TIME, and that is bought rather than designed
+ * around: `workers/ffmpeg/wrangler.toml` runs `standard-4` (4 vCPU) instead
+ * of `standard-1` (1/2 vCPU). Memory and disk bill on the instance's
+ * provisioned size for as long as it is awake and CPU bills only on use, so
+ * the cost of this is roughly a dime an hour of wakefulness plus the CPU the
+ * encodes actually burn — against a per-minute, forever fee for putting the
+ * library in a hosted video product. That is the operator's money either way
+ * and the comparison is in CLAUDE.md.
+ */
+
+/** The proxy's long side, in pixels. 1280 plays everywhere and seeks well. */
+export const PROXY_LONG_EDGE = 1280
+
+/**
+ * How long the DO waits for one proxy.
+ *
+ * ⚠️ Not a guess at how long an encode takes — a bound on how long one
+ * request may hold a container awake. The old value was ten minutes, chosen
+ * when the step was a full-resolution encode that could never finish anyway.
+ */
+export const PROXY_REQUEST_MS = 40 * 60 * 1000
+
+/**
+ * The old full-resolution endpoint's ceiling, and ONLY that.
+ *
+ * ⚠️ `/transcode-h264` re-encodes at the source resolution and downloads its
+ * input to the container's disk, so it still cannot take a file past this.
+ * Nothing in the pipeline calls it any more — `stepTranscode` and the legacy
+ * workflow both use `/transcode-proxy`, which has no size limit — and the two
+ * callers that remain are the hand-operated ones: Settings' *won't play* and
+ * the transcode backfill.
+ *
+ * ⚠️ So this is no longer "too big to have a playable copy". It is "too big
+ * for the ONE endpoint that needs the whole file locally", and the answer for
+ * such a file is the proxy, which `transcodeRefusal()` now says.
  */
 export const TRANSCODE_MAX_BYTES = 4 * 1024 * 1024 * 1024
 
-/** Why a recording cannot be made browser-playable, in words, or null. */
+/**
+ * Why the full-resolution transcode cannot take this file, in words, or null.
+ *
+ * ⚠️ A sentence and not a status code, because Settings' *won't play* is a
+ * door he presses — and the answer it gave for a big recording used to be a
+ * 500 with ffmpeg's stderr in it, several minutes later.
+ */
 export function transcodeRefusal(bytes: number | null | undefined): string | null {
   if (typeof bytes !== 'number' || bytes <= TRANSCODE_MAX_BYTES) return null
   const gb = (bytes / 1e9).toFixed(1)
-  return `This recording is ${gb} GB. Making a second, browser-playable copy `
-    + `means holding the whole file on one machine and re-encoding every `
-    + `frame of it, and neither fits at this size. The recording itself is `
-    + `kept untouched, and the words and the still are not affected — it just `
-    + `plays from the original, which some browsers cannot decode.`
+  return `This recording is ${gb} GB, which is too big to re-encode at its own `
+    + `size — that needs the whole file on one machine. The playable copy is `
+    + `made a different way, by the pipeline, and it is a smaller one: run `
+    + `"wedged half-way" and it will be built without the original being `
+    + `touched.`
 }

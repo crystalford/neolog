@@ -994,76 +994,127 @@ closed laptop, but **nothing here has been exercised end to end at that size**
 arithmetic and the unit tests are what stand behind this, not a real 10 GB
 file.
 
-### ⚠️ 5 Nov — "i have files over 10 gigs", so the transcode is skipped rather than failed
+### ⚠️ 5 Nov — "i have files over 10 gigs". Nothing plays the master.
 
-The answer above ended by naming `/transcode-h264` as the one step a file that
-size loses. He has those files, so that sentence is now the live case rather
-than a footnote, and leaving it as *"it will refuse it"* was not good enough:
-**refusing and skipping are different events, and the one that was happening
-cost money.**
+Two messages, and the second one corrected the first answer completely.
 
-A recording past the limit still went through the whole attempt — presign, a
-held `FFmpegGate` slot, a woken container, a download that fails at 4 GB —
-then the DO's `MAX_RESTARTS` of 2 did it twice more. Ten minutes of a woken
-instance per try, per file, on an encode that cannot finish, with a `failed`
-event at the end of it. **Container memory and disk bill for every second an
-instance is alive**, which this file already records as the shape of the
-operator's bill.
+Told he had files that size, I made the transcode **skip** them: a recording
+past 4 GB got no browser-playable copy, and I wrote down four reasons that was
+unavoidable. He read it and said:
 
-**Four things make it impossible at that size, and all four predate today:**
+> *"i'm not sure that's super complicated. let me phrase it like this. youtube
+> i could probably upload any size file and have it dependable and awesome as
+> a video storage and upload tool. let's make it as close to that as possible.
+> so what do we need to do"*
 
-- the container writes its input to local disk, and `downloadToTmp` refuses
-  past 4 GB because `standard-1`'s disk is smaller than that plus an output;
-- ⚠️ **two of the three callers read the finished MP4 into a WORKER** with
-  `arrayBuffer()` before putting it in R2 — `stepTranscode` and
-  `/api/v2/admin/transcode-one` — and a Worker has ~128 MB of memory, so for
-  those two the OUTPUT has always had to be small. **That is a separate
-  ceiling on a different quantity, it was written down nowhere, and the skip
-  does not fix it.** The legacy workflow streams `ffmpegResp.body` straight
-  into R2 and does not have it — which is the shape the other two should take
-  if that ceiling is ever worth lifting;
-- it is a full-resolution `libx264 -crf 23` encode, and 4K on a half-vCPU
-  instance is hours against a ten-minute abort in the DO and a twenty-minute
-  kill in the container;
-- the cost above.
+**He was right and the four reasons were mostly one wrong decision.** Three of
+them followed from assuming the playable copy had to be *the master
+re-encoded at its own resolution* — which no video site does. **Nothing plays
+the master.** The upload is kept untouched and what gets played is a small
+proxy. Once that is the design, the ceilings dissolve rather than needing to
+be worked around:
 
-So `TRANSCODE_MAX_BYTES` lives in **`src/lib/pipeline-status.ts`**, and the
-reason it lives *there* is that file's entire purpose: it exists because five
-files each held their own copy of one pipeline fact and two were short. ⚠️ A
-fourth opinion was already in the repo and nobody had noticed —
-`/api/v2/admin/transcode-backfill` capped at **1500 MB** by default and
-reported `oversized_skipped`. That one **stays, and stays narrower**, because
-it answers a different question: how much work to queue when dispatching four
-hundred recordings at once, not whether an encode can succeed. It is clamped
-so a request can ask for less and never for more — without the clamp,
-`max_size_mb: 99999` queues four hundred recordings that `stepTranscode`
-skips on arrival and reports them back as *dispatched*.
+| what blocked it | why it is gone |
+|---|---|
+| the container's disk refuses past 4 GB | ⚠️ **the input is never downloaded** — ffmpeg range-reads the master off R2, so 10 GB costs no disk at all |
+| a Worker has ~128 MB, and two callers did `arrayBuffer()` | the proxy is **streamed** into R2; that undocumented ceiling on the OUTPUT is gone too |
+| a full-resolution 4K encode takes hours | it is a **downscale** to 1280 on the long side — a fraction of the work |
+| encode time against a 10-minute abort | the only part actually **bought**: `standard-4`, below |
 
-⚠️ **The check happens before the gate is acquired and before the original is
-presigned**, and the test asserts that ordering. Checking it after the gate
-would still hold a slot and still bill for the instance, which is half the
-reason the skip exists.
+`/transcode-proxy` in `workers/ffmpeg/server.js` is it. A 4K master becomes a
+few hundred megabytes that plays in any browser, and the original is never
+streamed to anyone.
 
-**And the skip says what it costs.** `transcodeRefusal()` returns a sentence,
-not a code, because Settings' *won't play* is a door he presses — and the
-answer it used to give for one of these files was a 500 with ffmpeg's stderr
-in it, several minutes later. `transcoded_r2_key` stays null, so `/vlog/[id]`
-plays the ORIGINAL, and **Chrome on Windows may not decode an HEVC one.**
-That is a real gap, stated rather than papered over: the words, the still and
-the headline are unaffected, and the file itself is untouched.
+**Four details that are load-bearing, each with a test that fails without it:**
 
-`scripts/test/pipeline-status.mjs` — 25 assertions, in CI, each new one
-proved by putting its bug back: a caller re-declaring the number, the skip
-moved after the gate, the refusal reduced to a status code, and the
-backfill's clamp removed.
+- ⚠️ **the output goes to local disk before coming back, on purpose.** One
+  less hop would stream ffmpeg's stdout straight through — and a non-zero exit
+  half way would already have sent a truncated body under a `200`, so the
+  caller would store a corrupt proxy that looks fine. On disk a failure is a
+  clean 500 with nothing sent, and a proxy is small, which is the point of it.
+- ⚠️ **and the caller still checks the length it got against the length it was
+  promised.** A stream that ends early stores anyway, and what it stores is a
+  valid-looking object that plays and then stops. A short write throws, the
+  row is left alone, and the retry overwrites the key — **nothing is deleted**,
+  which is the standing rule for every object in this bucket.
+- ⚠️ **it never upscales.** `min(1280,iw)` / `min(1280,ih)` cap each dimension
+  at the source's own, so a 720p phone clip is not blown up and a vertical
+  recording stays vertical.
+- ⚠️ **`-map 0:a:0?` — the `?` is the whole thing.** A silent DJI clip has no
+  audio stream, and this file already records eight of ten corpus failures
+  coming down to exactly that. Without it ffmpeg exits non-zero on a recording
+  that is otherwise perfect.
 
-⚠️ **What is NOT solved:** a >4 GB HEVC recording has no browser-playable
-copy, and the honest reason is not the disk limit — it is that re-encoding
-4K on a half-vCPU container was never going to work and a 10 GB file is a bad
-thing to stream from R2 anyway. If watching these in the browser matters, the
-answer is a *downscaled* proxy (720p, a bitrate cap) rather than a
-full-resolution re-encode, and that is a new decision with a container-time
-bill attached, so it is his to make.
+**The presigned master is signed for six hours, not one.** ffmpeg range-reads
+it for the whole run, so a one-hour signature on a job that takes forty
+minutes expires mid-read — and that failure reads exactly like a corrupt
+master.
+
+**What is bought: `standard-4` instead of `standard-1`** in
+`workers/ffmpeg/wrangler.toml` — 4 vCPU / 12 GiB / 20 GB disk against
+1/2 vCPU / 4 GiB / 8 GB. The downscale cuts the encode work enormously but 4K
+HEVC still has to be **decoded**, and half a vCPU cannot do that at real time.
+⚠️ **This is the operator's bill, so the arithmetic is written down rather
+than assumed.** Container memory and disk are billed on the instance's
+*provisioned* size for every second it is **awake**; CPU is billed only on
+actual use. So `standard-4` is ~$0.11 an hour of wakefulness plus the CPU the
+encodes burn, against a Workers Paid allowance of 25 GiB-hours of memory and
+375 vCPU-minutes a month before anything is charged. It applies to every
+endpoint, because one container class serves all of them — deliberate: a
+second class would bound it more tightly and costs a Durable Object migration
+on a live pipeline, which is not worth it at a dime an hour.
+
+**Cloudflare Stream was weighed and declined, and it is worth recording why
+because it IS the YouTube-shaped answer from the same vendor.** It would do
+all of this with no transcode engineering at all. It is **$5 per 1,000 minutes
+stored per month and $1 per 1,000 delivered**, with a default 30 GB per-file
+upload cap. For a library of four hundred recordings that is a recurring fee
+on a number that only grows, forever, **for a second copy of data R2 already
+holds** — against roughly one-time pennies of CPU for a proxy that lives in
+R2 beside its master. That cuts against this file's oldest rule: the
+recordings in R2 are the thing being preserved. ⚠️ If he ever wants
+adaptive-bitrate streaming, a player, or captions served for him, Stream is
+the right answer and this decision should be revisited rather than defended.
+
+**`TRANSCODE_MAX_BYTES` still exists and means something much narrower now.**
+It is the ceiling on `/transcode-h264` — the old full-resolution endpoint,
+which still downloads its whole input — and **nothing in the pipeline calls
+that any more.** Its two remaining callers are the hand-operated ones:
+Settings' *won't play* and the transcode backfill. ⚠️ So the refusal sentence
+had to change too: it used to say the file was too big to have a playable
+copy, which is now false. It names the way that does work.
+
+⚠️ **The checks caught three of my own mistakes while writing this, and all
+three are old lessons in this file:**
+
+- `check-unreached-routes.mjs` failed the moment `/transcode-proxy` existed
+  with nothing calling it — a container endpoint with no caller, which is
+  exactly the state it was written for after seven of them shipped dead.
+- the test's comment-stripper ate `https://` out of every URL, because a bare
+  `//` rule does not know a protocol from a comment. The `[^:]` guard that
+  `check-sql-columns.mjs` and `bulk-upload.mjs` both carry fixes it.
+- then it ate the **rest of the file** from `{ reason: 'source is audio/*' }`
+  — a `/*` inside a STRING opening a match that runs to the next `*/`. That
+  is the same string-versus-code confusion that once deleted `downloadToTmp`,
+  `sweepStaleTmpDirs` and `runFfmpeg` out of the container server. ⚠️ The
+  stripper handles **line comments only** now, with the reason written beside
+  it: a regex cannot tell a comment from a string, and nothing under test here
+  hides behind a block comment.
+
+`scripts/test/pipeline-status.mjs` — 42 assertions, in CI. Seven of the new
+ones were proved by putting their bug back: the proxy buffered in a Worker,
+the cut-short check removed, the master downloaded to disk, the scale filter
+upscaling, the optional audio map dropped, the container back to half a vCPU,
+and a size gate put back in front of the proxy.
+
+⚠️ **Still not measured.** No file of this size has gone through end to end —
+there is no egress to the deployed site from a Claude Code session, so what
+stands behind this is the arithmetic and the assertions. The number to watch
+on the first real one is how long `/transcode-proxy` takes against
+`PROXY_REQUEST_MS` (forty minutes). If a long recording runs past it, the next
+step is **segmenting** — encode the proxy in chunks and concatenate — not a
+bigger instance; the design above is already shaped for that, since each chunk
+would be an independent HTTP-input encode.
 
 **What went with `CapturePanel`, and why:** browser-side audio chunking
 (`browser-audio.ts` and `/api/v2/upload/audio-chunk-presign`) — the

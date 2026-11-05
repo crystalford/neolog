@@ -133,68 +133,143 @@ for (const f of [
     /import \{ IN_FLIGHT_STATUSES \}/.test(code) && !/OCCUPIED_STATUSES/.test(code))
 }
 
-// ── The transcode ceiling, which is the same lesson on a number ─────────
-// ⚠️ 5 Nov. Three files call `/transcode-h264`, and a recording past this
-// size cannot be transcoded by any of them. One copy of the number, for the
-// reason this whole file exists: five copies of one pipeline fact, two short,
-// and every check in the repo green.
-const TRANSCODE_CALLERS = [
-  'workers/pipeline/src/index.ts',
-  'workers/process-upload/src/workflow.ts',
-  'src/app/api/v2/admin/transcode-one/route.ts',
-  // ⚠️ The backfill does not call ffmpeg itself — it dispatches through the
-  // DO — but it had a FOURTH opinion about how big is too big (1500 MB), and
-  // that is exactly the shape this file exists to stop. It keeps its own,
-  // NARROWER number because it answers a different question (how much work to
-  // queue at once), and it is clamped so it can never ask for more than the
-  // encode can do.
-  'src/app/api/v2/admin/transcode-backfill/route.ts',
-]
-
+// ── The playable copy: a downscale, and no size limit on it ─────────────
+// ⚠️ 5 Nov. The operator asked for uploads of any size to be as dependable
+// as YouTube. The answer is that NOTHING PLAYS THE MASTER — the pipeline
+// makes a small proxy — and these assertions are the three things that have
+// to stay true for that to hold at any size.
 {
   const lib = readFileSync('src/lib/pipeline-status.ts', 'utf8')
-  ok('the transcode ceiling is declared in the shared file',
-    /export const TRANSCODE_MAX_BYTES = 4 \* 1024 \* 1024 \* 1024/.test(lib))
-  ok('and the refusal is a sentence, not a status code',
-    /export function transcodeRefusal/.test(lib) && lib.includes('kept untouched'))
+  ok('the proxy long edge is shared, not re-typed per caller',
+    /export const PROXY_LONG_EDGE = 1280/.test(lib))
+  ok('and so is the request bound', /export const PROXY_REQUEST_MS/.test(lib))
+
+  const server = readFileSync('workers/ffmpeg/server.js', 'utf8')
+  const proxy = server.slice(server.indexOf('async function transcodeProxy'))
+  const body = proxy.slice(0, proxy.indexOf('\nconst routes'))
+
+  // ⚠️ The input must NOT be downloaded. This is the single reason the
+  // endpoint works at 10 GB where the old one could not, and a future edit
+  // that "tidies" it into downloadToTmp puts the 4 GB wall straight back.
+  ok('the proxy never downloads the master', !body.includes('downloadToTmp'))
+  ok('it hands ffmpeg the URL directly', /'-i', input_url/.test(body))
+  ok('and it downscales rather than re-encoding at source size',
+    body.includes("'-vf'") && body.includes('force_original_aspect_ratio=decrease'))
+  // ⚠️ Never upscales: min(edge,iw) caps at the source's own dimension, so a
+  // 720p phone clip is not blown up to 1280 and a vertical stays vertical.
+  ok('and never upscales a small source', /min\(\$\{edge\},iw\)/.test(body))
+  // ⚠️ A silent DJI clip has no audio stream. Eight of ten corpus failures
+  // were once exactly that, so the optional map is load-bearing.
+  ok('a silent recording still gets a proxy', /'-map', '0:a:0\?'/.test(body))
 }
 
-// Every caller takes it from there, and none re-derives it.
+// ⚠️ Comments stripped FIRST. Every one of these spans explains in prose
+// what it must not DO — `TRANSCODE_MAX_BYTES` is named in a comment saying it
+// no longer applies here, and the softStep is still labelled `transcode-h264`
+// so its outcome key stays stable. The same lesson `check-dropped-tables`,
+// `check-container-server` and `check-pipeline-artifact-exists` each learned:
+// a check that reads a file's own explanation of a bug reports the bug.
+// ⚠️ The `[^:]` guard is not decoration. A bare `//` rule eats `https://`
+// out of every URL in the file, so the endpoint under test vanishes and the
+// check passes or fails for a reason that has nothing to do with the code.
+// Same form `scripts/test/bulk-upload.mjs` and `check-sql-columns.mjs` use.
+// ⚠️ LINE comments only, and both halves of that are deliberate.
+//
+// The `[^:]` guard is not decoration: a bare `//` rule eats `https://` out of
+// every URL in the file, so the endpoint under test vanishes and the check
+// then passes or fails for a reason that has nothing to do with the code.
+//
+// And block comments are left ALONE, because stripping them with a regex is
+// the bug that once deleted three live helpers out of
+// `workers/ffmpeg/server.js`: `{ reason: 'source is audio/*' }` in this very
+// file opens a match that runs to the next `*/` and destroys everything
+// between. A regex cannot tell a comment from a string. Nothing checked here
+// hides behind a block comment — every explanation this test has to see past
+// is a `//` line.
+const strip = code => code.replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+
+// ⚠️ The proxy is STREAMED into R2. Buffering it in a Worker caps the feature
+// on OUTPUT size — the ceiling this repo carried for months without saying
+// so — and that is invisible until a long recording silently has no copy.
+for (const [f, start, end] of [
+  ['workers/pipeline/src/index.ts', 'transcode-proxy', 'transcoded_r2_key = ?'],
+  ['workers/process-upload/src/workflow.ts', 'transcode-proxy', 'transcoded_r2_key = ?'],
+]) {
+  const bare = strip(readFileSync(f, 'utf8'))
+  const span = bare.slice(bare.indexOf(start), bare.indexOf(end, bare.indexOf(start)))
+  ok(`${f}: the span under test was found`, span.length > 100 && span.length < 4000)
+  ok(`${f} streams the proxy into R2`, !span.includes('arrayBuffer('))
+  // ⚠️ A stream that ends early still stores, and what it stores looks like a
+  // valid object. Without this a half-written proxy plays and then stops.
+  ok(`${f} rejects a proxy that was cut short`,
+    span.includes('content-length') && /stored !== declared/.test(span))
+  // ⚠️ Asserted against the WHOLE file, not the span — the span begins at the
+  // endpoint name, so the `https://…/` in front of it sits outside. And the
+  // whole file is the stronger claim anyway: neither of these may reach the
+  // full-resolution endpoint ANYWHERE. The softStep LABEL may still read
+  // `transcode-h264`, because that key is what `extraction_outcomes` is read
+  // by and renaming it would orphan every recording's recorded outcome.
+  ok(`${f} fetches the proxy endpoint`,
+    bare.includes('ffmpeg.neolog.internal/transcode-proxy'))
+  ok(`${f} never fetches the full-resolution one`,
+    !bare.includes('ffmpeg.neolog.internal/transcode-h264'))
+  // ⚠️ The signature must outlive the ENCODE, not the request: ffmpeg
+  // range-reads the master throughout, so a one-hour URL on a forty-minute
+  // job expires mid-read and reads as a corrupt master.
+  const upTo = bare.slice(0, bare.indexOf(start))
+  const presign = upTo.lastIndexOf('presignR2Get')
+  ok(`${f} signs the master for longer than the encode`,
+    /6 \* 3600/.test(bare.slice(presign, presign + 120)))
+}
+
+// ⚠️ No size gate in front of the pipeline's transcode any more. That gate
+// was correct for a full-resolution encode and is the bug for a proxy: it
+// would refuse exactly the files this was built for.
+{
+  const bare = strip(readFileSync('workers/pipeline/src/index.ts', 'utf8'))
+  const st = bare.indexOf('private async stepTranscode')
+  const body = bare.slice(st, bare.indexOf('\n  private async', st + 10))
+  ok('the stepTranscode body was found', body.includes('transcode-proxy'))
+  ok('the pipeline no longer refuses a big file a playable copy',
+    !body.includes('TRANSCODE_MAX_BYTES'))
+}
+
+// The hand-operated callers keep the old endpoint, so they keep its ceiling.
 const ceilingCopies = []
-for (const f of TRANSCODE_CALLERS) {
+for (const f of [
+  'src/app/api/v2/admin/transcode-one/route.ts',
+  'src/app/api/v2/admin/transcode-backfill/route.ts',
+]) {
   const code = readFileSync(f, 'utf8')
-  ok(`${f} imports the transcode ceiling`,
+  ok(`${f} imports the ceiling it needs`,
     /import \{[^}]*TRANSCODE_MAX_BYTES[^}]*\} from '(?:@\/lib|[./]+src\/lib)\/pipeline-status'/.test(code))
-  const bare = code
-    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
-  // ⚠️ A caller that spells the number out again is the bug, whether or not
-  // it also imports the constant — that is how one of five copies goes short.
+  const bare = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
   if (/(?:const|let)\s+\w*(?:MAX_BYTES|TRANSCODE_LIMIT|MAX_TRANSCODE)\w*\s*=/.test(bare)) {
     ceilingCopies.push(`${f}: declares its own ceiling`)
   }
 }
-check('and no caller declares its own', ceilingCopies, [])
+check('and neither declares its own', ceilingCopies, [])
 
-// ⚠️ The backfill's own cap may narrow, never widen. Without the clamp a
-// request for `max_size_mb: 99999` queues four hundred recordings that
-// `stepTranscode` skips on arrival, and reports them back as dispatched.
+// ⚠️ The backfill's own cap may narrow, never widen.
 {
   const code = readFileSync('src/app/api/v2/admin/transcode-backfill/route.ts', 'utf8')
   ok('the backfill clamps its own cap to the ceiling',
     /Math\.min\(\s*maxSizeMb \* 1_000_000,\s*TRANSCODE_MAX_BYTES\s*\)/.test(code))
 }
 
-// ⚠️ The skip has to come BEFORE the container is woken. Checking it after
-// the gate is acquired would still hold a slot and bill for the instance,
-// which is half the reason the skip exists.
+// ⚠️ The refusal has to point at what DOES work, or it is the dead end this
+// repo already records for the healer's "Click Re-extract" message.
 {
-  const code = readFileSync('workers/pipeline/src/index.ts', 'utf8')
-  const step = code.slice(code.indexOf('private async stepTranscode'))
-  const guard = step.indexOf('TRANSCODE_MAX_BYTES')
-  const gate = step.indexOf('FFMPEG_GATE')
-  const presign = step.indexOf('presignR2Get')
-  ok('the size is checked before the gate is acquired', guard > -1 && guard < gate)
-  ok('and before the original is presigned', guard > -1 && guard < presign)
+  const lib = readFileSync('src/lib/pipeline-status.ts', 'utf8')
+  const fn = lib.slice(lib.indexOf('export function transcodeRefusal'))
+  ok('the refusal names the way that does work', /wedged half-way/.test(fn))
+}
+
+// ⚠️ The container has to have the CPU, or the proxy times out instead of
+// finishing. This is the one part of "like YouTube" that is bought.
+{
+  const toml = readFileSync('workers/ffmpeg/wrangler.toml', 'utf8')
+  ok('the container is sized for an encode', /instance_type = "standard-4"/.test(toml))
 }
 
 console.log(`\n  ${pass} passed, ${fail} failed`)

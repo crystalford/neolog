@@ -902,8 +902,100 @@ async function concatAudio(body, res) {
   }
 }
 
+// ─── endpoint: /transcode-proxy ──────────────────────────────────────────────
+/**
+ * A small, browser-playable copy of a recording. Any size in.
+ *
+ * ⚠️ 5 Nov — the operator: *"youtube i could probably upload any size file and
+ * have it dependable… let's make it as close to that as possible."* He is
+ * right, and `/transcode-h264` was the wrong shape for it: it re-encodes at
+ * the SOURCE resolution, which for a 4K master is both enormous and slow, and
+ * then it cannot even start because the file will not fit on disk.
+ *
+ * **Nothing plays the master.** That is the whole trick, and it is what every
+ * video site does: the upload is kept untouched and what gets played is a
+ * proxy — here 1280 on its long side, H.264, capped bitrate. A 4K recording
+ * becomes a few hundred megabytes that plays in any browser on any device,
+ * and the original is never streamed to anyone.
+ *
+ * Three things make it size-independent:
+ *
+ *  - ⚠️ **the input is read over HTTP**, never downloaded. ffmpeg range-reads
+ *    it off R2, so a 10 GB or a 100 GB master costs no disk at all. This is
+ *    the one reason the endpoint works where the old one could not.
+ *  - **the output goes to local disk first, then back as one response with a
+ *    Content-Length.** It would stream from ffmpeg's stdout in one less hop,
+ *    and that is exactly wrong here: a non-zero exit half-way through would
+ *    have already sent a truncated body, the status line would already say
+ *    200, and the caller would store a corrupt proxy that looks fine. On disk
+ *    a failure is a clean 500 with nothing sent — and a proxy is small, which
+ *    is the point of it.
+ *  - **it never upscales.** `min(1280,iw)` and `min(1280,ih)` cap each
+ *    dimension at the source's own, so a 720p phone clip is re-encoded at its
+ *    own size rather than blown up, and a vertical recording stays vertical.
+ *
+ * ⚠️ `-map 0:a:0?` — the `?` is load-bearing. A silent DJI clip has no audio
+ * stream, and this file already records eight of ten corpus failures coming
+ * down to exactly that; without the `?` ffmpeg exits non-zero on a recording
+ * that is otherwise perfectly fine.
+ */
+async function transcodeProxy(body, res) {
+  const { input_url, long_edge } = body
+  if (!input_url) return jsonError(res, 400, 'input_url required')
+
+  const edge = Number.isInteger(long_edge) && long_edge >= 240 && long_edge <= 1920
+    ? long_edge
+    : 1280
+
+  const dir = mkdtempSync(join(tmpdir(), 'neolog-ffmpeg-proxy-'))
+  const outFile = join(dir, 'proxy.mp4')
+  try {
+    await runFfmpeg([
+      '-y',
+      '-hide_banner',
+      '-loglevel', 'error',
+      // ⚠️ Only valid on an HTTP input, which this endpoint always has.
+      '-reconnect', '1',
+      '-reconnect_streamed', '1',
+      '-reconnect_delay_max', '30',
+      '-err_detect', 'ignore_err',
+      '-fflags', '+genpts+ignidx+igndts',
+      '-i', input_url,
+      '-map', '0:v:0',
+      '-map', '0:a:0?',
+      '-vf', `scale='min(${edge},iw)':'min(${edge},ih)':`
+        + `force_original_aspect_ratio=decrease:force_divisible_by=2`,
+      '-c:v', 'libx264',
+      '-preset', 'veryfast',
+      '-crf', '25',
+      '-maxrate', '3M',
+      '-bufsize', '6M',
+      '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      '-ac', '2',
+      // Re-encoding already applies the source's rotation; this states intent.
+      '-metadata:s:v:0', 'rotate=0',
+      '-movflags', '+faststart',
+      outFile,
+    ], outFile, FFMPEG_HTTP_TIMEOUT_MS)
+
+    const { size } = statSync(outFile)
+    if (size < 1024) {
+      cleanup(dir)
+      return jsonError(res, 500, `proxy came out empty (${size} bytes)`)
+    }
+    streamFile(res, outFile, 'video/mp4')
+    res.on('close', () => cleanup(dir))
+  } catch (err) {
+    cleanup(dir)
+    jsonError(res, 500, `ffmpeg /transcode-proxy failed: ${String(err?.message || err).slice(0, 1500)}`)
+  }
+}
+
 const routes = {
   '/transcode-h264': transcodeH264,
+  '/transcode-proxy': transcodeProxy,
   '/extract-thumb':  extractThumb,
   '/extract-thumb-mini-transcode': extractThumbMiniTranscode,
   '/extract-audio':  extractAudio,
@@ -914,7 +1006,7 @@ const routes = {
 // /health returns this so the operator can verify which version is live.
 // If you push a workers/ffmpeg change and /health still shows the old build,
 // deploy-workers.yml didn't actually deploy.
-const BUILD_VERSION = 'five-endpoints-2026-09-09'
+const BUILD_VERSION = 'proxy-transcode-2026-11-05'
 
 const SERVER_BOOT_AT = Date.now()
 

@@ -36,7 +36,7 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import type { D1Database, R2Bucket, Ai, Fetcher } from '@cloudflare/workers-types'
 import { runWhisper } from '../../../src/lib/whisper'
-import { TRANSCODE_MAX_BYTES } from '../../../src/lib/pipeline-status'
+import { PROXY_LONG_EDGE } from '../../../src/lib/pipeline-status'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
 
@@ -104,7 +104,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       const row = await this.env.DB.prepare(
         `SELECT id, operator_id, r2_key, original_filename, mime_type, recorded_at,
                 transcoded_r2_key, thumbnail_url, thumbnail_r2_key, transcript_text, pipeline_status,
-                audio_chunks_json, file_size_bytes
+                audio_chunks_json
            FROM vlogs WHERE id = ? AND operator_id = ?`,
       ).bind(vlog_id, operator_id).first<{
         id: string
@@ -113,8 +113,6 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         original_filename: string
         mime_type: string
         recorded_at: string | null
-        /** ⚠️ Read by the transcode step only — see `TRANSCODE_MAX_BYTES`. */
-        file_size_bytes: number | null
         transcoded_r2_key: string | null
         thumbnail_url: string | null
         thumbnail_r2_key: string | null
@@ -380,43 +378,42 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // the vlog detail page; the existing thumbnail + transcript remain
     // intact.
     let transcodedKey = vlog.transcoded_r2_key
-    // ⚠️ 5 Nov — a recording past `TRANSCODE_MAX_BYTES` skips this outright
-    // rather than spending three retries and thirty minutes of woken container
-    // on an encode that cannot finish. The step is soft, so the recording still
-    // completes; what is lost is browser playback of an HEVC original, and that
-    // is recorded beside the constant rather than left to be rediscovered.
-    const tooBigToTranscode =
-      typeof vlog.file_size_bytes === 'number' && vlog.file_size_bytes > TRANSCODE_MAX_BYTES
-    if (tooBigToTranscode) {
-      ;(outcomes as any)['transcode-h264'] = {
-        ok: false,
-        status: 'skipped',
-        reason: 'too_large',
-        bytes: vlog.file_size_bytes,
-        limit: TRANSCODE_MAX_BYTES,
-      }
-    }
-    if (isVideo && !transcodedKey && !isReExtract && !tooBigToTranscode) {
+    if (isVideo && !transcodedKey && !isReExtract) {
       await step.do('mark-transcoding', async () => reportStatus('transcoding'))
 
       transcodedKey = await softStep(
         'transcode-h264',
-        { retries: { limit: 3, delay: '30 seconds', backoff: 'exponential' }, timeout: '10 minutes' },
+        // ⚠️ 5 Nov — `/transcode-proxy`, not `/transcode-h264`. The playable
+        // copy is a DOWNSCALE of the master read over HTTP, so a recording of
+        // any size can have one; the old endpoint needed the whole file on the
+        // container's disk and re-encoded it at its own resolution. The
+        // timeout follows, because the bound is now on holding a container
+        // awake rather than on an encode that could never finish.
+        { retries: { limit: 3, delay: '30 seconds', backoff: 'exponential' }, timeout: '40 minutes' },
         async () => {
-          const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
-          const ffmpegResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/transcode-h264', {
+          // Long enough to outlive the encode, which range-reads it throughout.
+          const inputUrl = await presignR2Get(this.env, vlog.r2_key, 6 * 3600)
+          const ffmpegResp = await this.env.FFMPEG.fetch('https://ffmpeg.neolog.internal/transcode-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ input_url: inputUrl }),
+            body: JSON.stringify({ input_url: inputUrl, long_edge: PROXY_LONG_EDGE }),
           })
           if (!ffmpegResp.ok) {
             const err = await ffmpegResp.text()
-            throw new Error(`ffmpeg transcode failed (${ffmpegResp.status}): ${err.slice(0, 500)}`)
+            throw new Error(`ffmpeg proxy transcode failed (${ffmpegResp.status}): ${err.slice(0, 500)}`)
           }
           const key = `${operator_id}/transcoded/${vlog_id}.mp4`
-          await this.env.VIDEOS.put(key, ffmpegResp.body!, {
+          // Streamed, so the output has no Worker-memory ceiling.
+          const declared = Number(ffmpegResp.headers.get('content-length') || '0')
+          const put = await this.env.VIDEOS.put(key, ffmpegResp.body!, {
             httpMetadata: { contentType: 'video/mp4' },
           })
+          // ⚠️ A stream that ends early still stores. See the same check in
+          // the DO's `stepTranscode`.
+          const stored = (put as any)?.size ?? 0
+          if (declared > 0 && stored !== declared) {
+            throw new Error(`proxy was cut short: stored ${stored} of ${declared} bytes`)
+          }
           await this.env.DB.prepare(
             `UPDATE vlogs SET transcoded_r2_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
           ).bind(key, vlog_id).run()

@@ -20,7 +20,26 @@ account_id = "eda2e9bbd9acc42699027cfdcb50f998"
 class_name = "FfmpegContainer"
 image = "./Dockerfile"
 max_instances = 5
-instance_type = "standard-1"
+# ⚠️ 5 Nov — standard-4 (4 vCPU / 12 GiB / 20 GB disk) rather than
+# standard-1 (1/2 vCPU / 4 GiB / 8 GB). The operator asked for uploads of any
+# size to be as dependable as YouTube, and the only part of that which is
+# genuinely bought rather than designed is encode TIME: /transcode-proxy
+# downscales a master to 1280 on its long side, which is a fraction of the
+# work a full-resolution re-encode was, but 4K HEVC still has to be DECODED
+# and a half vCPU cannot do that faster than real time.
+#
+# What this costs: memory and disk bill on the instance's PROVISIONED size for
+# every second it is awake, and CPU bills only on actual use. So the change is
+# about a dime an hour of wakefulness plus the CPU the encodes burn, and the
+# Workers Paid plan includes 25 GiB-hours of memory and 375 vCPU-minutes a
+# month before any of it is charged. Compared against a per-minute forever fee
+# for keeping the library in a hosted video product, this is the cheap side.
+#
+# ⚠️ It applies to every endpoint, thumbnails and audio included, because
+# one container class serves all of them. That is deliberate: a second class
+# for the heavy work would bound the cost more tightly and costs a Durable
+# Object migration on a live pipeline, which is not worth it at a dime an hour.
+instance_type = "standard-4"
 # Containers shut down after this many seconds of inactivity (60s default).
 # ffmpeg jobs run shorter than that; bump if you see cold-start churn.
 # instance_idle_timeout_ms = 60000
