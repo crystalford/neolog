@@ -3437,6 +3437,72 @@ first — the same distinction the deletion script failed to make.
 
 ---
 
+### ⚠️ 5 Nov — the deploy had been failing since 21 Oct and nothing said so
+
+The operator pasted a build error. It was not the error that mattered; the
+dates were.
+
+```
+ERROR Next.js version 15.5.24 is not supported by the Next.js team.
+Major versions are supported for 2 years from their release date.
+```
+
+**Next 15 was released 2024-10-21. Two years is 2026-10-21.**
+`@opennextjs/cloudflare` checks that against the CLOCK at build time and
+exits 1. ⚠️ **Nothing in this repo changed — time passed.** The pinned
+version in the lockfile (1.20.6) has always carried the gate; it simply
+started returning false.
+
+⚠️ **The last successful deploy was 23 September.** Every push from 4–5 Nov
+failed on this: six commits, the entire uploader rebuild — one uploader
+resumable, the ten-gigabyte pass, the proxy transcode, upload in the nav —
+**none of it ever reached the site.** The operator spent two days reporting
+that uploads failed and that he could not find the upload page, and both
+were true of the code he was running, which was six weeks old. `/upload` did
+not exist on the live site. He was still on the composer's single-PUT path,
+which is exactly the path the rebuild existed to delete.
+
+**The tourniquet:** `--dangerouslyUseUnsupportedNextVersion`, on every
+command that builds (`deploy.yml`, `bootstrap-cloudflare.yml`, and the two
+`package.json` scripts). It turns the error into a warning. ⚠️ It is not the
+fix — it means running a Next that Vercel no longer patches. **The fix is
+Next 16** (released 2025-10-21, window open to 2027-10-21), and it is a
+major upgrade that deserves the same two-pass, verified-live treatment the
+14 → 15 migration got.
+
+⚠️ **Why it was invisible for six weeks, which is the part worth keeping.**
+`typecheck.yml` ran `next build` on every push and went green every time.
+The deploy ran `opennextjs-cloudflare build` and died. **The thing that broke
+lives in the OpenNext wrapper, not in Next**, so the check and the deploy
+were building different things and only one of them was the one that ships.
+My own pre-push routine had the identical hole: I ran `next build`, saw exit
+0, and reported the deploy as triggered.
+
+**So the deploy's real command runs in CI now**, as its own step in
+`typecheck.yml`, and it is in the local list run before every push. A build
+that cannot deploy fails the check that claims the build is fine. ⚠️ The
+general rule, which this repo keeps re-learning in new costumes: **a check
+is only worth its green if it runs the same command the thing it guards
+runs.** `check-sql-columns` exists because `tsc` was green on a wrong column;
+`tsconfig.workers.json` exists because the root `tsc` never looked at
+`workers/`; this exists because `next build` was never what shipped.
+
+⚠️ **And a red Actions run is not a notification.** Six weeks of failures sat
+in the Actions tab, correctly reported, and the operator found them only by
+opening it for an unrelated reason. He has no terminal and does not watch CI.
+**When I say "pushed, the deploy is running", that is a claim I have not
+checked** — the honest version is to read the run's conclusion before saying
+anything is live, which `mcp__github__actions_list` does in one call.
+
+⚠️ **The Cloudflare Pages check in that screenshot is a different thing and
+is noise.** `Cloudflare Workers and Pages / Cloudflare Pages — Build failed`
+is a leftover Pages project still attached to this repo from before the
+19 Sep migration to Workers. It builds on every push, fails, and has nothing
+to do with the live site. Disconnecting it is a dashboard action (Workers &
+Pages → the old Pages project → Settings → disconnect the Git integration);
+it cannot be done from a session, and until it is, every commit will show one
+red check that means nothing.
+
 ### ⚠️ A 404 from a probe during a deploy is not a missing route
 
 The backfill job came back **HTTP 404 with Next's own not-found page**, on

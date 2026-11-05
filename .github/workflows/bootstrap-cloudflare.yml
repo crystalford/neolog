@@ -427,7 +427,21 @@ jobs:
           # The OpenNext Cloudflare adapter builds the Next.js app to a
           # Worker-with-static-assets bundle (.open-next/), which
           # `wrangler deploy` then ships, reading wrangler.toml natively.
-          npx opennextjs-cloudflare build
+          # ⚠️ 5 Nov — `--dangerouslyUseUnsupportedNextVersion`, and it is
+          # load-bearing. Next 15 was released 2024-10-21 and Vercel supports a
+          # major for two years, so its window closed 2026-10-21 and
+          # @opennextjs/cloudflare turns that into a HARD BUILD ERROR by
+          # checking the clock. Nothing in this repo changed; time passed.
+          #
+          # ⚠️ EVERY DEPLOY FROM 2026-10-21 TO 2026-11-05 FAILED ON THIS AND
+          # NOBODY NOTICED. The last good one was 23 Sep. Six commits of
+          # uploader work sat unshipped while the operator used the old code
+          # and reported it failing.
+          #
+          # This flag is a tourniquet, not the fix. The fix is Next 16 (window
+          # open to 2027-10-21), which is its own careful pass. Until then this
+          # runs a Next that Vercel no longer patches.
+          npx opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
           npx wrangler deploy
 
       - name: Summary

@@ -298,3 +298,24 @@ jobs:
           # Stub values so build doesn't bail looking for real ones — type-check
           # only, not a real deploy.
           NEXT_PUBLIC_DEPLOY_ENV: ci
+
+      # ⚠️ 5 Nov — THE DEPLOY'S OWN BUILD, run here, and this exists because
+      # its absence cost six weeks.
+      #
+      # `next build` above passed on every one of those commits. The deploy
+      # still failed, because the thing that broke lives in the OpenNext
+      # WRAPPER and not in Next: it refuses a Next major outside Vercel's
+      # two-year support window, decided against the clock at build time. Next
+      # 15's window closed 2026-10-21 and every deploy after that died, while
+      # this workflow stayed green and said the build was fine.
+      #
+      # So "the build passes" meant the wrong build. The deploy's real command
+      # runs here now, which is also the command I run before pushing — the
+      # gap was that my local check and CI both measured `next build` while
+      # the deploy measured something else.
+      #
+      # It does not deploy: `build` only writes `.open-next/worker.js`.
+      - name: The deploy's own build (what actually ships)
+        run: pnpm exec opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion
+        env:
+          NEXT_PUBLIC_DEPLOY_ENV: ci
