@@ -994,6 +994,77 @@ closed laptop, but **nothing here has been exercised end to end at that size**
 arithmetic and the unit tests are what stand behind this, not a real 10 GB
 file.
 
+### ⚠️ 5 Nov — "i have files over 10 gigs", so the transcode is skipped rather than failed
+
+The answer above ended by naming `/transcode-h264` as the one step a file that
+size loses. He has those files, so that sentence is now the live case rather
+than a footnote, and leaving it as *"it will refuse it"* was not good enough:
+**refusing and skipping are different events, and the one that was happening
+cost money.**
+
+A recording past the limit still went through the whole attempt — presign, a
+held `FFmpegGate` slot, a woken container, a download that fails at 4 GB —
+then the DO's `MAX_RESTARTS` of 2 did it twice more. Ten minutes of a woken
+instance per try, per file, on an encode that cannot finish, with a `failed`
+event at the end of it. **Container memory and disk bill for every second an
+instance is alive**, which this file already records as the shape of the
+operator's bill.
+
+**Four things make it impossible at that size, and all four predate today:**
+
+- the container writes its input to local disk, and `downloadToTmp` refuses
+  past 4 GB because `standard-1`'s disk is smaller than that plus an output;
+- ⚠️ **two of the three callers read the finished MP4 into a WORKER** with
+  `arrayBuffer()` before putting it in R2 — `stepTranscode` and
+  `/api/v2/admin/transcode-one` — and a Worker has ~128 MB of memory, so for
+  those two the OUTPUT has always had to be small. **That is a separate
+  ceiling on a different quantity, it was written down nowhere, and the skip
+  does not fix it.** The legacy workflow streams `ffmpegResp.body` straight
+  into R2 and does not have it — which is the shape the other two should take
+  if that ceiling is ever worth lifting;
+- it is a full-resolution `libx264 -crf 23` encode, and 4K on a half-vCPU
+  instance is hours against a ten-minute abort in the DO and a twenty-minute
+  kill in the container;
+- the cost above.
+
+So `TRANSCODE_MAX_BYTES` lives in **`src/lib/pipeline-status.ts`**, and the
+reason it lives *there* is that file's entire purpose: it exists because five
+files each held their own copy of one pipeline fact and two were short. ⚠️ A
+fourth opinion was already in the repo and nobody had noticed —
+`/api/v2/admin/transcode-backfill` capped at **1500 MB** by default and
+reported `oversized_skipped`. That one **stays, and stays narrower**, because
+it answers a different question: how much work to queue when dispatching four
+hundred recordings at once, not whether an encode can succeed. It is clamped
+so a request can ask for less and never for more — without the clamp,
+`max_size_mb: 99999` queues four hundred recordings that `stepTranscode`
+skips on arrival and reports them back as *dispatched*.
+
+⚠️ **The check happens before the gate is acquired and before the original is
+presigned**, and the test asserts that ordering. Checking it after the gate
+would still hold a slot and still bill for the instance, which is half the
+reason the skip exists.
+
+**And the skip says what it costs.** `transcodeRefusal()` returns a sentence,
+not a code, because Settings' *won't play* is a door he presses — and the
+answer it used to give for one of these files was a 500 with ffmpeg's stderr
+in it, several minutes later. `transcoded_r2_key` stays null, so `/vlog/[id]`
+plays the ORIGINAL, and **Chrome on Windows may not decode an HEVC one.**
+That is a real gap, stated rather than papered over: the words, the still and
+the headline are unaffected, and the file itself is untouched.
+
+`scripts/test/pipeline-status.mjs` — 25 assertions, in CI, each new one
+proved by putting its bug back: a caller re-declaring the number, the skip
+moved after the gate, the refusal reduced to a status code, and the
+backfill's clamp removed.
+
+⚠️ **What is NOT solved:** a >4 GB HEVC recording has no browser-playable
+copy, and the honest reason is not the disk limit — it is that re-encoding
+4K on a half-vCPU container was never going to work and a 10 GB file is a bad
+thing to stream from R2 anyway. If watching these in the browser matters, the
+answer is a *downscaled* proxy (720p, a bitrate cap) rather than a
+full-resolution re-encode, and that is a new decision with a container-time
+bill attached, so it is his to make.
+
 **What went with `CapturePanel`, and why:** browser-side audio chunking
 (`browser-audio.ts` and `/api/v2/upload/audio-chunk-presign`) — the
 container's `/extract-audio` does this in the pipeline, and the browser

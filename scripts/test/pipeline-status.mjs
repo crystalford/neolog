@@ -133,5 +133,69 @@ for (const f of [
     /import \{ IN_FLIGHT_STATUSES \}/.test(code) && !/OCCUPIED_STATUSES/.test(code))
 }
 
+// ── The transcode ceiling, which is the same lesson on a number ─────────
+// ⚠️ 5 Nov. Three files call `/transcode-h264`, and a recording past this
+// size cannot be transcoded by any of them. One copy of the number, for the
+// reason this whole file exists: five copies of one pipeline fact, two short,
+// and every check in the repo green.
+const TRANSCODE_CALLERS = [
+  'workers/pipeline/src/index.ts',
+  'workers/process-upload/src/workflow.ts',
+  'src/app/api/v2/admin/transcode-one/route.ts',
+  // ⚠️ The backfill does not call ffmpeg itself — it dispatches through the
+  // DO — but it had a FOURTH opinion about how big is too big (1500 MB), and
+  // that is exactly the shape this file exists to stop. It keeps its own,
+  // NARROWER number because it answers a different question (how much work to
+  // queue at once), and it is clamped so it can never ask for more than the
+  // encode can do.
+  'src/app/api/v2/admin/transcode-backfill/route.ts',
+]
+
+{
+  const lib = readFileSync('src/lib/pipeline-status.ts', 'utf8')
+  ok('the transcode ceiling is declared in the shared file',
+    /export const TRANSCODE_MAX_BYTES = 4 \* 1024 \* 1024 \* 1024/.test(lib))
+  ok('and the refusal is a sentence, not a status code',
+    /export function transcodeRefusal/.test(lib) && lib.includes('kept untouched'))
+}
+
+// Every caller takes it from there, and none re-derives it.
+const ceilingCopies = []
+for (const f of TRANSCODE_CALLERS) {
+  const code = readFileSync(f, 'utf8')
+  ok(`${f} imports the transcode ceiling`,
+    /import \{[^}]*TRANSCODE_MAX_BYTES[^}]*\} from '(?:@\/lib|[./]+src\/lib)\/pipeline-status'/.test(code))
+  const bare = code
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  // ⚠️ A caller that spells the number out again is the bug, whether or not
+  // it also imports the constant — that is how one of five copies goes short.
+  if (/(?:const|let)\s+\w*(?:MAX_BYTES|TRANSCODE_LIMIT|MAX_TRANSCODE)\w*\s*=/.test(bare)) {
+    ceilingCopies.push(`${f}: declares its own ceiling`)
+  }
+}
+check('and no caller declares its own', ceilingCopies, [])
+
+// ⚠️ The backfill's own cap may narrow, never widen. Without the clamp a
+// request for `max_size_mb: 99999` queues four hundred recordings that
+// `stepTranscode` skips on arrival, and reports them back as dispatched.
+{
+  const code = readFileSync('src/app/api/v2/admin/transcode-backfill/route.ts', 'utf8')
+  ok('the backfill clamps its own cap to the ceiling',
+    /Math\.min\(\s*maxSizeMb \* 1_000_000,\s*TRANSCODE_MAX_BYTES\s*\)/.test(code))
+}
+
+// ⚠️ The skip has to come BEFORE the container is woken. Checking it after
+// the gate is acquired would still hold a slot and bill for the instance,
+// which is half the reason the skip exists.
+{
+  const code = readFileSync('workers/pipeline/src/index.ts', 'utf8')
+  const step = code.slice(code.indexOf('private async stepTranscode'))
+  const guard = step.indexOf('TRANSCODE_MAX_BYTES')
+  const gate = step.indexOf('FFMPEG_GATE')
+  const presign = step.indexOf('presignR2Get')
+  ok('the size is checked before the gate is acquired', guard > -1 && guard < gate)
+  ok('and before the original is presigned', guard > -1 && guard < presign)
+}
+
 console.log(`\n  ${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

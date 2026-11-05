@@ -23,6 +23,7 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findMany } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
+import { TRANSCODE_MAX_BYTES } from '@/lib/pipeline-status'
 import type { D1Database } from '@cloudflare/workers-types'
 
 interface Env {
@@ -51,7 +52,16 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({})) as { max_size_mb?: number; limit?: number }
   const maxSizeMb = typeof body.max_size_mb === 'number' ? body.max_size_mb : 1500
   const limit = Math.min(Math.max(1, body.limit ?? 400), 400)
-  const maxBytes = maxSizeMb * 1_000_000
+  // ⚠️ 5 Nov — two different questions, and the narrower one stays.
+  // `max_size_mb` (1500 by default) is about HOW MUCH WORK TO QUEUE at once:
+  // this dispatches up to four hundred recordings, and a pile of large
+  // transcodes is a throughput decision, the same way `IN_FLIGHT_STATUSES`
+  // and `OCCUPIED_STATUSES` answer different questions about one column.
+  // `TRANSCODE_MAX_BYTES` is about whether the encode can succeed AT ALL.
+  // So the request may ask for less and never for more — raising it past the
+  // ceiling would queue work that `stepTranscode` skips on arrival and report
+  // it back to him as dispatched.
+  const maxBytes = Math.min(maxSizeMb * 1_000_000, TRANSCODE_MAX_BYTES)
 
   const db = getDb(env)
   const rows = await findMany<{ id: string; file_size_bytes: number | null }>(
@@ -107,6 +117,9 @@ export async function POST(req: NextRequest) {
     oversized_skipped: oversized,
     dispatch_failed: failed,
     errors,
-    note: 'Transcodes run async in the pipeline DOs. Poll runtime-state.has_transcoded for progress.',
+    size_ceiling_bytes: maxBytes,
+    note: 'Transcodes run async in the pipeline DOs. Poll runtime-state.has_transcoded for progress. '
+      + 'oversized_skipped counts recordings above size_ceiling_bytes — past TRANSCODE_MAX_BYTES the '
+      + 'encode cannot succeed at all, so those are never dispatched.',
   }, { headers: { 'Cache-Control': 'no-store' } })
 }

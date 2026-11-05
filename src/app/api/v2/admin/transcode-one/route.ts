@@ -22,6 +22,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getDb, findOne, run } from '@/lib/d1'
 import { requireOperator, UnauthenticatedError } from '@/lib/access'
 import { presignGetUrl } from '@/lib/r2'
+import { TRANSCODE_MAX_BYTES, transcodeRefusal } from '@/lib/pipeline-status'
 import type { D1Database, R2Bucket, Fetcher } from '@cloudflare/workers-types'
 
 interface Env {
@@ -60,9 +61,11 @@ export async function POST(req: NextRequest) {
     transcoded_r2_key: string | null
     mime_type: string | null
     original_filename: string | null
+    file_size_bytes: number | null
   }>(
     db,
-    `SELECT id, operator_id, r2_key, transcoded_r2_key, mime_type, original_filename
+    `SELECT id, operator_id, r2_key, transcoded_r2_key, mime_type, original_filename,
+            file_size_bytes
        FROM vlogs
       WHERE id = ? AND operator_id = ? AND deleted_at IS NULL`,
     body.vlog_id, operator.id,
@@ -76,6 +79,21 @@ export async function POST(req: NextRequest) {
       ok: true,
       skipped: 'already_transcoded',
       transcoded_r2_key: vlog.transcoded_r2_key,
+    })
+  }
+
+  // ⚠️ This is the door he presses when a recording will not play, so the
+  // answer has to be a sentence and not a 500 twenty minutes later. See
+  // `TRANSCODE_MAX_BYTES`: past it the encode cannot succeed, so saying why
+  // is the whole of what this route can usefully do.
+  const refusal = transcodeRefusal(vlog.file_size_bytes)
+  if (refusal) {
+    return NextResponse.json({
+      ok: true,
+      skipped: 'too_large',
+      bytes: vlog.file_size_bytes,
+      limit: TRANSCODE_MAX_BYTES,
+      says: refusal,
     })
   }
 

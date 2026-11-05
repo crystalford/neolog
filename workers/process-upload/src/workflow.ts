@@ -36,6 +36,7 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from 'cloudflare:workers'
 import type { D1Database, R2Bucket, Ai, Fetcher } from '@cloudflare/workers-types'
 import { runWhisper } from '../../../src/lib/whisper'
+import { TRANSCODE_MAX_BYTES } from '../../../src/lib/pipeline-status'
 import { ulid } from '../../../src/lib/ulid'
 import { putObject } from '../../../src/lib/r2'
 
@@ -103,7 +104,7 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
       const row = await this.env.DB.prepare(
         `SELECT id, operator_id, r2_key, original_filename, mime_type, recorded_at,
                 transcoded_r2_key, thumbnail_url, thumbnail_r2_key, transcript_text, pipeline_status,
-                audio_chunks_json
+                audio_chunks_json, file_size_bytes
            FROM vlogs WHERE id = ? AND operator_id = ?`,
       ).bind(vlog_id, operator_id).first<{
         id: string
@@ -112,6 +113,8 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
         original_filename: string
         mime_type: string
         recorded_at: string | null
+        /** ⚠️ Read by the transcode step only — see `TRANSCODE_MAX_BYTES`. */
+        file_size_bytes: number | null
         transcoded_r2_key: string | null
         thumbnail_url: string | null
         thumbnail_r2_key: string | null
@@ -377,7 +380,23 @@ export class ProcessUploadWorkflow extends WorkflowEntrypoint<Env, Params> {
     // the vlog detail page; the existing thumbnail + transcript remain
     // intact.
     let transcodedKey = vlog.transcoded_r2_key
-    if (isVideo && !transcodedKey && !isReExtract) {
+    // ⚠️ 5 Nov — a recording past `TRANSCODE_MAX_BYTES` skips this outright
+    // rather than spending three retries and thirty minutes of woken container
+    // on an encode that cannot finish. The step is soft, so the recording still
+    // completes; what is lost is browser playback of an HEVC original, and that
+    // is recorded beside the constant rather than left to be rediscovered.
+    const tooBigToTranscode =
+      typeof vlog.file_size_bytes === 'number' && vlog.file_size_bytes > TRANSCODE_MAX_BYTES
+    if (tooBigToTranscode) {
+      ;(outcomes as any)['transcode-h264'] = {
+        ok: false,
+        status: 'skipped',
+        reason: 'too_large',
+        bytes: vlog.file_size_bytes,
+        limit: TRANSCODE_MAX_BYTES,
+      }
+    }
+    if (isVideo && !transcodedKey && !isReExtract && !tooBigToTranscode) {
       await step.do('mark-transcoding', async () => reportStatus('transcoding'))
 
       transcodedKey = await softStep(

@@ -48,6 +48,7 @@ import type {
 
 import { runWhisper } from '../../../src/lib/whisper'
 import { ulid } from '../../../src/lib/ulid'
+import { TRANSCODE_MAX_BYTES } from '../../../src/lib/pipeline-status'
 
 export interface Env {
   DB: D1Database
@@ -467,6 +468,8 @@ interface VlogRow {
   operator_id: string
   r2_key: string
   mime_type: string
+  /** ⚠️ Read by `stepTranscode` only — see `TRANSCODE_MAX_BYTES`. */
+  file_size_bytes: number | null
   transcript_text: string | null
   audio_chunks_json: string | null
   thumbnail_r2_key: string | null
@@ -875,6 +878,19 @@ export class VlogPipelineDO {
       await this.recordEvent(vlog.id, 'transcode', 'skipped', 'already_transcoded', {})
       return
     }
+    // ⚠️ Not attempted rather than attempted and failed. See
+    // `TRANSCODE_MAX_BYTES` — at this size it cannot succeed, and the attempt
+    // costs a held gate slot and ten minutes of a woken container per
+    // restart, per file.
+    if (vlog.file_size_bytes !== null && vlog.file_size_bytes > TRANSCODE_MAX_BYTES) {
+      await this.recordEvent(vlog.id, 'transcode', 'skipped', 'too_large', {
+        bytes: vlog.file_size_bytes,
+        limit: TRANSCODE_MAX_BYTES,
+        reason: 'the container cannot hold a file this size on disk, and a full-resolution encode would not finish',
+        consequence: 'the original is played directly, which some browsers cannot decode',
+      })
+      return
+    }
 
     const inputUrl = await presignR2Get(this.env, vlog.r2_key, 3600)
 
@@ -1203,7 +1219,7 @@ export class VlogPipelineDO {
 
   private async loadVlog(vlog_id: string): Promise<VlogRow | null> {
     const row = await this.env.DB.prepare(
-      `SELECT id, operator_id, r2_key, mime_type, transcript_text,
+      `SELECT id, operator_id, r2_key, mime_type, file_size_bytes, transcript_text,
               audio_chunks_json, thumbnail_r2_key, transcoded_r2_key
          FROM vlogs WHERE id = ?`,
     ).bind(vlog_id).first<VlogRow>()
