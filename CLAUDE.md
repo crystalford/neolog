@@ -1147,8 +1147,31 @@ It could not be found because of three things, none of them the uploader:
   avatar dropdown was deleted on 8 Sep, so it was reachable from nothing
 - nothing on `/`, where he is when he has files, pointed at it
 
-So the label says *"Put recordings in"*, `/vlogs` is in the masthead, and
-the composer offers the uploader once four files are attached. ⚠️ **I was
+So the label said *"Put recordings in"*, `/vlogs` went in the masthead, and
+the composer offers the uploader once four files are attached.
+
+⚠️ **5 Nov — both halves of that came back, and the second one is the
+lesson.** He asked *"where is upload"*, then *"like is there a link"*, then
+*"why does it say 'put recordings in' that sounds so weird"*.
+
+**The link:** there was exactly one in the product, a button on `/vlogs`, and
+from the home page — where he stands when he has files — none at all. That is
+this entry's own third reason verbatim. The fix then was `/vlogs` in the
+masthead with the uploader ON it; on 4 Nov the uploader became its own page
+and the door became a button one level deeper, which is worse than the state
+that had already failed. **Moving a surface to its own route moves it further
+from him, and the link has to move with it** — a button on the page it used
+to live on is not the same door. `upload` is a fourth masthead entry now,
+which is a deviation from the package's three, recorded the same way `index`
+leaving was.
+
+**The label:** *"Put recordings in"* was written to stop *"Add a recording"*
+reading as one file, and it fixed that by saying something no one says out
+loud. ⚠️ **He went looking for the word "upload"** — that is the whole
+answer, and it was available the entire time. The button is **Upload
+recordings**, the page's H1 is **Upload**, the nav says **upload**, and the
+composer's over-200 MB refusal now names it the way the nav does. A label is
+a word he would use, not a phrase constructed to be unambiguous. ⚠️ **I was
 most of the way through writing a second uploader before reading
 `CapturePanel`.** `check-unreached-lib.mjs` is what stopped it: the new
 `upload-file.ts` had no importer, which is exactly the state it exists to
@@ -2685,8 +2708,12 @@ The `extraction_outcomes` column is the source of truth for "what worked, what f
 
 ## Surfaces — what actually shipped
 
-The masthead is **three entries — home · search · index** — because that is
-what `log.html` carries on every page of the design package. It grew to seven
+The masthead is **four entries — home · search · recordings · upload**. The
+design package carries three (home · search · index) on every one of its
+pages, and two deliberate deviations are recorded below: `index` came out
+20 Sep because it was a door onto a permanently blank room, and `upload` went
+in 5 Nov because he could not find it (see that entry — it is the 20 Sep bug
+returning). It grew to seven
 once, then to a four-entry consolidation with a health pill and a dropdown of
 destinations; all of that was the old product's dashboard. **An entry goes in
 the nav only if a page in the package puts it there.** Everything else is
@@ -2695,7 +2722,7 @@ reached from the page it belongs to: the log's footer, an entry's rail, a row.
 | Label | Route | What it is |
 |---|---|---|
 | **Log** | `/` | **Home — the log.** The composer on top (type, talk, drop files in; auto-grows from one line to a chapter; a `when` control for backdating with a precision — *that day / that month / that year* — so "2008 was a huge year" doesn't have to pretend to a day). Then the receipt: one line, one undo. Then search, the eight-way filter toolbar, the order toggle (*when it happened* / *when I logged it*), and the day-grouped feed. The rail carries the written-down bar (coverage by year — the door to thin years) and what arrived on its own. |
-| **Put recordings in** | `/upload` | **The uploader.** Choosing files starts them — no post step, no caption field, nothing to press afterwards. A row per file with its own bar and, when something goes wrong, the reason in words on the row. Multipart with lazily presigned parts and a resumable ledger (`src/lib/bulk-upload.ts`); re-add a file that stopped and only the missing parts go. Reached from `/vlogs`. |
+| **Upload** | `/upload` | **The uploader, in the masthead.** Choosing files starts them — no post step, no caption field, nothing to press afterwards. A row per file with its own bar and, when something goes wrong, the reason in words on the row. Multipart with lazily presigned parts and a resumable ledger (`src/lib/bulk-upload.ts`); re-add a file that stopped and only the missing parts go. In the nav, and also linked from `/vlogs`. |
 | **Now** | `/now` | The intake with nothing else on the screen — the signal-wave field, the slab, one hint after a few seconds in an empty field. No nav, no feed, no counts. Reached from *full screen* in the composer. |
 | **An entry** | `/entry/[id]` | One entry, whole: both dates and the distance between them, who wrote each line, the file at full size, the transcript. The rail is the corrections — wrong date (a year alone is a complete answer), wrong words, who can see it, bury/dig up. **The fix lives where the mistake is.** |
 | **Names and places** | `/pages` | Every name, place, project and subject on the log — each one a page. Banded into going-on-now / from-before / people / places; columns page · kind · span · entries · status. Status and span are derived on read so they cannot go stale against the counts. **A page is made when he names something** — `POST /api/v2/pages`. Seeding from what a model thought mattered is gone. |

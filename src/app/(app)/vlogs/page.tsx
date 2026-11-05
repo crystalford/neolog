@@ -145,7 +145,7 @@ export default function Recordings() {
             than a second copy of it. */}
         <div className="paste">
           <div className="bar">
-            <Link href="/upload"><button className="p">Put recordings in</button></Link>
+            <Link href="/upload"><button className="p">Upload recordings</button></Link>
             <input
               value={q}
               onChange={e => setQ(e.target.value)}

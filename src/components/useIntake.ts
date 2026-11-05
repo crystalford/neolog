@@ -166,7 +166,7 @@ function humanSize(n: number): string {
         if (item.file.size > BIG_FILE) {
           throw new Error(
             `${humanSize(item.file.size)} is too big to drop in here. `
-            + `Put it in on the uploads page — it goes in a piece at a time `
+            + `Use Upload in the nav — it goes in a piece at a time `
             + `and picks up where it left off if anything stops it.`,
           )
         }

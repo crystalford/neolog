@@ -47,10 +47,38 @@ import { usePathname } from 'next/navigation'
  * recordings, and the bulk uploader on them. That was reachable only from a
  * page reachable only from a dropdown that no longer exists.
  */
+/**
+ * ⚠️ 5 Nov — `upload` is a fourth entry, and it is here because he asked
+ * *"where is upload"* and then *"like is there a link"*.
+ *
+ * There was one link in the whole product: a button on `/vlogs`. From the
+ * home page — where he is standing when he has files — there was none.
+ *
+ * **This is the 20 Sep bug, returned.** That entry records the uploader being
+ * unreachable for three reasons, the third being *"nothing on `/`, where he
+ * is when he has files, pointed at it."* The fix then was to put `/vlogs` in
+ * the masthead with the uploader ON it. Then on 4 Nov the uploader became its
+ * own page, `/upload`, and the door became a button on `/vlogs` — one level
+ * deeper than the state that had already failed once.
+ *
+ * ⚠️ So the lesson from 20 Sep needs restating, because knowing it did not
+ * prevent it: **moving a surface to its own route moves it further from him,
+ * and the link has to move with it.** A button on the page it used to live on
+ * is not the same door.
+ *
+ * A fourth masthead entry is a deliberate deviation from the design package,
+ * which carries three. It is the same kind of deviation as `index` →
+ * `recordings` above and it is recorded for the same reason: the package is a
+ * starting point, and putting files in is the single most frequent thing this
+ * operator does with this product. Every video site has a persistent upload
+ * control in its header; he asked for this to be as close to one of those as
+ * possible, in those words.
+ */
 const NAV: { label: string; href: string; on: RegExp[] }[] = [
-  { label: 'home',       href: '/',      on: [/^\/$/, /^\/now/, /^\/entry\//, /^\/walk\//] },
+  { label: 'home',       href: '/',       on: [/^\/$/, /^\/now/, /^\/entry\//, /^\/walk\//] },
   { label: 'search',     href: '/search', on: [/^\/search/] },
-  { label: 'recordings', href: '/vlogs', on: [/^\/vlogs/, /^\/vlog\//] },
+  { label: 'recordings', href: '/vlogs',  on: [/^\/vlogs/, /^\/vlog\//] },
+  { label: 'upload',     href: '/upload', on: [/^\/upload/] },
 ]
 
 export function Masthead() {

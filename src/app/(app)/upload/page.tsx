@@ -239,7 +239,7 @@ export default function UploadPage() {
         </div>
 
         <div className="pghead">
-          <h1>Put recordings in</h1>
+          <h1>Upload</h1>
           <p className="lede">
             Choose them and they start. There is nothing to press afterwards,
             and nothing to type — each one is placed by its own clock and says
