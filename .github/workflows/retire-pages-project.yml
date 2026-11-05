@@ -72,6 +72,13 @@ jobs:
       - name: Diagnose — what Pages projects exist and what they claim
         run: |
           set -uo pipefail
+          # ⚠️ `say` writes to BOTH the job log and the rendered step summary.
+          # The first version wrote only to $GITHUB_STEP_SUMMARY, which renders
+          # in the browser and is invisible in the logs — so the one party who
+          # could act on the output could not read it. A diagnostic nobody can
+          # read is the shape this repo keeps finding (see the backfill job
+          # that piped its own error into jq and printed nothing).
+          say() { printf '%s\n' "$*"; printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
           api() {
             curl -sS -X "$1" \
               "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}$2" \
@@ -79,29 +86,29 @@ jobs:
               -H "Content-Type: application/json"
           }
 
-          echo "## Pages projects on this account" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          say "## Pages projects on this account"
+          say ""
 
           LIST=$(api GET "/pages/projects")
           if [ "$(echo "$LIST" | jq -r '.success')" != "true" ]; then
-            echo "Could not list Pages projects:" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "$LIST" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            say "Could not list Pages projects:"
+            say '```'
+            echo "$LIST" | head -c 1500 | tee -a "$GITHUB_STEP_SUMMARY"
+            say '```'
             echo "::error::Pages list failed — the token may lack Pages:Read."
             exit 1
           fi
 
           COUNT=$(echo "$LIST" | jq '.result | length')
-          echo "Found **$COUNT**." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          say "Found **$COUNT**."
+          say ""
+          say '```'
           # ⚠️ Every line of the jq program stays inside this block scalar.
           # A continuation starting at column 0 ends the YAML block and the
           # workflow stops parsing — which is how the first version of this
           # file failed before it ever ran.
-          echo "$LIST" | jq -r '.result[] | "name:  \(.name)", "  subdomain: \(.subdomain // "-")", "  domains:   \((.domains // []) | if length == 0 then "none" else join(", ") end)", "  git:       \(if .source then "\(.source.type // "?") \(.source.config.owner // "?")/\(.source.config.repo_name // "?") branch=\(.source.config.production_branch // "?")" else "NOT CONNECTED" end)", "  build cmd: \(.deployment_configs.production.build_config.build_command // "-")", "  created:   \(.created_on)", ""' >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$LIST" | jq -r '.result[] | "name:  \(.name)", "  subdomain: \(.subdomain // "-")", "  domains:   \((.domains // []) | if length == 0 then "none" else join(", ") end)", "  git:       \(if .source then "\(.source.type // "?") \(.source.config.owner // "?")/\(.source.config.repo_name // "?") branch=\(.source.config.production_branch // "?")" else "NOT CONNECTED" end)", "  build cmd: \(.deployment_configs.production.build_config.build_command // "-")", "  created:   \(.created_on)", ""' | tee -a "$GITHUB_STEP_SUMMARY"
+          say '```'
 
           # ⚠️ Say out loud whether the named project still claims a hostname.
           # Deleting one that does would take the domain with it, and that is
@@ -109,28 +116,30 @@ jobs:
           CLAIMED=$(echo "$LIST" | jq -r --arg p "$PROJECT" \
             '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
           if [ -n "$CLAIMED" ]; then
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "⚠️ **\`$PROJECT\` still claims:** \`$CLAIMED\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "Check these resolve via the Worker before deleting." >> "$GITHUB_STEP_SUMMARY"
+            say ""
+            say "⚠️ **\`$PROJECT\` still claims:** \`$CLAIMED\`"
+            say "Check these resolve via the Worker before deleting."
           fi
 
       - name: Where neolog.ai actually points
         run: |
           set -uo pipefail
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "## What is serving neolog.ai right now" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          say() { printf '%s\n' "$*"; printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
+          say ""
+          say "## What is serving neolog.ai right now"
+          say ""
           # A real request, not an API read of what something claims. If this
           # is served by the Worker then the Pages project is genuinely inert.
           CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://neolog.ai/ || echo "000")
-          echo "- \`GET https://neolog.ai/\` → HTTP **$CODE**" >> "$GITHUB_STEP_SUMMARY"
-          echo "  (a 302 to Cloudflare Access is the expected healthy answer —" >> "$GITHUB_STEP_SUMMARY"
-          echo "  the site is behind Access and nothing here is signed in)" >> "$GITHUB_STEP_SUMMARY"
+          say "- \`GET https://neolog.ai/\` → HTTP **$CODE**"
+          say "  (a 302 to Cloudflare Access is the expected healthy answer —"
+          say "  the site is behind Access and nothing here is signed in)"
 
       - name: Unlink the git connection
         if: ${{ inputs.action == 'unlink' }}
         run: |
           set -uo pipefail
+          say() { printf '%s\n' "$*"; printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
           # Clearing `source` is what stops Pages cloning this repo on every
           # push. The project and its history survive.
           RES=$(curl -sS -X PATCH \
@@ -138,20 +147,20 @@ jobs:
             -H "Authorization: Bearer ${CF_API_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"source": null}')
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          say ""
           if [ "$(echo "$RES" | jq -r '.success')" = "true" ]; then
             STILL=$(echo "$RES" | jq -r 'if .result.source then "still connected" else "disconnected" end')
-            echo "### Unlink: \`$STILL\`" >> "$GITHUB_STEP_SUMMARY"
+            say "### Unlink: \`$STILL\`"
             if [ "$STILL" != "disconnected" ]; then
-              echo "⚠️ The API accepted it and the project still reports a source." >> "$GITHUB_STEP_SUMMARY"
-              echo "Use \`delete\`, or disconnect in the dashboard." >> "$GITHUB_STEP_SUMMARY"
+              say "⚠️ The API accepted it and the project still reports a source."
+              say "Use \`delete\`, or disconnect in the dashboard."
               exit 1
             fi
           else
-            echo "### Unlink failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "$RES" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            say "### Unlink failed"
+            say '```'
+            echo "$RES" | head -c 1500 | tee -a "$GITHUB_STEP_SUMMARY"
+            say '```'
             echo "::error::Could not clear the git source. Try action: delete."
             exit 1
           fi
@@ -160,6 +169,7 @@ jobs:
         if: ${{ inputs.action == 'delete' }}
         run: |
           set -uo pipefail
+          say() { printf '%s\n' "$*"; printf '%s\n' "$*" >> "$GITHUB_STEP_SUMMARY"; }
           # ⚠️ Refuse if it still claims a hostname. The operator can override
           # by detaching the domain first — this will not race a live domain.
           LIST=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects" \
@@ -168,24 +178,24 @@ jobs:
             '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
           if [ -n "$CLAIMED" ]; then
             echo "::error::'$PROJECT' still claims $CLAIMED — refusing to delete."
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "### Delete refused" >> "$GITHUB_STEP_SUMMARY"
-            echo "\`$PROJECT\` still claims \`$CLAIMED\`. Detach that first." >> "$GITHUB_STEP_SUMMARY"
+            say ""
+            say "### Delete refused"
+            say "\`$PROJECT\` still claims \`$CLAIMED\`. Detach that first."
             exit 1
           fi
 
           RES=$(curl -sS -X DELETE \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
             -H "Authorization: Bearer ${CF_API_TOKEN}")
-          echo "" >> "$GITHUB_STEP_SUMMARY"
+          say ""
           if [ "$(echo "$RES" | jq -r '.success')" = "true" ]; then
-            echo "### Deleted \`$PROJECT\`" >> "$GITHUB_STEP_SUMMARY"
-            echo "No more Pages build on push. The red check should stop appearing." >> "$GITHUB_STEP_SUMMARY"
+            say "### Deleted \`$PROJECT\`"
+            say "No more Pages build on push. The red check should stop appearing."
           else
-            echo "### Delete failed" >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
-            echo "$RES" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
-            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            say "### Delete failed"
+            say '```'
+            echo "$RES" | head -c 1500 | tee -a "$GITHUB_STEP_SUMMARY"
+            say '```'
             echo "::error::Delete failed — the token may lack Pages:Edit."
             exit 1
           fi
