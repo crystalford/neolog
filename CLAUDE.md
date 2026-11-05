@@ -3494,14 +3494,42 @@ opening it for an unrelated reason. He has no terminal and does not watch CI.
 checked** — the honest version is to read the run's conclusion before saying
 anything is live, which `mcp__github__actions_list` does in one call.
 
-⚠️ **The Cloudflare Pages check in that screenshot is a different thing and
-is noise.** `Cloudflare Workers and Pages / Cloudflare Pages — Build failed`
-is a leftover Pages project still attached to this repo from before the
-19 Sep migration to Workers. It builds on every push, fails, and has nothing
-to do with the live site. Disconnecting it is a dashboard action (Workers &
-Pages → the old Pages project → Settings → disconnect the Git integration);
-it cannot be done from a session, and until it is, every commit will show one
-red check that means nothing.
+⚠️ **The Cloudflare Pages check is a different thing and is noise — and it
+nearly cost another round.** Shown the fixed deploy, the operator pasted the
+PAGES build log and said *"still failed"*. He was reading the right screen
+and the wrong build: the Actions deploy had succeeded, and what failed was a
+leftover Pages project from before the 19 Sep migration to Workers.
+
+**Three things in that log say Pages rather than Actions**, and they are the
+way to tell them apart next time: `Using v2 root directory strategy` and
+`/opt/buildhome/` (the Pages build environment); `Found wrangler.toml… Did
+you mean to use wrangler.toml to configure Pages?`; and, conclusively,
+**`Executing user command: npx @cloudflare/next-on-pages@1`** — the adapter
+this repo stopped using on 19 September. The Pages project still has that
+build command saved, so it clones the repo on every push, runs a dead
+adapter, and fails on a peer-dependency conflict in `wrangler@4.158`'s own
+types. It serves nothing: `neolog.ai` is a Workers Custom Domain.
+
+⚠️ **The noise is not harmless, and that is the reason to act on it rather
+than explain it away.** A permanent red check on every commit is precisely
+how six weeks of REAL deploy failures went unnoticed — **a tab full of red
+where one of the reds means something is a tab nobody reads.**
+
+**`.github/workflows/retire-pages-project.yml`** does it, and the shape is
+the point: ⚠️ I first told him to go and fix it in the Cloudflare dashboard,
+which contradicts this file's oldest operating rule — *the operator has no
+terminal, and a Cloudflare-side action that needs the account token is a
+`workflow_dispatch` workflow here*. `domain-cutover.yml` already set that
+precedent for exactly this kind of job. `diagnose` is read-only and runs on
+every action including `delete`; `unlink` clears the git source so the builds
+stop and the project survives; `delete` removes it and **refuses while it
+still claims a hostname**, because taking a live domain down with a cleanup
+is the failure `domain-cutover.yml` was written after.
+
+⚠️ Its first version did not parse: a multi-line `jq` program inside a
+`run: |` block had continuation lines at column 0, which ends the YAML block
+scalar. `python3 -c "yaml.safe_load(...)"` catches that in a second, and a
+workflow that cannot parse never runs at all — there is no failure to read.
 
 ### ⚠️ A 404 from a probe during a deploy is not a missing route
 

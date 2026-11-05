@@ -1,0 +1,191 @@
+name: Retire the dead Pages project
+
+# One-off, manual-only. Retires the Cloudflare PAGES project left behind by
+# the 19 Sep migration to Workers (see CLAUDE.md, that entry and 5 Nov).
+#
+# ⚠️ WHAT THIS IS ABOUT. Since the move to Workers, this repo still has a
+# Pages project wired to it. Every push makes Pages clone the repo and run
+# its own stored build command — which is still
+# `npx @cloudflare/next-on-pages@1`, the adapter this repo STOPPED USING on
+# 19 September. It fails on a peer-dependency conflict that has nothing to do
+# with this codebase, and posts a red `Cloudflare Workers and Pages /
+# Cloudflare Pages — Build failed` check on the commit.
+#
+# It serves no traffic: neolog.ai is a Workers Custom Domain on the `neolog`
+# Worker, cut over on 19 Sep and verified end to end. The Pages project is
+# pure noise.
+#
+# ⚠️ AND THE NOISE IS NOT HARMLESS. A permanent red check on every commit is
+# how six weeks of REAL deploy failures went unnoticed — a tab full of red
+# where one of the reds means something is a tab nobody reads. That is the
+# reason this is worth a workflow rather than being left alone.
+#
+# The operator has no terminal, so a Cloudflare-side action that needs the
+# account token is a `workflow_dispatch` workflow here, the same shape and
+# for the same reason as `domain-cutover.yml`.
+#
+#   diagnose  (default, READ-ONLY) — list every Pages project on the account,
+#             its build command and its git wiring, and show which domains it
+#             claims. Run this first and read it.
+#   unlink    — remove the git connection only. Builds stop; the project, its
+#              deployment history and any domain on it stay. Reversible by
+#              reconnecting in the dashboard.
+#   delete    — delete the Pages project outright. ⚠️ Irreversible, and it
+#              takes the project's deployment history with it. Only correct
+#              once `diagnose` shows it holds no domain you still want.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "diagnose (read-only), unlink (stop the builds), or delete (remove the project — irreversible)"
+        required: true
+        default: 'diagnose'
+        type: choice
+        options:
+          - diagnose
+          - unlink
+          - delete
+      project:
+        description: "Pages project name. Leave as-is unless diagnose shows a different one."
+        required: true
+        default: 'neolog'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CF_API_TOKEN:  ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  ACTION:        ${{ inputs.action }}
+  PROJECT:       ${{ inputs.project }}
+
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    steps:
+      # ⚠️ Always runs, for every action — including before a delete. The
+      # whole lesson of `domain-cutover.yml` is that a Cloudflare object's
+      # real state is not what you assume it is, and the destructive step
+      # should be written against what the account actually says.
+      - name: Diagnose — what Pages projects exist and what they claim
+        run: |
+          set -uo pipefail
+          api() {
+            curl -sS -X "$1" \
+              "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}$2" \
+              -H "Authorization: Bearer ${CF_API_TOKEN}" \
+              -H "Content-Type: application/json"
+          }
+
+          echo "## Pages projects on this account" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          LIST=$(api GET "/pages/projects")
+          if [ "$(echo "$LIST" | jq -r '.success')" != "true" ]; then
+            echo "Could not list Pages projects:" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$LIST" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Pages list failed — the token may lack Pages:Read."
+            exit 1
+          fi
+
+          COUNT=$(echo "$LIST" | jq '.result | length')
+          echo "Found **$COUNT**." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          # ⚠️ Every line of the jq program stays inside this block scalar.
+          # A continuation starting at column 0 ends the YAML block and the
+          # workflow stops parsing — which is how the first version of this
+          # file failed before it ever ran.
+          echo "$LIST" | jq -r '.result[] | "name:  \(.name)", "  subdomain: \(.subdomain // "-")", "  domains:   \((.domains // []) | if length == 0 then "none" else join(", ") end)", "  git:       \(if .source then "\(.source.type // "?") \(.source.config.owner // "?")/\(.source.config.repo_name // "?") branch=\(.source.config.production_branch // "?")" else "NOT CONNECTED" end)", "  build cmd: \(.deployment_configs.production.build_config.build_command // "-")", "  created:   \(.created_on)", ""' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          # ⚠️ Say out loud whether the named project still claims a hostname.
+          # Deleting one that does would take the domain with it, and that is
+          # the failure `domain-cutover.yml` was written after.
+          CLAIMED=$(echo "$LIST" | jq -r --arg p "$PROJECT" \
+            '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
+          if [ -n "$CLAIMED" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "⚠️ **\`$PROJECT\` still claims:** \`$CLAIMED\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "Check these resolve via the Worker before deleting." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Where neolog.ai actually points
+        run: |
+          set -uo pipefail
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## What is serving neolog.ai right now" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          # A real request, not an API read of what something claims. If this
+          # is served by the Worker then the Pages project is genuinely inert.
+          CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://neolog.ai/ || echo "000")
+          echo "- \`GET https://neolog.ai/\` → HTTP **$CODE**" >> "$GITHUB_STEP_SUMMARY"
+          echo "  (a 302 to Cloudflare Access is the expected healthy answer —" >> "$GITHUB_STEP_SUMMARY"
+          echo "  the site is behind Access and nothing here is signed in)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Unlink the git connection
+        if: ${{ inputs.action == 'unlink' }}
+        run: |
+          set -uo pipefail
+          # Clearing `source` is what stops Pages cloning this repo on every
+          # push. The project and its history survive.
+          RES=$(curl -sS -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"source": null}')
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(echo "$RES" | jq -r '.success')" = "true" ]; then
+            STILL=$(echo "$RES" | jq -r 'if .result.source then "still connected" else "disconnected" end')
+            echo "### Unlink: \`$STILL\`" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$STILL" != "disconnected" ]; then
+              echo "⚠️ The API accepted it and the project still reports a source." >> "$GITHUB_STEP_SUMMARY"
+              echo "Use \`delete\`, or disconnect in the dashboard." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "### Unlink failed" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$RES" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Could not clear the git source. Try action: delete."
+            exit 1
+          fi
+
+      - name: Delete the Pages project
+        if: ${{ inputs.action == 'delete' }}
+        run: |
+          set -uo pipefail
+          # ⚠️ Refuse if it still claims a hostname. The operator can override
+          # by detaching the domain first — this will not race a live domain.
+          LIST=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          CLAIMED=$(echo "$LIST" | jq -r --arg p "$PROJECT" \
+            '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
+          if [ -n "$CLAIMED" ]; then
+            echo "::error::'$PROJECT' still claims $CLAIMED — refusing to delete."
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "### Delete refused" >> "$GITHUB_STEP_SUMMARY"
+            echo "\`$PROJECT\` still claims \`$CLAIMED\`. Detach that first." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          RES=$(curl -sS -X DELETE \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}")
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$(echo "$RES" | jq -r '.success')" = "true" ]; then
+            echo "### Deleted \`$PROJECT\`" >> "$GITHUB_STEP_SUMMARY"
+            echo "No more Pages build on push. The red check should stop appearing." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "### Delete failed" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "$RES" | head -c 1500 >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::Delete failed — the token may lack Pages:Edit."
+            exit 1
+          fi
