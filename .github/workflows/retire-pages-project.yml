@@ -107,7 +107,7 @@ jobs:
           # A continuation starting at column 0 ends the YAML block and the
           # workflow stops parsing — which is how the first version of this
           # file failed before it ever ran.
-          echo "$LIST" | jq -r '.result[] | "name:  \(.name)", "  subdomain: \(.subdomain // "-")", "  domains:   \((.domains // []) | if length == 0 then "none" else join(", ") end)", "  git:       \(if .source then "\(.source.type // "?") \(.source.config.owner // "?")/\(.source.config.repo_name // "?") branch=\(.source.config.production_branch // "?")" else "NOT CONNECTED" end)", "  build cmd: \(.deployment_configs.production.build_config.build_command // "-")", "  created:   \(.created_on)", ""' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "$LIST" | jq -r '.result[] | "name:  \(.name)", "  subdomain: \(.subdomain // "-")", "  domains:   \((.domains // []) | if length == 0 then "none" else join(", ") end)", "  git:       \(if .source then "\(.source.type // "?") \(.source.config.owner // "?")/\(.source.config.repo_name // "?") branch=\(.source.config.production_branch // "?")" else "NOT CONNECTED" end)", "  build cmd: \(.deployment_configs.production.build_config.build_command // .build_config.build_command // "-")", "  created:   \(.created_on)", ""' | tee -a "$GITHUB_STEP_SUMMARY"
           say '```'
 
           # ⚠️ Say out loud whether the named project still claims a hostname.
@@ -174,8 +174,15 @@ jobs:
           # by detaching the domain first — this will not race a live domain.
           LIST=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects" \
             -H "Authorization: Bearer ${CF_API_TOKEN}")
+          # ⚠️ The project's OWN `<name>.pages.dev` does not count, and the
+          # first version of this guard did not know that — it refuses on any
+          # entry in `domains`, and Cloudflare puts the auto-assigned
+          # subdomain there for every project, so `delete` could never run.
+          # Found by actually running `diagnose` rather than assuming the
+          # shape. A real custom hostname is still a hard stop.
           CLAIMED=$(echo "$LIST" | jq -r --arg p "$PROJECT" \
-            '.result[] | select(.name == $p) | (.domains // []) | join(", ")')
+            '.result[] | select(.name == $p)
+             | [(.domains // [])[] | select(. != ($p + ".pages.dev"))] | join(", ")')
           if [ -n "$CLAIMED" ]; then
             echo "::error::'$PROJECT' still claims $CLAIMED — refusing to delete."
             say ""
