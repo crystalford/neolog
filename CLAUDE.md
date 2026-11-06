@@ -3526,10 +3526,40 @@ stop and the project survives; `delete` removes it and **refuses while it
 still claims a hostname**, because taking a live domain down with a cleanup
 is the failure `domain-cutover.yml` was written after.
 
-⚠️ Its first version did not parse: a multi-line `jq` program inside a
-`run: |` block had continuation lines at column 0, which ends the YAML block
-scalar. `python3 -c "yaml.safe_load(...)"` catches that in a second, and a
-workflow that cannot parse never runs at all — there is no failure to read.
+⚠️ **Four bugs in that one workflow, and every single one was in the
+CHECKING rather than the doing.** Worth keeping as a set, because the shape
+repeats: each one reported a confident failure about an action that had
+already worked, and each one sent me back to change code that was right.
+
+1. **It did not parse.** A multi-line `jq` program inside a `run: |` block
+   had continuation lines at column 0, which ends the YAML block scalar. ⚠️ A
+   workflow that cannot parse never runs, so there is no failure to read —
+   `python3 -c "yaml.safe_load(...)"` catches it in a second and is how these
+   are checked now.
+2. **It wrote only to `$GITHUB_STEP_SUMMARY`.** That renders in the browser
+   and is invisible in the job log, so the diagnostic reached the operator —
+   who has no reason to parse Cloudflare API shapes — and not me, who asked
+   for it. `say()` writes to both now. Same shape as the backfill job that
+   piped its own error into `jq` and printed nothing.
+3. **The delete guard could never have passed.** It refused on any entry in
+   `domains`, and Cloudflare auto-assigns `<name>.pages.dev` to every
+   project. It ignores the project's own subdomain now and still hard-stops
+   on a real custom hostname.
+4. ⚠️ **`jq`'s `//` treats `false` exactly like `null`.** `false // "absent"`
+   returns `"absent"` — so for a boolean field, **the one value that meant
+   success was the one value the check could not report.** It failed the
+   unlink twice while the config dump printed beside it said `false` both
+   times. `has()` is the only way to tell absent from false.
+
+**The write itself was correct from the second attempt onward.** `PATCH
+{"source": null}` is accepted and ignored by the Pages API — that one was
+real, and it is why the step re-reads and compares instead of trusting the
+response. Everything after it was the verification lying.
+
+⚠️ **The rule: a check that cannot express success is worse than no check.**
+It does not merely fail to help — it actively sends you back to change
+working code, which is how a correct fix gets reverted. When an assertion
+disagrees with a raw dump printed beside it, the assertion is the suspect.
 
 ### ⚠️ A 404 from a probe during a deploy is not a missing route
 

@@ -191,16 +191,31 @@ jobs:
           AFTER=$(curl -sS \
             "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/${PROJECT}" \
             -H "Authorization: Bearer ${CF_API_TOKEN}")
-          # ⚠️ `deployments_enabled` is NOT a field Pages returns — asserting
-          # on it reported "absent" and failed a write that had partly
-          # worked. The one that governs a build on push to the production
-          # branch is `production_deployments_enabled`.
-          ON=$(echo "$AFTER" | jq -r '.result.source.config.production_deployments_enabled // "absent"')
-          PRE=$(echo "$AFTER" | jq -r '.result.source.config.preview_deployment_setting // "absent"')
+          # ⚠️ `jq`'s `//` TREATS `false` LIKE `null`. `false // "absent"`
+          # returns "absent", so the one value that means success here — the
+          # field being `false` — was the one value the check could never
+          # report. It failed a write that had already worked, twice, and the
+          # config dump beside it said `false` the whole time.
+          #
+          # `has()` is the only way to tell absent from false. Three bugs in a
+          # row in this step were all in the VERIFICATION and none in the
+          # action: `source: null` (accepted, ignored), `deployments_enabled`
+          # (read with the same `//` gotcha), and this. A check that cannot
+          # express success is worse than no check — it sends you back to
+          # change code that was already right.
+          cfg() {
+            echo "$AFTER" | jq -r --arg k "$1" \
+              'if (.result.source.config | has($k))
+               then (.result.source.config[$k] | tostring) else "absent" end'
+          }
+          ON=$(cfg production_deployments_enabled)
+          ALL=$(cfg deployments_enabled)
+          PRE=$(cfg preview_deployment_setting)
 
           say ""
           say "### Unlink"
           say ""
+          say "- \`deployments_enabled\` is now **$ALL**"
           say "- \`production_deployments_enabled\` is now **$ON**"
           say "- \`preview_deployment_setting\` is now **$PRE**"
           say ""
@@ -209,7 +224,7 @@ jobs:
           echo "$AFTER" | jq '.result.source.config' | tee -a "$GITHUB_STEP_SUMMARY"
           say '```'
 
-          if [ "$ON" = "false" ]; then
+          if [ "$ON" = "false" ] && [ "$ALL" = "false" ]; then
             say ""
             say "Automatic builds are off. The next push should produce no"
             say "Cloudflare Pages check at all. The project, its history and"
